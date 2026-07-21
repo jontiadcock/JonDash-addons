@@ -26,6 +26,22 @@ export default async function TemplatePage({ ctx, path }: ModulePageProps) {
         </p>
       </section>
 
+      {/* This module exists to be read, so it says so on its own page. Delete this
+          section first when you copy it. */}
+      <section className="card p-4 text-sm">
+        <p className="font-medium">This is a template for developers</p>
+        <p className="mt-1" style={{ color: "var(--muted)" }}>
+          It is a real, working module kept as small as possible, so you can copy it and build your
+          own. Nothing here is needed by JonDash — uninstalling removes it completely.
+        </p>
+        <p className="mt-2" style={{ color: "var(--muted)" }}>
+          Its files are in <code>modules/template/</code> inside your JonDash folder. Read{" "}
+          <code>MODULE.md</code> there for the full guide — what each file does, how to rename it, and
+          what the installer will refuse. If you would rather have an AI write your module, paste the
+          contents of <code>AI-PROMPT.md</code> into it and describe what you want.
+        </p>
+      </section>
+
       {/* A plain form pointed at a Server Action — no client JavaScript involved. */}
       <form action={addItemAction} className="flex gap-2">
         <input

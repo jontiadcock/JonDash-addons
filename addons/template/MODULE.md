@@ -1,14 +1,22 @@
-# Module template
+# Module template (for developers)
 
 A complete, working JonDash module with one of everything, meant to be copied. Install it to see the
 parts working together, then copy the folder and make it yours.
+
+**This module is only useful if you are building a module.** It adds a small demonstration widget and
+page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
 - **Version:** 0.0.1-beta.1
 - **Minimum JonDash version:** 1.4.0-beta.3
 - **Permissions requested:** none
+- **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
-  a page, and add/delete forms that write through a Server Action.
+  a page, and add/delete forms that write through a Server Action
+
+**In a hurry?** [`AI-PROMPT.md`](AI-PROMPT.md) next to this file is a self-contained prompt you can
+paste into an AI agent, along with a description of what you want, to have it write a valid module for
+you. It needs no other context.
 
 ---
 
@@ -26,6 +34,7 @@ parts working together, then copy the folder and make it yours.
 | `lib/text.ts` | no | Pure helpers, easy to test. |
 | `lib/constants.ts` | no | The module id in one place. |
 | `tests/text.test.ts` | no | Example test. Ships with the module — see the warning inside it. |
+| `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write your module. Delete it from your copy. |
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.

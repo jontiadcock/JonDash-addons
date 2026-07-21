@@ -19,9 +19,9 @@ const template: ModuleDefinition = {
   id: MODULE_ID,
 
   /** Shown in the admin list and when browsing a source. Be honest and specific. */
-  name: "Module template",
+  name: "Module template (for developers)",
   description:
-    "A minimal working module to copy when building your own: one setting, its own table, a dashboard widget, a page, and a form that saves safely.",
+    "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
 
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
   version: "0.0.1-beta.1",
