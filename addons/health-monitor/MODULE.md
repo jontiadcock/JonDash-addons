@@ -5,7 +5,7 @@ schedule, keeps a history, and sends an alert when something goes down and again
 
 - **Module id:** `health-monitor`
 - **Version:** 1.0.0-beta.1 (unpublished — see [Status](#status))
-- **Minimum JonDash version:** 1.4.0
+- **Minimum JonDash version:** 1.4.0-beta.3
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Visibility:** admins only (`adminOnly: true`)
 
@@ -18,11 +18,12 @@ schedule, keeps a history, and sends an alert when something goes down and again
 | Type   | What it does                                                                       |
 | ------ | ---------------------------------------------------------------------------------- |
 | `http` | Requests a URL and records the status code plus a timing breakdown: DNS, TCP connect, TLS handshake, time to first byte, total. Follows redirects and judges the destination; asserts an expected status or range. |
-| `tcp`  | Opens a TCP connection to a host and port and records the connect time. For databases, SSH, game servers — anything that isn't HTTP, and the way to ask whether a host is alive. |
+| `tcp`  | Opens a TCP connection to a host and port and records the connect time. For databases, SSH, game servers — anything that isn't HTTP. |
+| `ping` | ICMP round-trip time. For a device that answers nothing else — a router, a switch, a printer. |
 | `dns`  | Resolves a name within a time limit. By default it resolves the way an application would — through the operating system — so a Pi-hole, a VPN or a hosts entry is honoured. Ask for a specific `recordType` or `expectValue` and it queries the configured DNS server directly instead. |
 | `tls`  | Reads the certificate a host presents and reports days until expiry, issuer and hostname match. |
 
-There is deliberately **no ICMP ping** — see [No ping](#no-ping).
+Ping is performed by JonDash itself rather than by this module — see [Ping](#ping).
 
 ### The engine
 
@@ -158,15 +159,15 @@ for a self-hosted dashboard. The safeguards are the ones that matter for an admi
 `http` and `https` schemes only, a hard timeout on every check, a cap of five redirects, no cookies or
 credentials sent, no `file://`, and responses are read up to a size cap and never executed or rendered.
 
-### No ping
+### Ping
 
-ICMP needs either a raw socket — elevated privileges plus a native dependency — or the operating
-system's `ping` binary. Modules may not spawn processes (`child_process` is refused at install), and
-adding a native dependency is out, so **this module cannot do ICMP** and does not pretend to.
+ICMP needs the operating system's `ping` binary, and modules may not spawn processes — so JonDash
+performs the ping itself and this module only asks for the result. The host validation and the
+fixed argument list that make that safe live once, in the app, instead of being copied into every
+module that wants to ping something.
 
-Use a `tcp` check against a port the host answers on; for most things worth monitoring, one exists.
-Real ICMP would have to be offered by the framework as a capability, where the hardening lives in
-trusted code rather than in every module that wants it.
+A ping monitor is `up` when a reply comes back, `down` when nothing does, and reports a failed check
+(rather than crashing) if the app refuses the host.
 
 ### Hostile input
 
@@ -193,20 +194,17 @@ engine do not change.
 
 ## Status
 
-Two features are specified, built up to the boundary, and **inactive** until the core app ships the
-capability each needs. Both were accepted and are being built:
+Everything described above works. One thing is deliberately not built yet:
 
-1. **Email alerts** need `ctx.email.send(…)`. The email channel is implemented and starts working the
-   moment that exists; until then it reports itself unavailable rather than failing silently, and
-   webhook channels are unaffected.
-2. **Add/edit screens** need `moduleAction(moduleId, fn)`. Until then, configuration is the JSON
-   setting described in [Configuring](#configuring).
-
-Also pending: the poller currently captures a request context, which misattributes background audit
-entries; it moves to `systemModuleContext("health-monitor")` as soon as that lands.
+- **Add/edit screens.** Monitors and channels are configured through the JSON setting described in
+  [Configuring](#configuring). The framework now provides what a proper form needs, so this is the
+  next release's work, not a limitation of the design — the tables and the check engine don't change.
 
 Deferred, and shaped by the rules for unauthenticated routes (own permission, off by default, its own
 rate limit): a heartbeat / dead-man's-switch monitor and a public status page.
+
+If email isn't configured in JonDash yet, an email channel records a clear failure against that alert
+and any webhook channels still deliver — the alert is never lost silently.
 
 ### Install-time verification
 
@@ -227,7 +225,8 @@ must match its `addons.json` entry exactly.
 - **Audit attribution.** Background work runs with the context of whichever admin's request started the
   poller, so an audit entry written by a later tick names that person. A system-scoped context would
   fix it; nothing is granted beyond what they already had.
-- **No ICMP.** A host that answers nothing but ping cannot be monitored. See [No ping](#no-ping).
+- **Ping needs a JonDash that provides it** (1.4.0-beta.3 or later). On an older build a ping monitor
+  reports that the app can't run the check, rather than silently claiming the host is down.
 - **Redirect destinations are followed**, including to a different host. Targets are admin-configured
   and private addresses are allowed on purpose, so a monitored endpoint can point the check somewhere
   else on your network. The chain is capped at five hops and restricted to http(s), and nothing from
@@ -251,4 +250,4 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
-| 1.0.0-beta.1 | First build. Four check types, scheduler, incidents, eight notification channels, widget and page. ICMP ping dropped (modules may not spawn processes). Email and edit screens pending core support. Ships 19 tests covering the check engine; verified end to end against a real JonDash 1.4.0-beta.2. |
+| 1.0.0-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |

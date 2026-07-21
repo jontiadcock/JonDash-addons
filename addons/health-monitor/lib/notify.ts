@@ -12,18 +12,6 @@ import type { AlertEvent, ChannelRow, MonitorRow } from "./types";
 
 const SEND_TIMEOUT_MS = 10_000;
 
-/**
- * Email goes through JonDash's own configured mailer, which the module reaches via a
- * capability the framework does not expose yet (`email:send` is declared and consented,
- * but `ctx.email` is not wired). This shape is what the module expects; until it appears
- * the email channel reports itself unavailable instead of failing quietly, and the other
- * channels are unaffected.
- */
-type MailerCapability = {
-  send(msg: { to: string; subject: string; text?: string; html?: string }): Promise<{ ok: boolean; error?: string }>;
-};
-type MaybeMailContext = ModuleContext & { email?: MailerCapability };
-
 export type Alert = {
   event: AlertEvent;
   monitor: Pick<MonitorRow, "id" | "name" | "kind" | "target" | "runbook">;
@@ -133,15 +121,21 @@ export async function sendAlert(
 
   switch (channel.kind) {
     case "email": {
-      const mailer = (ctx as MaybeMailContext).email;
-      if (!mailer) return { ok: false, error: "email capability not available in this JonDash version" };
+      // ctx.email exists only with `email:send`, and it throws rather than failing
+      // quietly — so a mailer that isn't set up becomes a logged channel failure here,
+      // leaving any webhook channels to deliver the alert regardless.
+      if (!ctx.email) return { ok: false, error: "email permission not granted" };
       const recipients = Array.isArray(cfg.to) ? (cfg.to as string[]) : fallbackEmails;
       if (recipients.length === 0) return { ok: false, error: "no recipients configured" };
-      const results = await Promise.all(
-        recipients.map((to) => mailer.send({ to, subject: title, text: body })),
-      );
-      const failed = results.find((r) => !r.ok);
-      return failed ? { ok: false, error: failed.error ?? "send failed" } : { ok: true };
+      const failures: string[] = [];
+      for (const to of recipients) {
+        try {
+          await ctx.email.send({ to, subject: title, text: body });
+        } catch (e) {
+          failures.push(`${to}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return failures.length ? { ok: false, error: failures.join("; ") } : { ok: true };
     }
 
     case "webhook": {
@@ -236,8 +230,7 @@ export async function sendAlert(
   }
 }
 
-/** Whether a channel kind can actually deliver on this JonDash version. */
+/** Whether a channel kind can actually deliver with the permissions this module holds. */
 export function channelAvailable(ctx: ModuleContext, kind: string): boolean {
-  if (kind === "email") return Boolean((ctx as MaybeMailContext).email);
-  return Boolean(ctx.fetch);
+  return kind === "email" ? Boolean(ctx.email) : Boolean(ctx.fetch);
 }

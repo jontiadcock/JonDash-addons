@@ -1,3 +1,6 @@
+/** The module's id — must match `module.ts` and the folder name. */
+export const MODULE_ID = "health-monitor";
+
 /**
  * Shared types for the health-monitor module.
  *
@@ -9,12 +12,11 @@
 /**
  * The kinds of check this module knows how to run.
  *
- * There is no `ping`: ICMP needs either a raw socket (privileged, native dependency) or
- * the operating system's `ping` binary, and `child_process` is banned for modules. A
- * `tcp` check against a port the host answers on is the supported way to ask "is it
- * alive"; real ICMP would have to come from the framework as a capability.
+ * `ping` is ICMP via `ctx.net.ping` — the framework owns it because it needs the OS
+ * `ping` binary, and the host validation and argument handling that makes that safe
+ * belongs in trusted code once rather than in every module that wants it.
  */
-export type MonitorKind = "http" | "tcp" | "dns" | "tls";
+export type MonitorKind = "http" | "tcp" | "ping" | "dns" | "tls";
 
 /** A monitor's health. `unknown` = never checked yet. */
 export type MonitorState = "up" | "degraded" | "down" | "unknown";

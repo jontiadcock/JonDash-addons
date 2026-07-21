@@ -21,7 +21,7 @@ import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/part
  * form submissions; configuration happens in the module's settings for now.
  */
 export default async function HealthPage({ ctx, path }: ModulePageProps) {
-  await ensureRunning(ctx);
+  await ensureRunning();
   const db = ctx.db;
   if (!db) {
     return <p className="text-sm" style={{ color: "var(--muted)" }}>The module has no database handle.</p>;

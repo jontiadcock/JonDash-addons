@@ -33,7 +33,7 @@ const idSchema = z
 const monitorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(80),
-  kind: z.enum(["http", "tcp", "dns", "tls"]),
+  kind: z.enum(["http", "tcp", "ping", "dns", "tls"]),
   target: z.string().min(1).max(500),
   port: z.number().int().min(1).max(65535).optional(),
   intervalSec: z.number().int().min(10).max(86_400).optional(),

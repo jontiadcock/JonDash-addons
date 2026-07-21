@@ -1,6 +1,7 @@
 import type { ModuleDefinition } from "@/lib/modules/types";
 import HealthWidget from "./widget";
 import HealthPage from "./page";
+import { MODULE_ID } from "./lib/types";
 import { SETTING_FIELDS } from "./lib/settings";
 import { ensureRunning, stopScheduler } from "./lib/scheduler";
 import { syncConfig } from "./lib/config";
@@ -15,12 +16,12 @@ import { syncConfig } from "./lib/config";
  * configuration format.
  */
 const healthMonitor: ModuleDefinition = {
-  id: "health-monitor",
+  id: MODULE_ID,
   name: "Health monitoring",
   description:
-    "Watches your services with HTTP, TCP, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
+    "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
   version: "1.0.0-beta.1",
-  minAppVersion: "1.4.0",
+  minAppVersion: "1.4.0-beta.3",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.
@@ -44,7 +45,7 @@ const healthMonitor: ModuleDefinition = {
    */
   async onEnable(ctx) {
     await syncConfig(ctx);
-    await ensureRunning(ctx, { force: true });
+    await ensureRunning({ force: true });
   },
 
   /** Stop polling the moment the module is switched off. */

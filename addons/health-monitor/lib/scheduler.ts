@@ -1,5 +1,7 @@
 import "server-only";
 import type { ModuleContext } from "@/lib/modules/types";
+import { systemModuleContext } from "@/lib/modules/api";
+import { MODULE_ID } from "./types";
 import { checkMonitor } from "./engine";
 import { syncConfig } from "./config";
 import { dueMonitors, rollupAndPrune } from "./store";
@@ -9,14 +11,16 @@ import { readSettings } from "./settings";
  * The poller.
  *
  * One timer per server process, `unref`'d so it never keeps Node alive, guarded by a
- * flag on `globalThis` so a re-evaluated module bundle can't start a second one. This
- * mirrors how the core's rate limiter sweeps its buckets — the same shape, for the same
- * single-process deployment.
+ * flag on `globalThis` so a re-evaluated module bundle can't start a second one.
+ *
+ * Every tick builds a fresh SYSTEM context rather than holding on to whichever request
+ * happened to start the timer: background checks belong to nobody, and audit entries
+ * written from a tick should say so. It also gives the poller a way to notice it should
+ * stop — `systemModuleContext` throws once the module is disabled or uninstalled.
  *
  * The honest limitation: a module's code is only loaded when something imports it, so
- * the timer starts on the first request that renders the widget or the page rather than
- * at boot. `catchUp()` closes that gap by running anything overdue when a page renders.
- * A scheduler owned by the app would remove the gap entirely.
+ * after a JonDash restart the timer starts on the first request that renders the widget
+ * or the page. `catchUp()` closes that gap by running anything overdue at that point.
  */
 
 type SchedulerState = {
@@ -24,16 +28,13 @@ type SchedulerState = {
   running: boolean;
   lastCatchUp: number;
   lastMaintenance: number;
-  ctx: ModuleContext | null;
 };
 
 const KEY = "__jondash_health_monitor_scheduler__";
 
 function state(): SchedulerState {
   const g = globalThis as unknown as Record<string, SchedulerState | undefined>;
-  if (!g[KEY]) {
-    g[KEY] = { timer: null, running: false, lastCatchUp: 0, lastMaintenance: 0, ctx: null };
-  }
+  if (!g[KEY]) g[KEY] = { timer: null, running: false, lastCatchUp: 0, lastMaintenance: 0 };
   return g[KEY]!;
 }
 
@@ -80,23 +81,24 @@ async function tick(ctx: ModuleContext): Promise<void> {
   }
 }
 
-/**
- * Start the poller if it isn't already running. Safe to call on every render.
- *
- * The context captured here belongs to whoever's request started it; the background work
- * uses only its data capabilities, but audit entries written from a later tick are
- * attributed to that first admin. A system-scoped context would be the proper fix.
- */
-export function ensureScheduler(ctx: ModuleContext, pollSeconds: number): void {
+/** A timer tick: build a system context, or stop if the module is no longer enabled. */
+async function systemTick(): Promise<void> {
+  let ctx: ModuleContext;
+  try {
+    ctx = await systemModuleContext(MODULE_ID);
+  } catch {
+    stopScheduler();
+    return;
+  }
+  await tick(ctx);
+}
+
+/** Start the poller if it isn't already running. Safe to call on every render. */
+export function ensureScheduler(pollSeconds: number): void {
   const s = state();
-  s.ctx = s.ctx ?? ctx;
   if (s.timer) return;
 
-  const period = Math.max(5, pollSeconds) * 1000;
-  const timer = setInterval(() => {
-    const current = state();
-    if (current.ctx) void tick(current.ctx);
-  }, period);
+  const timer = setInterval(() => void systemTick(), Math.max(5, pollSeconds) * 1000);
   // Never hold the process open for a health check.
   (timer as unknown as { unref?: () => void }).unref?.();
   s.timer = timer;
@@ -107,7 +109,6 @@ export function stopScheduler(): void {
   const s = state();
   if (s.timer) clearInterval(s.timer);
   s.timer = null;
-  s.ctx = null;
 }
 
 /**
@@ -126,9 +127,13 @@ export async function catchUp(ctx: ModuleContext, force = false): Promise<void> 
   await tick(ctx);
 }
 
-/** Everything a rendering surface needs: config applied, poller running, gaps filled. */
-export async function ensureRunning(ctx: ModuleContext, opts: { force?: boolean } = {}): Promise<void> {
+/**
+ * Everything a rendering surface needs: poller running, configuration applied, gaps
+ * filled. Uses a system context throughout — none of this is the viewer's work.
+ */
+export async function ensureRunning(opts: { force?: boolean } = {}): Promise<void> {
+  const ctx = await systemModuleContext(MODULE_ID);
   const settings = await readSettings(ctx);
-  ensureScheduler(ctx, settings.pollSeconds);
+  ensureScheduler(settings.pollSeconds);
   await catchUp(ctx, opts.force);
 }

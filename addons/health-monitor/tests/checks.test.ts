@@ -123,6 +123,41 @@ describe("tcp checks", () => {
   });
 });
 
+describe("ping checks", () => {
+  // ICMP itself belongs to the framework (`ctx.net.ping`); what this module owns is the
+  // translation of its answer — a number is a reply, null is silence, a throw is a host
+  // the framework refused — into a check outcome.
+  const withNet = (net: NonNullable<ModuleContext["net"]>): ModuleContext => ({ ...ctx(), net });
+  const pingMonitor = { kind: "ping" as const, target: "192.168.1.1", port: null };
+
+  it("reports a reply as up, with its round-trip time", async () => {
+    const c = withNet({ ping: async () => 12.4 });
+    const out = await runCheck(c, pingMonitor, {}, 2000, 30);
+    expect(out.state).toBe("up");
+    expect(out.latencyMs).toBe(12);
+  });
+
+  it("treats silence as down rather than an error", async () => {
+    const c = withNet({ ping: async () => null });
+    const out = await runCheck(c, pingMonitor, {}, 2000, 30);
+    expect(out.state).toBe("down");
+    expect(out.message).toMatch(/no reply/);
+  });
+
+  it("turns a rejected host into a failed check, not a crash", async () => {
+    const c = withNet({ ping: async () => { throw new Error("invalid host"); } });
+    const out = await runCheck(c, pingMonitor, {}, 2000, 30);
+    expect(out.state).toBe("down");
+    expect(out.message).toBe("invalid host");
+  });
+
+  it("says so when the JonDash version has no ping capability", async () => {
+    const out = await runCheck(ctx(), pingMonitor, {}, 2000, 30);
+    expect(out.state).toBe("down");
+    expect(out.message).toMatch(/cannot run ping/);
+  });
+});
+
 describe("dns checks", () => {
   // Regression: this used to query the configured DNS server directly, which reports a
   // false outage on any box whose resolver is a Pi-hole, a VPN or 127.0.0.1. "localhost"

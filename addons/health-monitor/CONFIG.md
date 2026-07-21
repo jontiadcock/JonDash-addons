@@ -4,9 +4,8 @@ Monitors, notification channels and maintenance windows are declared as JSON in 
 **Monitors and channels (JSON)** setting (`configJson`), under **Admin → Modules → Health monitoring**.
 Saving it applies the change within one scheduler tick.
 
-This is temporary. The framework does not yet let a module handle a form submission safely, so there
-are no add/edit screens; when it does, the same data gets a proper UI and this field becomes
-import/export. The shape below is the contract either way.
+This is temporary. Add/edit screens are the next release's work; when they arrive the same data gets a
+proper UI and this field becomes import/export. The shape below is the contract either way.
 
 Rules that keep a bad paste from breaking a working setup:
 
@@ -24,9 +23,8 @@ Rules that keep a bad paste from breaking a working setup:
     {
       "id": "router",
       "name": "Router",
-      "kind": "tcp",
+      "kind": "ping",
       "target": "192.168.1.1",
-      "port": 443,
       "intervalSec": 60,
       "channels": ["ops-email"]
     },
@@ -56,7 +54,7 @@ Rules that keep a bad paste from breaking a working setup:
 | ------------- | -------- | ----------------------------------------------------------------------- |
 | `id`          | yes      | Stable identifier. Its history follows it.                              |
 | `name`        | yes      | What appears on the dashboard.                                          |
-| `kind`        | yes      | `http`, `tcp`, `dns` or `tls`. There is no ICMP ping — use `tcp` against a port the host answers on. |
+| `kind`        | yes      | `http`, `tcp`, `ping`, `dns` or `tls`.                                  |
 | `target`      | yes      | A full URL for `http`; a hostname or IP for everything else.            |
 | `port`        | for `tcp` | Port number. `tls` defaults to 443.                                    |
 | `intervalSec` | no       | Seconds between checks. Defaults to the module setting.                 |
@@ -120,7 +118,7 @@ Alerts are suppressed inside a window; checks still run and history is still rec
 ```json
 {
   "monitors": [
-    { "id": "router", "name": "Router", "kind": "tcp", "target": "192.168.1.1", "port": 443, "intervalSec": 120, "channels": ["ops"] },
+    { "id": "router", "name": "Router", "kind": "ping", "target": "192.168.1.1", "intervalSec": 120, "channels": ["ops"] },
     { "id": "nas", "name": "NAS web UI", "kind": "http", "target": "http://192.168.1.20:5000", "parentId": "router", "channels": ["ops"] },
     { "id": "db", "name": "Database port", "kind": "tcp", "target": "192.168.1.20", "port": 5432, "parentId": "router", "channels": ["ops"] },
     { "id": "site-cert", "name": "Site certificate", "kind": "tls", "target": "example.com", "intervalSec": 21600, "channels": ["ops"] },

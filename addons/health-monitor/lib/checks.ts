@@ -297,6 +297,31 @@ async function runDnsQuery(host: string, cfg: MonitorConfig, timeoutMs: number):
 }
 
 /**
+ * ICMP, via the framework. `ctx.net.ping` resolves round-trip milliseconds, or null when
+ * the host simply didn't answer — which is an ordinary monitor result, not an error. It
+ * throws only on a host it won't accept, and that is worth reporting as a failed check
+ * rather than letting it escape.
+ */
+async function runPing(
+  net: NonNullable<ModuleContext["net"]>,
+  host: string,
+  timeoutMs: number,
+): Promise<CheckOutcome> {
+  try {
+    const latencyMs = await net.ping(host, { timeoutMs });
+    if (latencyMs === null) return down(`no reply within ${timeoutMs}ms`);
+    return {
+      state: "up",
+      latencyMs: Math.round(latencyMs),
+      message: `replied in ${Math.round(latencyMs)}ms`,
+      phases: { totalMs: Math.round(latencyMs) },
+    };
+  } catch (e) {
+    return down(e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
  * A plain "does it resolve?" goes through the OS; asking for a specific record type or
  * an expected value means a real DNS query is what was wanted.
  */
@@ -410,6 +435,9 @@ export async function runCheck(
       return sanitise(await runHttp(monitor.target, cfg, timeoutMs));
     case "tcp":
       return sanitise(await runTcp(monitor.target, monitor.port ?? 0, timeoutMs));
+    case "ping":
+      if (!ctx.net) return down("this JonDash version cannot run ping checks");
+      return sanitise(await runPing(ctx.net, monitor.target, timeoutMs));
     case "dns":
       return sanitise(await runDns(monitor.target, cfg, timeoutMs));
     case "tls":

@@ -2,6 +2,17 @@
   "manifestVersion": 1,
   "channel": "beta",
   "name": "JonDash official addons",
-  "description": "Official add-on modules for JonDash. In JonDash, add this repo as a module source (Admin -> Settings -> Modules) to browse and install. Modules update independently of the JonDash base app. Channels: this manifest (main branch) = stable; the beta branch = beta. See VERSIONING.md.",
-  "modules": []
+  "description": "Official add-on modules for JonDash. In JonDash, add this repo as a module source (Admin -> Settings -> Modules) to browse and install. Modules update independently of the JonDash base app. Channels: the main branch = stable; this manifest (beta branch) = beta. See VERSIONING.md.",
+  "modules": [
+    {
+      "id": "health-monitor",
+      "name": "Health monitoring",
+      "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
+      "version": "1.0.0-beta.1",
+      "minAppVersion": "1.4.0-beta.3",
+      "permissions": ["network:outbound", "crypto:use", "email:send", "audit:write"],
+      "path": "addons/health-monitor",
+      "tag": "health-monitor/v1.0.0-beta.1"
+    }
+  ]
 }

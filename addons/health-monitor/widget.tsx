@@ -12,7 +12,7 @@ import { HealthStyles, StatusDot, StatusStrip } from "./ui/parts";
  * is what closes the cold-start gap after a restart.
  */
 export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
-  await ensureRunning(ctx);
+  await ensureRunning();
 
   const db = ctx.db;
   const monitors: MonitorRow[] = db ? await listMonitors(db) : [];
