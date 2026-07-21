@@ -1,6 +1,10 @@
 # This is a module SOURCE repo — it holds module source, not a built app.
 # Nothing here needs installing; keep dependency/build cruft out.
 node_modules/
+
+# Disposable JonDash installs used to test modules against a real app.
+# This repo is PUBLIC — a whole copy of the app (and its database) must never land here.
+.testbed/
 .vite/
 .next/
 dist/
