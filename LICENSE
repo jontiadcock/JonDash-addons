@@ -1,27 +1,48 @@
-JonDash Addons — Source-Available, View-Only License
+JonDash Addons — Personal-Use License
 Copyright (c) 2026 Jonti Adcock. All rights reserved.
 
-This repository is made public so that its source code may be read and
-reviewed. Reading the source is the only permission granted.
+Plain-language summary (the terms below are what actually apply): use JonDash for
+free for your own personal, non-commercial purposes. Don't sell it, don't charge
+for it, and don't hand out copies. You may build your own add-on modules — but if
+you share an add-on with anyone else, you must publish it in your own public code
+repository and let the author know via GitHub so it can be linked. This summary is
+not legal advice.
 
-No license or permission is granted to any person or entity to use, run,
-execute, install, copy, reproduce, modify, adapt, translate, merge, publish,
-distribute, sublicense, sell, or otherwise exploit this software or any
-portion of it, in source or compiled form, by any means, without the prior
-express written permission of the copyright holder.
+1. Personal use. The copyright holder grants you a free, non-exclusive,
+   non-transferable licence to download, install, run, and use JonDash for your own
+   personal, non-commercial purposes.
 
-Viewing the source on a hosting platform (such as GitHub), and any fork,
-clone, or download feature that platform provides, does not grant any of the
-rights withheld above. Such platform features are permitted solely to view
-the source, in accordance with the platform's terms of service.
+2. No commercial use or sale. You may not sell, rent, lease, sublicense, or charge
+   for JonDash or for access to it; use it to provide a paid or commercial service;
+   or use it for any commercial purpose — without the prior written permission of
+   the copyright holder.
 
-All rights not expressly granted are reserved by the copyright holder.
+3. No redistribution. You may not distribute, republish, or give copies of JonDash
+   (in whole or in part, in source or compiled form) to anyone else. Point people to
+   the official repository so they can obtain their own copy under this licence. A
+   hosting platform's view / fork / clone / download features are permitted only so
+   that you may read the source and obtain your own personal copy under this licence,
+   in accordance with that platform's terms of service.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF,
-OR IN CONNECTION WITH THE SOFTWARE, ITS USE, OR ITS VIEWING.
+4. Add-on modules and modifications. You may create add-on modules and personal
+   modifications of JonDash for your own personal use under sections 1–3. If you make
+   an add-on module available to any other person, you must:
+     (a) publish that add-on in your own public source-code repository; and
+     (b) notify the copyright holder (Jonti Adcock) via GitHub — for example through
+         the profile at https://github.com/jontiadcock — so that it can be linked or
+         listed.
+   You may not sell shared add-ons, and you may not distribute a shared add-on in
+   closed-source form.
 
-For permission requests, contact the copyright holder.
+5. Reserved rights. All rights not expressly granted here are reserved by the
+   copyright holder.
+
+6. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN
+   AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+   WITH THE SOFTWARE, ITS USE, OR ITS VIEWING.
+
+7. Contact. For commercial licensing, or for any permission not granted above,
+   contact the copyright holder via https://github.com/jontiadcock.

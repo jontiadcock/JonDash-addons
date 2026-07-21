@@ -58,5 +58,6 @@ that generates a module to your spec are in JonDash's author guide:
 
 ## License
 
-Source-available, **view-only** — see [LICENSE](LICENSE) (in line with the main JonDash repo). Reading the
-source is the only permission granted.
+**Personal-use** — see [LICENSE](LICENSE) (in line with the main JonDash repo). Free for personal,
+non-commercial use; no selling or redistribution. If you build an add-on, **publish it in your own public
+repository and let the author know via GitHub** so it can be linked.
