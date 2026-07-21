@@ -3,7 +3,7 @@ import type { ModuleWidgetProps } from "@/lib/modules/types";
 import { ensureRunning } from "./lib/scheduler";
 import { hourlyBuckets, listMonitors, openIncidentCount, type HourBucket } from "./lib/store";
 import { formatAgo, formatMs, stateColour, STATE_LABEL, worstState } from "./lib/format";
-import type { MonitorRow } from "./lib/types";
+import { MODULE_PATH, type MonitorRow } from "./lib/types";
 import { HealthStyles, StatusDot, StatusStrip } from "./ui/parts";
 
 /**
@@ -23,8 +23,27 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
     for (const m of monitors) strips.set(m.id, await hourlyBuckets(db, m.id, 24));
   }
 
-  const overall = worstState(monitors.filter((m) => m.enabled).map((m) => m.status));
-  const problems = monitors.filter((m) => m.status === "down" || m.status === "degraded");
+  const active = monitors.filter((m) => m.enabled === 1);
+  const overall = worstState(active.map((m) => m.status));
+  const problems = active.filter((m) => m.status === "down" || m.status === "degraded");
+
+  // A user can shrink this widget to a single grid cell, so it can't assume room for a
+  // long list: show whatever needs attention first, then fill up to a few healthy ones,
+  // and say how many are left. The detail lives one click away on the module's page.
+  const MAX_ROWS = 4;
+  const shown = [...problems, ...monitors.filter((m) => !problems.includes(m))].slice(0, MAX_ROWS);
+  const hidden = monitors.length - shown.length;
+
+  // "All up" has to mean it: a monitor that has failed once but hasn't been confirmed
+  // down yet is neither up nor down, and saying otherwise is the one thing a status
+  // widget must never do.
+  const pending = active.filter((m) => m.status === "unknown").length;
+  const summary =
+    problems.length > 0
+      ? `${problems.length} of ${active.length} need attention`
+      : pending > 0
+        ? `${active.length - pending} up · ${pending} still checking`
+        : `All ${active.length} up`;
 
   return (
     <div className="hm card p-4">
@@ -34,7 +53,7 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
           <StatusDot state={overall} />
           Health
         </p>
-        <Link href="/m/health-monitor" className="text-sm" style={{ color: "var(--primary)" }}>
+        <Link href={MODULE_PATH} className="text-sm" style={{ color: "var(--primary)" }}>
           open
         </Link>
       </div>
@@ -46,14 +65,12 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
       ) : (
         <>
           <p className="mt-1 text-sm" style={{ color: "var(--muted)" }}>
-            {overall === "up"
-              ? `All ${monitors.length} service${monitors.length === 1 ? "" : "s"} up`
-              : `${problems.length} of ${monitors.length} need attention`}
-            {openIncidents > 0 ? ` · ${openIncidents} open incident${openIncidents === 1 ? "" : "s"}` : ""}
+            {summary}
+            {openIncidents > 0 ? ` · ${openIncidents} ongoing` : ""}
           </p>
 
           <ul className="mt-3 flex flex-col gap-3">
-            {monitors.map((m) => (
+            {shown.map((m) => (
               <li key={m.id} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-3 text-sm">
                   <span className="flex min-w-0 items-center gap-2">
@@ -73,8 +90,14 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
             ))}
           </ul>
 
+          {hidden > 0 ? (
+            <p className="mt-2 text-xs" style={{ color: "var(--muted)" }}>
+              and {hidden} more
+            </p>
+          ) : null}
+
           {problems.length > 0 ? (
-            <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
+            <p className="mt-3 truncate text-xs" style={{ color: "var(--muted)" }}>
               {problems[0].name}: {problems[0].lastMessage ?? "no detail"} · checked{" "}
               {formatAgo(problems[0].lastCheckAt)}
             </p>

@@ -4,8 +4,8 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 0.0.1-beta.1
-- **Minimum JonDash version:** 1.4.0-beta.3
+- **Version:** 0.0.2-beta.1
+- **Minimum JonDash version:** 1.4.0-beta.6
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Visibility:** admins only (`adminOnly: true`)
 
@@ -88,9 +88,11 @@ is drawn as plain SVG — no charting library, no new dependencies.
 
 Rendered by the framework under **Admin → Modules → Health monitoring**.
 
+These are defaults and safety limits. **Monitors and alert destinations are not set up here** — they
+live on the module's own page; see [Configuring](#configuring).
+
 | Key                    | Type    | Default | Meaning                                                        |
 | ---------------------- | ------- | ------- | -------------------------------------------------------------- |
-| `configJson`           | string  | `{}`    | **Interim** — the monitors and channels, as JSON. See [Configuring](#configuring). |
 | `pollSeconds`          | number  | 15      | How often the scheduler looks for due checks.                   |
 | `defaultIntervalSec`   | number  | 60      | Default gap between checks for a monitor that doesn't set one.  |
 | `defaultTimeoutMs`     | number  | 10000   | Default per-check timeout.                                      |
@@ -105,6 +107,7 @@ Rendered by the framework under **Admin → Modules → Health monitoring**.
 | `certWarnDays`         | string  | `30,14,7` | Days before certificate expiry to warn.                       |
 | `notifyEmails`         | string  | —       | Comma-separated recipients for the email channel.               |
 | `alertsEnabled`        | boolean | `true`  | Master switch. Off = checks still run, nothing is sent.         |
+| `configJson`           | text    | —       | Optional bulk import. Adds and updates only; never deletes.     |
 
 No setting is marked secret. Channel credentials are **not** stored in settings — they live encrypted
 in the module's own table (see below).
@@ -181,24 +184,31 @@ download — never parsed, never rendered, never executed.
 
 ## Configuring
 
-The framework does not yet give modules a safe way to handle form submissions, so v1 has **no
-add/edit screens**. Until that lands, monitors and channels are declared in the `configJson` setting
-and reconciled into the database automatically when it changes. The format is documented in
-[`CONFIG.md`](CONFIG.md).
+Everything is set up on the module's own page at `/m/health-monitor` — there is no JSON to write.
 
-This is deliberately temporary. When the framework provides a module-action helper, the same data
-gains a proper UI and `configJson` becomes an import/export field instead — the tables and the check
-engine do not change.
+**To watch something:** open the page, fill in *Add something to watch* — a name, what kind of thing
+it is, its address, and how often to check — and press the button. It is checked immediately, so you
+know within seconds whether the address was right. Ports, timeouts, retries, a dependency and a note
+are all under *More options*, and every one of them falls back to a sensible default.
+
+**To be told when it breaks:** go to *Alerts*, add a destination, and send it a test before you rely
+on it. Then tick that destination on each monitor that should use it. A monitor with no destinations
+records outages but tells nobody, and the page says so.
+
+**To change or remove one:** open it from the list. The same form edits it, *Check it now* runs it on
+demand, and deleting asks first — it takes the history with it. To stop checking without losing the
+history, untick *Checking is switched on*.
+
+**Bulk import** is still there for restoring a saved configuration or adding a lot at once: paste it
+into the module's *Bulk import* setting and press the button on the page. It **only adds and
+updates — it never deletes**, so it can't quietly undo something you set up in the interface. The
+format is in [`CONFIG.md`](CONFIG.md).
 
 ---
 
 ## Status
 
-Everything described above works. One thing is deliberately not built yet:
-
-- **Add/edit screens.** Monitors and channels are configured through the JSON setting described in
-  [Configuring](#configuring). The framework now provides what a proper form needs, so this is the
-  next release's work, not a limitation of the design — the tables and the check engine don't change.
+Everything described above works, and is verified by actually running it rather than by inspection.
 
 Deferred, and shaped by the rules for unauthenticated routes (own permission, off by default, its own
 rate limit): a heartbeat / dead-man's-switch monitor and a public status page.
@@ -238,11 +248,14 @@ must match its `addons.json` entry exactly.
 
 ## Testing
 
-1. Put the folder at `modules/health-monitor/`, rebuild, and enable it in **Admin → Modules**.
-2. Paste a monitor into `configJson` — a URL you control, and one you know is down.
-3. Watch the widget: the working one goes green within an interval, the broken one goes red after its
-   retries are exhausted, and an incident opens.
-4. Add a webhook channel and confirm the alert arrives, then confirm the recovery alert.
+1. Install it from a source, or put the folder at `modules/health-monitor/`, then enable it in
+   **Admin → Modules**.
+2. On the module's page, add two monitors: something you know works, and something you know doesn't —
+   `http://127.0.0.1:9/` is reliably refused. Each is checked the moment you save it.
+3. The broken one turns red once its failures are confirmed, an outage is recorded, and the widget
+   moves it to the top.
+4. On **Alerts**, add a destination and send it a test. Tick it on the broken monitor and confirm the
+   alert arrives, then fix the target and confirm the recovery alert.
 5. Disable the module: the widget and page disappear and the base dashboard is unchanged.
 6. Uninstall: every `mod_health_monitor_*` table and every setting is gone.
 
@@ -250,4 +263,5 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
+| 0.0.2-beta.1 | Set-up moved out of JSON and into the interface: add, edit, pause and delete monitors from the module page, manage alert destinations with a test-send button, and run a check on demand. Every setting reworded in plain English with an explanation. Bulk import kept for restoring a saved configuration, and it no longer deletes anything. Custom icon; the widget now leads with whatever needs attention and stays useful when resized small. Needs JonDash 1.4.0-beta.6. |
 | 0.0.1-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |

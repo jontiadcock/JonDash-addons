@@ -1,11 +1,7 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { ModuleContext } from "@/lib/modules/types";
 import {
-  deleteChannelsExcept,
-  deleteMaintenanceExcept,
-  deleteMonitorsExcept,
   setRoutes,
   upsertChannel,
   upsertMaintenance,
@@ -13,17 +9,15 @@ import {
 } from "./store";
 
 /**
- * The interim configuration channel.
+ * Bulk import.
  *
- * The framework has no sanctioned way for a module to handle a form submission yet, so
- * monitors, channels and maintenance windows are declared as JSON in the module's
- * `configJson` setting and reconciled into the module's own tables whenever that text
- * changes. When module actions arrive this becomes the import/export path and a real UI
- * writes the same tables — the schema below is the contract either way.
+ * Monitors and channels are normally created in the interface. This is the way to bring
+ * a lot of them in at once, or to restore a configuration you kept a copy of — the same
+ * shape the module used before it had forms.
  *
- * The JSON is untrusted input from an admin's textarea, so everything is validated and
- * clamped before it reaches the database; an invalid document is rejected whole, leaving
- * the previous configuration running rather than half-applying a broken one.
+ * The JSON is untrusted text from a settings box, so everything is validated and clamped
+ * before it reaches the database, and an invalid document is rejected whole rather than
+ * half-applied.
  */
 
 const idSchema = z
@@ -105,29 +99,29 @@ export function parseConfigJson(text: string): ConfigResult {
   return { ok: true, config: parsed.data };
 }
 
-function hash(text: string): string {
-  return createHash("sha256").update(text).digest("hex").slice(0, 32);
-}
-
 export type SyncOutcome = { applied: boolean; monitors: number; channels: number; removed: number; error?: string };
 
 /**
- * Apply `configJson` to the module's tables if it has changed since last time. The hash
- * of the applied text is kept in the module's own store, so this is a cheap no-op on
- * every tick and only does work when an admin actually edits the setting.
+ * Apply the `configJson` setting to the module's tables, on request.
+ *
+ * This used to run on every scheduler tick and delete anything absent from the JSON.
+ * That was fine when JSON was the only way to configure the module, and actively
+ * dangerous once monitors could be added through the interface: a stale settings box
+ * would quietly delete everything someone had just created. So it now runs only when
+ * asked, and it **only adds and updates — it never deletes**. Removing something is
+ * done in the interface, where it can be confirmed.
  */
-export async function syncConfig(ctx: ModuleContext): Promise<SyncOutcome> {
+export async function importConfigJson(ctx: ModuleContext): Promise<SyncOutcome> {
   const db = ctx.db;
   if (!db) return { applied: false, monitors: 0, channels: 0, removed: 0, error: "no database handle" };
 
   const text = String((await ctx.settings.get("configJson")) ?? "");
-  const current = hash(text);
-  const lastApplied = String((await ctx.store.get("configHash")) ?? "");
-  if (current === lastApplied) return { applied: false, monitors: 0, channels: 0, removed: 0 };
+  if (!text.trim()) {
+    return { applied: false, monitors: 0, channels: 0, removed: 0, error: "There is nothing in the import box." };
+  }
 
   const parsed = parseConfigJson(text);
   if (!parsed.ok) {
-    // Remember nothing: the next tick retries, and the previous config keeps running.
     await ctx.store.set("configError", parsed.error);
     return { applied: false, monitors: 0, channels: 0, removed: 0, error: parsed.error };
   }
@@ -145,7 +139,6 @@ export async function syncConfig(ctx: ModuleContext): Promise<SyncOutcome> {
       enabled: c.enabled === false ? 0 : 1,
     });
   }
-  await deleteChannelsExcept(db, channels.map((c) => c.id));
 
   let order = 0;
   for (const m of monitors) {
@@ -167,7 +160,7 @@ export async function syncConfig(ctx: ModuleContext): Promise<SyncOutcome> {
     });
     await setRoutes(db, m.id, m.channels ?? []);
   }
-  const removed = await deleteMonitorsExcept(db, monitors.map((m) => m.id));
+  const removed = 0; // import never deletes
 
   for (const w of maintenance) {
     await upsertMaintenance(db, {
@@ -182,9 +175,7 @@ export async function syncConfig(ctx: ModuleContext): Promise<SyncOutcome> {
       durationMin: w.durationMin ?? null,
     });
   }
-  await deleteMaintenanceExcept(db, maintenance.map((w) => w.id));
 
-  await ctx.store.set("configHash", current);
   await ctx.store.delete("configError");
   if (ctx.audit) {
     await ctx.audit("config.apply", `${monitors.length} monitors, ${channels.length} channels`);

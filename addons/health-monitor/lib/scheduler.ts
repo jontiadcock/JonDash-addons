@@ -3,7 +3,6 @@ import type { ModuleContext } from "@/lib/modules/types";
 import { systemModuleContext } from "@/lib/modules/api";
 import { MODULE_ID } from "./types";
 import { checkMonitor } from "./engine";
-import { syncConfig } from "./config";
 import { dueMonitors, rollupAndPrune } from "./store";
 import { readSettings } from "./settings";
 
@@ -66,13 +65,12 @@ async function runDue(ctx: ModuleContext): Promise<number> {
   return checked;
 }
 
-/** One scheduler tick: apply any configuration change, then run what is due. */
+/** One scheduler tick: run whatever is due. */
 async function tick(ctx: ModuleContext): Promise<void> {
   const s = state();
   if (s.running) return; // a slow batch must not overlap the next tick
   s.running = true;
   try {
-    await syncConfig(ctx);
     await runDue(ctx);
   } catch {
     // A tick that fails must not kill the timer; the next one tries again.

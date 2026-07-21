@@ -1,19 +1,21 @@
 # Configuration format
 
-Monitors, notification channels and maintenance windows are declared as JSON in the module's
-**Monitors and channels (JSON)** setting (`configJson`), under **Admin → Modules → Health monitoring**.
-Saving it applies the change within one scheduler tick.
+**You do not need this to set up monitors** — add them on the module page at `/m/health-monitor`.
 
-This is temporary. Add/edit screens are the next release's work; when they arrive the same data gets a
-proper UI and this field becomes import/export. The shape below is the contract either way.
+This format is for bringing in a lot at once, or restoring a configuration you kept a copy of. Paste
+it into the module's **Bulk import** setting, then press **Import from settings** on that page.
+
+It **only adds and updates — it never deletes.** Anything already set up that is absent from the
+document is left alone, so an old copy can't quietly undo your current setup.
 
 Rules that keep a bad paste from breaking a working setup:
 
 - The document is validated as a whole. If anything is invalid, **nothing** is applied and the previous
   configuration keeps running — the error is shown at the top of `/m/health-monitor`.
-- Ids are lowercase letters, digits, `-` or `_`, and are how a monitor's history is tracked. Renaming an
-  id is treated as deleting one monitor and creating another.
-- Anything you remove from the document is removed from the database, including its history.
+- Ids are lowercase letters, digits, `-` or `_`, and are how a monitor's history is tracked. Importing
+  an id that already exists updates it; a new id creates a new monitor with fresh history.
+- Removing something from the document does **not** remove it from JonDash. Delete it on the module
+  page instead, where it asks first.
 
 ## Shape
 

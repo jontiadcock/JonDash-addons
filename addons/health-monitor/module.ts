@@ -3,8 +3,10 @@ import HealthWidget from "./widget";
 import HealthPage from "./page";
 import { MODULE_ID } from "./lib/types";
 import { SETTING_FIELDS } from "./lib/settings";
+import { HealthIcon } from "./ui/icon";
 import { ensureRunning, stopScheduler } from "./lib/scheduler";
-import { syncConfig } from "./lib/config";
+import { importConfigJson } from "./lib/config";
+import { listMonitors } from "./lib/store";
 
 /**
  * Health monitoring — checks the services you care about on a schedule, keeps their
@@ -20,8 +22,8 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.1-beta.1",
-  minAppVersion: "1.4.0-beta.3",
+  version: "0.0.2-beta.1",
+  minAppVersion: "1.4.0-beta.6",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.
@@ -34,17 +36,25 @@ const healthMonitor: ModuleDefinition = {
   adminOnly: true,
 
   settings: SETTING_FIELDS,
+
+  /** Shown beside the module name; inherits the theme colour. */
+  icon: HealthIcon,
   DashboardWidget: HealthWidget,
   Page: HealthPage,
   migrations: "./migrations",
 
   /**
-   * Apply whatever configuration is already saved and start the poller straight away.
-   * Without the second step nothing would be checked until somebody happened to open
-   * the dashboard — enabling a monitor should be enough to start monitoring.
+   * Start the poller straight away — enabling the module should be enough to start
+   * monitoring, not "enabling it and then happening to open the dashboard".
+   *
+   * If someone pasted a configuration into the bulk-import box before enabling, and
+   * there are no monitors yet, apply it as a convenience. Existing monitors are never
+   * touched here: import is otherwise an explicit action.
    */
   async onEnable(ctx) {
-    await syncConfig(ctx);
+    if (ctx.db && (await listMonitors(ctx.db)).length === 0) {
+      await importConfigJson(ctx).catch(() => undefined);
+    }
     await ensureRunning({ force: true });
   },
 

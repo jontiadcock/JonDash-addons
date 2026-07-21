@@ -1,6 +1,12 @@
 /** The module's id — must match `module.ts` and the folder name. */
 export const MODULE_ID = "health-monitor";
 
+/** Where this module's pages live. */
+export const MODULE_PATH = `/m/${MODULE_ID}`;
+
+/** What an action reports back to the page, to be shown to the person who did it. */
+export type ActionResult = { ok: boolean; message: string };
+
 /**
  * Shared types for the health-monitor module.
  *

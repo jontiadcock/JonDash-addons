@@ -101,6 +101,25 @@ export async function upsertMonitor(
   );
 }
 
+/** Every monitor id in use — for generating a unique id for a new one. */
+export async function monitorIds(db: Db): Promise<string[]> {
+  const rows = await db.query<{ id: string }>(`SELECT id FROM ${db.table("monitors")}`);
+  return rows.map((r) => r.id);
+}
+
+/** Delete one monitor and everything recorded about it. */
+export async function deleteMonitor(db: Db, id: string): Promise<void> {
+  for (const table of ["results", "rollups", "incidents", "routes", "notifications"]) {
+    await db.run(`DELETE FROM ${db.table(table)} WHERE monitorId = ?`, id);
+  }
+  await db.run(`DELETE FROM ${db.table("monitors")} WHERE id = ?`, id);
+}
+
+/** Make a monitor due immediately, so the next tick picks it up. */
+export async function markDue(db: Db, id: string): Promise<void> {
+  await db.run(`UPDATE ${db.table("monitors")} SET nextCheckAt = NULL WHERE id = ?`, id);
+}
+
 /** Remove monitors (and their history) that are no longer declared. */
 export async function deleteMonitorsExcept(db: Db, keepIds: string[]): Promise<number> {
   const all = await db.query<{ id: string }>(`SELECT id FROM ${db.table("monitors")}`);
@@ -406,6 +425,26 @@ export async function deleteChannelsExcept(db: Db, keepIds: string[]): Promise<v
     await db.run(`DELETE FROM ${db.table("routes")} WHERE channelId = ?`, row.id);
     await db.run(`DELETE FROM ${db.table("channels")} WHERE id = ?`, row.id);
   }
+}
+
+/** Delete one channel and any monitor routings that pointed at it. */
+export async function deleteChannel(db: Db, id: string): Promise<void> {
+  await db.run(`DELETE FROM ${db.table("routes")} WHERE channelId = ?`, id);
+  await db.run(`DELETE FROM ${db.table("channels")} WHERE id = ?`, id);
+}
+
+export async function getChannel(db: Db, id: string): Promise<ChannelRow | null> {
+  const rows = await db.query<ChannelRow>(`SELECT * FROM ${db.table("channels")} WHERE id = ?`, id);
+  return rows[0] ?? null;
+}
+
+/** The channel ids a monitor currently alerts through, for ticking the right boxes. */
+export async function routeIdsFor(db: Db, monitorId: string): Promise<string[]> {
+  const rows = await db.query<{ channelId: string }>(
+    `SELECT channelId FROM ${db.table("routes")} WHERE monitorId = ?`,
+    monitorId,
+  );
+  return rows.map((r) => r.channelId);
 }
 
 export async function setRoutes(db: Db, monitorId: string, channelIds: string[]): Promise<void> {
