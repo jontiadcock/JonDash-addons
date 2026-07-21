@@ -49,6 +49,13 @@ addons/<module-id>/  # one folder per module
 *(Format v1 — the exact fields the installer consumes are finalized with JonDash's Phase 2 installer; this
 scaffold is the target.)*
 
+## Versioning & channels
+
+Each add-on has its **own version** and its own **stable / beta** channel, independent of other add-ons and
+of JonDash. Channels are branches (`main` = stable, `beta` = beta); every published version is tagged
+`<id>/v<version>`. In JonDash you opt a **specific module** into beta from that module's settings. The full
+scheme (branches, tags, manifest, publishing workflow) is in **[VERSIONING.md](VERSIONING.md)**.
+
 ## Building your own module
 
 You don't have to use this repo — you can build a module and **import it directly** into JonDash, or host
