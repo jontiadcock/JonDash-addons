@@ -100,7 +100,7 @@ export default async function HealthPage({ ctx, path }: ModulePageProps) {
                 </div>
               </div>
               <div className="mt-3">
-                <StatusStrip buckets={strips.get(m.id) ?? []} height={18} />
+                <StatusStrip buckets={strips.get(m.id) ?? []} height={18} maxWidth={460} />
               </div>
               {m.lastMessage ? (
                 <p className="mt-2 truncate text-xs" style={{ color: "var(--muted)" }}>
@@ -125,9 +125,12 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
   const buckets = await hourlyBuckets(db, monitor.id, 24);
   const recent = await recentResults(db, monitor.id, 60);
   const incidents = await listIncidents(db, monitor.id, 10);
+  // A failed check has no latency; Number(null) is 0, which would draw a false floor
+  // across the chart, so drop the nulls rather than plotting them as zero.
   const trend = recent
     .slice()
     .reverse()
+    .filter((r) => r.latencyMs !== null && r.latencyMs !== undefined)
     .map((r) => Number(r.latencyMs))
     .filter((v) => Number.isFinite(v));
 
@@ -163,7 +166,7 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
           <Stat label="Response" value={formatMs(day.avgMs)} hint={`p95 ${formatMs(day.p95Ms)}`} />
         </div>
         <div className="mt-4">
-          <StatusStrip buckets={buckets} height={22} />
+          <StatusStrip buckets={buckets} height={22} maxWidth={520} />
           <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
             Last 24 hours, one bar per hour
           </p>

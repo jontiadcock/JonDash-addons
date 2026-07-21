@@ -49,9 +49,21 @@ function bucketState(b: HourBucket): MonitorState {
  * One bar per hour, oldest on the left. Bars are drawn at a fixed size and the SVG
  * scales to its container, so the same strip works in a narrow widget and a wide page.
  */
-export function StatusStrip({ buckets, height = 22 }: { buckets: HourBucket[]; height?: number }) {
-  const barWidth = 4;
-  const gap = 2;
+export function StatusStrip({
+  buckets,
+  height = 22,
+  maxWidth,
+}: {
+  buckets: HourBucket[];
+  height?: number;
+  /** Cap the drawn width. 24 bars stretched across a wide card read as loose blocks
+   *  rather than a timeline, so give the strip a sensible maximum on roomy layouts. */
+  maxWidth?: number;
+}) {
+  // The SVG stretches to its container, so what matters is the ratio: a thin gap keeps
+  // the bars reading as one continuous timeline.
+  const barWidth = 10;
+  const gap = 1.5;
   const width = buckets.length * (barWidth + gap) - gap;
 
   return (
@@ -59,6 +71,7 @@ export function StatusStrip({ buckets, height = 22 }: { buckets: HourBucket[]; h
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
       height={height}
+      style={maxWidth ? { maxWidth, display: "block" } : undefined}
       preserveAspectRatio="none"
       role="img"
       aria-label={`Hourly status for the last ${buckets.length} hours`}

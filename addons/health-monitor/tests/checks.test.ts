@@ -123,6 +123,29 @@ describe("tcp checks", () => {
   });
 });
 
+describe("dns checks", () => {
+  // Regression: this used to query the configured DNS server directly, which reports a
+  // false outage on any box whose resolver is a Pi-hole, a VPN or 127.0.0.1. "localhost"
+  // resolves through the OS but is not in DNS, so it only passes via the lookup path.
+  it("resolves a name the operating system knows", async () => {
+    const out = await runCheck(ctx(), { kind: "dns", target: "localhost", port: null }, {}, 5000, 30);
+    expect(out.state).toBe("up");
+    expect(out.message).toMatch(/resolved to/);
+    expect(out.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("reports a name that does not resolve as down", async () => {
+    const out = await runCheck(
+      ctx(),
+      { kind: "dns", target: "no-such-host.invalid", port: null },
+      {},
+      5000,
+      30,
+    );
+    expect(out.state).toBe("down");
+  });
+});
+
 describe("host validation", () => {
   const nasty = "127.0.0.1; rm -rf /";
 

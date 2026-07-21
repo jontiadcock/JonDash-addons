@@ -111,19 +111,24 @@ export function stopScheduler(): void {
 }
 
 /**
- * Run anything overdue right now, throttled. Called when the widget or page renders so
- * a restart doesn't leave a hole in the history until the next tick.
+ * Run anything overdue right now. Throttled, because every dashboard render calls it and
+ * a busy dashboard shouldn't mean a check per page view.
+ *
+ * `force` skips the throttle for an explicit action — enabling the module is a deliberate
+ * "start monitoring", and it must not silently do nothing because somebody happened to
+ * load a page five seconds earlier.
  */
-export async function catchUp(ctx: ModuleContext): Promise<void> {
+export async function catchUp(ctx: ModuleContext, force = false): Promise<void> {
   const s = state();
-  if (s.running || Date.now() - s.lastCatchUp < MIN_CATCHUP_GAP_MS) return;
+  if (s.running) return;
+  if (!force && Date.now() - s.lastCatchUp < MIN_CATCHUP_GAP_MS) return;
   s.lastCatchUp = Date.now();
   await tick(ctx);
 }
 
 /** Everything a rendering surface needs: config applied, poller running, gaps filled. */
-export async function ensureRunning(ctx: ModuleContext): Promise<void> {
+export async function ensureRunning(ctx: ModuleContext, opts: { force?: boolean } = {}): Promise<void> {
   const settings = await readSettings(ctx);
   ensureScheduler(ctx, settings.pollSeconds);
-  await catchUp(ctx);
+  await catchUp(ctx, opts.force);
 }

@@ -74,11 +74,16 @@ Rules that keep a bad paste from breaking a working setup:
 | Kind   | Options                                                                          |
 | ------ | --------------------------------------------------------------------------------- |
 | `http` | `expectStatus` (`200`, `"2xx"`, `"200-204"`; default any 2xx/3xx), `method`, `headers`, `insecureTls` |
-| `dns`  | `recordType` (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`; default `A`), `expectValue` |
+| `dns`  | `recordType` (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`), `expectValue`             |
 | `tls`  | `certWarnDays` (default from settings), `insecureTls`                             |
 
 `insecureTls` accepts a self-signed or untrusted certificate. It is off by default and only worth
 turning on for a LAN service you know issues its own certificate.
+
+**A `dns` monitor with no `config` asks the operating system to resolve the name** — the same path your
+other software uses, so a Pi-hole, a VPN or a hosts entry is respected. Setting `recordType` or
+`expectValue` switches it to querying your configured DNS server directly, which is what you want when
+you are checking a specific record rather than "can this name be resolved at all".
 
 ## Channel fields
 

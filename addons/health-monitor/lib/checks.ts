@@ -216,8 +216,48 @@ function runTcp(host: string, port: number, timeoutMs: number): Promise<CheckOut
   });
 }
 
-async function runDns(host: string, cfg: MonitorConfig, timeoutMs: number): Promise<CheckOutcome> {
-  if (!validHost(host)) return down("invalid host");
+/**
+ * "Can this name be resolved?" — the way an application would resolve it, through the
+ * operating system (hosts file, VPN and split-horizon rules, whatever the box is
+ * actually configured to use).
+ *
+ * This is the default because the alternative, querying the configured DNS server
+ * directly, reports a failure on a great many normal self-hosted setups: a Pi-hole or
+ * router-based resolver that only answers on an interface Node isn't querying, or a
+ * machine whose listed nameserver is 127.0.0.1 behind something that isn't up yet. That
+ * is a false outage, and a monitor that cries wolf is worse than no monitor.
+ */
+async function runDnsLookup(host: string, timeoutMs: number): Promise<CheckOutcome> {
+  const startedAt = process.hrtime.bigint();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      dns.promises.lookup(host, { all: true }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+    const latencyMs = Math.round(ms(startedAt));
+    const addresses = result.map((a) => a.address);
+    if (addresses.length === 0) return { state: "down", latencyMs, message: "no address returned" };
+    return {
+      state: "up",
+      latencyMs,
+      code: addresses[0],
+      message: `resolved to ${addresses.slice(0, 3).join(", ")}`,
+      phases: { dnsMs: latencyMs, totalMs: latencyMs },
+    };
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOTFOUND" || code === "EAI_AGAIN") return down("name does not resolve", code);
+    return down(e instanceof Error ? e.message : String(e), code);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Query the configured DNS server directly — used when a specific record is asked for. */
+async function runDnsQuery(host: string, cfg: MonitorConfig, timeoutMs: number): Promise<CheckOutcome> {
   const type = cfg.recordType ?? "A";
   const resolver = new dns.promises.Resolver();
   const startedAt = process.hrtime.bigint();
@@ -244,10 +284,26 @@ async function runDns(host: string, cfg: MonitorConfig, timeoutMs: number): Prom
     };
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    return down(code === "ECANCELLED" ? `timed out after ${timeoutMs}ms` : (code ?? String(e)));
+    if (code === "ECANCELLED") return down(`timed out after ${timeoutMs}ms`, code);
+    // Naming the server turns an opaque ECONNREFUSED into something actionable.
+    if (code === "ECONNREFUSED" || code === "ESERVFAIL" || code === "ETIMEOUT") {
+      const server = dns.getServers()[0] ?? "the configured server";
+      return down(`DNS server ${server} did not answer (${code})`, code);
+    }
+    return down(code ?? String(e), code);
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * A plain "does it resolve?" goes through the OS; asking for a specific record type or
+ * an expected value means a real DNS query is what was wanted.
+ */
+async function runDns(host: string, cfg: MonitorConfig, timeoutMs: number): Promise<CheckOutcome> {
+  if (!validHost(host)) return down("invalid host");
+  const wantsSpecificAnswer = Boolean(cfg.recordType || cfg.expectValue);
+  return wantsSpecificAnswer ? runDnsQuery(host, cfg, timeoutMs) : runDnsLookup(host, timeoutMs);
 }
 
 /**

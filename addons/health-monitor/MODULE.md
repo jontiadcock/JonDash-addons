@@ -19,7 +19,7 @@ schedule, keeps a history, and sends an alert when something goes down and again
 | ------ | ---------------------------------------------------------------------------------- |
 | `http` | Requests a URL and records the status code plus a timing breakdown: DNS, TCP connect, TLS handshake, time to first byte, total. Follows redirects and judges the destination; asserts an expected status or range. |
 | `tcp`  | Opens a TCP connection to a host and port and records the connect time. For databases, SSH, game servers — anything that isn't HTTP, and the way to ask whether a host is alive. |
-| `dns`  | Resolves a name within a time limit and optionally asserts the answer contains an expected address. |
+| `dns`  | Resolves a name within a time limit. By default it resolves the way an application would — through the operating system — so a Pi-hole, a VPN or a hosts entry is honoured. Ask for a specific `recordType` or `expectValue` and it queries the configured DNS server directly instead. |
 | `tls`  | Reads the certificate a host presents and reports days until expiry, issuer and hostname match. |
 
 There is deliberately **no ICMP ping** — see [No ping](#no-ping).
@@ -35,10 +35,10 @@ budget) and **down**. Monitors can also be paused, or covered by a maintenance w
 stays quiet.
 
 Checks are driven by a single in-process poller — one timer per server process, `unref`'d so it never
-holds the process open, with jitter and a cap on how many checks run at once. Because the timer starts
-when the module's code is first loaded, there is a cold-start gap after a restart; the widget and page
-also run any overdue checks when they render, which closes it on first view. See
-[Known limits](#known-limits).
+holds the process open, and a cap on how many checks run at once. Enabling the module starts it
+immediately, so switching it on is enough to start monitoring. After a JonDash restart the timer only
+starts when the module's code is next loaded by a request; the widget and page run anything overdue
+when they render, which closes that gap on first view. See [Known limits](#known-limits).
 
 ### History and retention
 
@@ -219,9 +219,10 @@ must match its `addons.json` entry exactly.
 
 ## Known limits
 
-- **Cold start.** The scheduler starts when the module's code is first loaded by a request, not at
-  boot. After a restart, nothing is checked until someone opens JonDash — then overdue checks run
-  immediately. A scheduler owned by the app would remove this.
+- **Cold start after a restart.** Enabling the module starts the poller, but a JonDash restart clears
+  it, and a module's code is only loaded when something asks for it. So after a restart nothing is
+  checked until someone opens JonDash — at which point overdue checks run immediately. A scheduler
+  owned by the app would remove this.
 - **One process.** The poller assumes a single server process, which is how JonDash runs.
 - **Audit attribution.** Background work runs with the context of whichever admin's request started the
   poller, so an audit entry written by a later tick names that person. A system-scoped context would
@@ -250,4 +251,4 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
-| 1.0.0-beta.1 | First build. Four check types, scheduler, incidents, eight notification channels, widget and page. ICMP ping dropped (modules may not spawn processes). Email and edit screens pending core support. Ships 17 tests covering the check engine. |
+| 1.0.0-beta.1 | First build. Four check types, scheduler, incidents, eight notification channels, widget and page. ICMP ping dropped (modules may not spawn processes). Email and edit screens pending core support. Ships 19 tests covering the check engine; verified end to end against a real JonDash 1.4.0-beta.2. |

@@ -2,7 +2,7 @@ import type { ModuleDefinition } from "@/lib/modules/types";
 import HealthWidget from "./widget";
 import HealthPage from "./page";
 import { SETTING_FIELDS } from "./lib/settings";
-import { stopScheduler } from "./lib/scheduler";
+import { ensureRunning, stopScheduler } from "./lib/scheduler";
 import { syncConfig } from "./lib/config";
 
 /**
@@ -18,7 +18,7 @@ const healthMonitor: ModuleDefinition = {
   id: "health-monitor",
   name: "Health monitoring",
   description:
-    "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
+    "Watches your services with HTTP, TCP, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
   version: "1.0.0-beta.1",
   minAppVersion: "1.4.0",
 
@@ -37,9 +37,14 @@ const healthMonitor: ModuleDefinition = {
   Page: HealthPage,
   migrations: "./migrations",
 
-  /** Apply whatever configuration is already saved, so enabling starts checking. */
+  /**
+   * Apply whatever configuration is already saved and start the poller straight away.
+   * Without the second step nothing would be checked until somebody happened to open
+   * the dashboard — enabling a monitor should be enough to start monitoring.
+   */
   async onEnable(ctx) {
     await syncConfig(ctx);
+    await ensureRunning(ctx, { force: true });
   },
 
   /** Stop polling the moment the module is switched off. */
