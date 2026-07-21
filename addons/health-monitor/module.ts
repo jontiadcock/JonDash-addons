@@ -20,7 +20,7 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "1.0.0-beta.1",
+  version: "0.0.1-beta.1",
   minAppVersion: "1.4.0-beta.3",
 
   // network:outbound — contact the targets and notification endpoints you configure.

@@ -4,7 +4,7 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 1.0.0-beta.1 (unpublished — see [Status](#status))
+- **Version:** 0.0.1-beta.1
 - **Minimum JonDash version:** 1.4.0-beta.3
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Visibility:** admins only (`adminOnly: true`)
@@ -250,4 +250,4 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
-| 1.0.0-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |
+| 0.0.1-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |
