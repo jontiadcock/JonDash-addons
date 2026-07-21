@@ -1,0 +1,14 @@
+# This is a module SOURCE repo — it holds module source, not a built app.
+# Nothing here needs installing; keep dependency/build cruft out.
+node_modules/
+.vite/
+.next/
+dist/
+build/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

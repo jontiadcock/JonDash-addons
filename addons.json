@@ -1,0 +1,6 @@
+{
+  "manifestVersion": 1,
+  "name": "JonDash official addons",
+  "description": "Official add-on modules for JonDash. In JonDash, add this repo as a module source (Admin -> Settings -> Modules) to browse and install. Modules update independently of the JonDash base app.",
+  "modules": []
+}

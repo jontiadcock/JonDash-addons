@@ -1,0 +1,3 @@
+# Module folders live here, one per module: addons/<module-id>/
+# Each contains module.ts + MODULE.md (+ widget.tsx / page.tsx / migrations/ as needed).
+# See the repo README and JonDash's docs/MODULES-AUTHORING.md for the contract.
