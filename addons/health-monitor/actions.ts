@@ -83,7 +83,7 @@ export const saveMonitorAction = moduleAction(
 
     // A new monitor should report its state straight away, not at the next interval.
     if (!existing) await markDue(ctx.db, id);
-    await catchUp(ctx, true);
+    await catchUp(ctx);
 
     revalidatePath(ADMIN_PATH);
     revalidatePath(MODULE_PATH);

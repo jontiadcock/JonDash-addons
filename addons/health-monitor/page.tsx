@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { ModulePageProps } from "@/lib/modules/types";
-import { ensureRunning } from "./lib/scheduler";
 import {
   getMonitor,
   hourlyBuckets,
@@ -25,7 +24,6 @@ import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/part
  * misplaced click reconfiguring the monitoring.
  */
 export default async function HealthPage({ ctx, path }: ModulePageProps) {
-  await ensureRunning();
   const db = ctx.db;
   if (!db) {
     return <p className="text-sm" style={{ color: "var(--muted)" }}>The module has no database.</p>;

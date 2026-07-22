@@ -8,17 +8,20 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.4",
-      "minAppVersion": "1.4.0",
+      "version": "0.0.5-beta.1",
+      "minAppVersion": "1.5.0-beta.1",
       "permissions": [
         "network:outbound",
         "crypto:use",
         "email:send",
         "audit:write"
       ],
+      "helpers": [
+        "scheduler"
+      ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.4",
-      "notes": "Checks are now added and changed in Admin -> Modules -> Health monitoring, and the module page is display-only. The form adapts to what you are checking: website, ping, port, DNS or SSL certificate."
+      "tag": "health-monitor/v0.0.5-beta.1",
+      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting has been removed - it never controlled how often anything was actually checked."
     },
     {
       "id": "template",

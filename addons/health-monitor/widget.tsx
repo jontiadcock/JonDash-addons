@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { ModuleWidgetProps } from "@/lib/modules/types";
-import { ensureRunning } from "./lib/scheduler";
 import { hourlyBuckets, listMonitors, openIncidentCount, type HourBucket } from "./lib/store";
 import { formatAgo, formatMs, stateColour, STATE_LABEL, worstState } from "./lib/format";
 import { MODULE_PATH, type MonitorRow } from "./lib/types";
@@ -8,12 +7,13 @@ import { HealthStyles, StatusDot, StatusStrip } from "./ui/parts";
 
 /**
  * The dashboard widget: a single reassuring line when everything is up, and the detail
- * only when it isn't. Rendering also starts the poller and runs anything overdue, which
- * is what closes the cold-start gap after a restart.
+ * only when it isn't.
+ *
+ * Rendering does no work beyond reading. Monitoring runs on the `scheduler` helper from
+ * server start, so what you see here is the state as of the last tick — not something
+ * this render just went and produced.
  */
 export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
-  await ensureRunning();
-
   const db = ctx.db;
   const monitors: MonitorRow[] = db ? await listMonitors(db) : [];
   const openIncidents = db ? await openIncidentCount(db) : 0;

@@ -5,7 +5,8 @@ import { MODULE_ID } from "./lib/types";
 import { SETTING_FIELDS } from "./lib/settings";
 import { HealthIcon } from "./ui/icon";
 import HealthSettingsPanel from "./ui/settings-panel";
-import { ensureRunning, stopScheduler } from "./lib/scheduler";
+import { catchUp, tick, runMaintenance, SCAN_EVERY_MS, MAINTENANCE_EVERY_MS } from "./lib/scheduler";
+import { systemModuleContext } from "@/lib/modules/api";
 import { importConfigJson } from "./lib/config";
 import { listMonitors } from "./lib/store";
 
@@ -23,8 +24,11 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.4",
-  minAppVersion: "1.4.0",
+  version: "0.0.5-beta.1",
+  // The `scheduler` helper and `schedules` arrived in 1.5.0. Named as the PRE-RELEASE:
+  // semver ranks `1.5.0-beta.4` below `1.5.0`, so a bare "1.5.0" would be refused on
+  // every 1.5.0 beta — the builds beta-channel users are actually running.
+  minAppVersion: "1.5.0-beta.1",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.
@@ -48,9 +52,40 @@ const healthMonitor: ModuleDefinition = {
   Page: HealthPage,
   migrations: "./migrations",
 
+  /** Everything this module needs beyond its own code. Declaring the helper is required:
+   *  `schedules` without it is a mistake the installer catches. */
+  helpers: ["scheduler"],
+
   /**
-   * Start the poller straight away — enabling the module should be enough to start
-   * monitoring, not "enabling it and then happening to open the dashboard".
+   * Background work is DECLARED, never started. The helper runs these from server start,
+   * checks this module is still enabled on every tick, and never lets a slow run overlap
+   * itself. That is the whole point of the migration: monitoring that is alive at 03:00
+   * with nobody watching, rather than starting whenever somebody opens the dashboard.
+   *
+   * Both jobs are cheap and idempotent — safe to skip, safe to run twice, and they read
+   * what is due from the monitors table rather than assuming they ran on time.
+   */
+  schedules: [
+    {
+      key: "poll",
+      everyMs: SCAN_EVERY_MS,
+      run: async (ctx) => {
+        await tick(ctx);
+      },
+    },
+    {
+      key: "maintenance",
+      everyMs: MAINTENANCE_EVERY_MS,
+      run: async (ctx) => {
+        await runMaintenance(ctx);
+      },
+    },
+  ],
+
+  /**
+   * Enabling should start monitoring immediately rather than at the next tick, so run a
+   * pass now. The schedule itself needs no starting — the helper picks this module up
+   * within its reconcile window, with no restart.
    *
    * If someone pasted a configuration into the bulk-import box before enabling, and
    * there are no monitors yet, apply it as a convenience. Existing monitors are never
@@ -60,18 +95,12 @@ const healthMonitor: ModuleDefinition = {
     if (ctx.db && (await listMonitors(ctx.db)).length === 0) {
       await importConfigJson(ctx).catch(() => undefined);
     }
-    await ensureRunning({ force: true });
+    await catchUp(await systemModuleContext(MODULE_ID));
   },
 
-  /** Stop polling the moment the module is switched off. */
-  async onDisable() {
-    stopScheduler();
-  },
-
-  /** The framework drops the tables and settings; just make sure nothing is still running. */
-  async onUninstall() {
-    stopScheduler();
-  },
+  // No onDisable/onUninstall: there is no timer to tear down any more. The helper checks
+  // enabled state per tick, so switching this module off stops its work by itself, and
+  // switching it back on resumes without a restart.
 };
 
 export default healthMonitor;
