@@ -48,14 +48,20 @@ THE ModuleDefinition (module.ts):
     name: string;               // shown to the admin
     description: string;        // one honest sentence
     version: string;            // semver; "0.0.1-beta.1" for a first beta
-    minAppVersion: string;      // "1.4.0-beta.3" if you use moduleAction/ctx.email/ctx.net
+    minAppVersion: string;      // "1.4.0" — the release that introduced the module framework
     permissions: string[];      // the FEWEST that work — see below
     adminOnly?: boolean;        // true = only full admins see any of it
-    settings?: { key: string; label: string; type: "string"|"number"|"boolean";
+    settings?: { key: string; label: string; type: "string"|"text"|"number"|"boolean";
                  default?: unknown; help?: string; secret?: boolean }[];
-    DashboardWidget?: Component;   // props: { ctx }
-    Page?: Component;              // props: { ctx, path: string[] }
-    SettingsPanel?: Component;     // optional; otherwise settings are auto-rendered
+                                   // "text" = multiline textarea; secret values are encrypted
+    icon?: Component;              // optional inline SVG shown beside the module name;
+                                   //   use stroke/fill "currentColor" so it follows the theme
+    DashboardWidget?: Component;   // props: { ctx }. Users can resize it, so stay useful when small
+    Page?: Component;              // props: { ctx, path: string[] }, served at /m/<id>
+    SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Modules -> your module,
+                                   //   BELOW the auto-generated settings fields (not instead of
+                                   //   them), and only once the module is enabled. Put anything
+                                   //   richer than a flat settings list here.
     migrations?: string;           // e.g. "./migrations"
     onEnable?(ctx): Promise<void>; onDisable?(ctx): Promise<void>; onUninstall?(ctx): Promise<void>;
   }
@@ -99,6 +105,9 @@ SAVING CHANGES — the only sanctioned way:
   that the module is enabled, then gives you a scoped ctx. It THROWS if any check fails — never catch
   and ignore that. It proves WHO is calling; validating WHAT they sent is still your job.
   For background work with no user, use systemModuleContext("<id>") from the same module.
+  If you use useActionState in a client component: React clears UNCONTROLLED inputs itself after a
+  successful form action, but values you hold in state are NOT cleared with them — reset that state
+  inside the action, not in an effect (the React Compiler lint refuses setState in an effect).
 
 HARD RULES — an install is refused if you break these:
 - Never use child_process, eval, new Function, or a dynamic import() with a computed path.

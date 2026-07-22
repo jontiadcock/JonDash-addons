@@ -24,7 +24,7 @@ const healthMonitor: ModuleDefinition = {
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
   version: "0.0.4-beta.1",
-  minAppVersion: "1.4.0-beta.11",
+  minAppVersion: "1.4.0",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.

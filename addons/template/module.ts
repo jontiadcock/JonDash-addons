@@ -26,8 +26,8 @@ const template: ModuleDefinition = {
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
   version: "0.0.1-beta.1",
 
-  /** The oldest JonDash this module works on. `moduleAction` needs 1.4.0-beta.3. */
-  minAppVersion: "1.4.0-beta.3",
+  /** The oldest JonDash this module works on. Everything here needs 1.4.0. */
+  minAppVersion: "1.4.0",
 
   /**
    * Ask for NOTHING you don't use — every entry becomes a warning the admin reads, and

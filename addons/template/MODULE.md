@@ -8,7 +8,7 @@ page and nothing else; uninstalling removes it completely. Ordinary users can ig
 
 - **Module id:** `template`
 - **Version:** 0.0.1-beta.1
-- **Minimum JonDash version:** 1.4.0-beta.3
+- **Minimum JonDash version:** 1.4.0
 - **Permissions requested:** none
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
