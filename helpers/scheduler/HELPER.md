@@ -1,8 +1,7 @@
 # Scheduler helper
 
-**Status: specification, version 0.0.1-beta.1. The runtime is being built in the core app; this
-describes the agreed contract so consumers can be planned against it. Do not build against it until
-the core session confirms the contract is fixed.**
+**Status: published, version 0.0.1-beta.1 (beta channel). The runtime lives here and is maintained
+here. Not yet exercised end to end — that happens when `health-monitor` migrates onto it.**
 
 Lets a module run work on a schedule **from the moment the server starts**, rather than the first time
 somebody happens to open a page.
@@ -56,6 +55,7 @@ should catch.
 | **No overlap** | A slow run causes the next tick to be **skipped, not queued**. Your job can't stack on itself. |
 | **Isolated failures** | A throwing job is logged and keeps its schedule. It doesn't stop the timer or affect other modules. |
 | **Disabled modules are skipped** | Enabled state is checked **per tick**, not trusted from a boot snapshot. Disabling stops the work silently — a switched-off module doing nothing is correct, not an error — and re-enabling resumes it with no restart. |
+| **Modules enabled later are picked up** | Enabling a module doesn't restart the server, so the scheduler re-checks for new schedules every 30 seconds. Switch a module on and its work starts shortly after, without a restart. |
 | **Scoped context** | `run` receives your module's own system context: your settings, your store, your `mod_<id>_*` tables, and only the capabilities you declared. |
 
 ## What it deliberately does not do
@@ -92,4 +92,4 @@ the module looked for due work and never how often anything was actually checked
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.1-beta.1 | Specification of the agreed contract. Runtime being built in the core app. |
+| 0.0.1-beta.1 | First release. Runtime moved into this repo by the core session and now maintained here. Fixed before publishing: jobs were collected once at boot, so a module enabled afterwards never ran — and with no schedules present at boot the scheduler gave up entirely, which is the state of every fresh install. |

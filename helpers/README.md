@@ -1,7 +1,7 @@
 # Helpers
 
-**Status: specification. The runtime is being built in the core app and the contract is not fixed —
-nothing here should be treated as final until the core session says so.**
+**The scheduler helper is published on the beta channel. The filesystem helper is agreed in principle
+and not yet specified.**
 
 A **helper** is first-party shared capability that modules can depend on. Where a module is written by
 anyone and is deliberately fenced in, a helper is written by the JonDash project and is trusted to do

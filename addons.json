@@ -33,5 +33,18 @@
       "tag": "template/v0.0.3",
       "notes": "The AI prompt now covers the whole job: standing up a throwaway JonDash, running the installer verifier, running tests, and clicking through the result — so an agent can hand back tested work, not just code."
     }
+  ],
+  "helpers": [
+    {
+      "id": "scheduler",
+      "name": "Scheduler",
+      "description": "Runs modules' declared background work on time, starting when the server starts rather than when someone opens a page.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.5.0",
+      "provides": [],
+      "path": "helpers/scheduler",
+      "tag": "scheduler/v0.0.1-beta.1",
+      "notes": "First release. Declared schedules run from server start, with catch-up after downtime, staggered starts, no overlap and isolated failures."
+    }
   ]
 }
