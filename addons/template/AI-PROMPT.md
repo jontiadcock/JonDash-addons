@@ -54,11 +54,14 @@ THE ModuleDefinition (module.ts):
     description: string;        // one honest sentence
     version: string;            // semver; "0.0.1-beta.1" for a first beta
     minAppVersion: string;      // "1.4.0" — the release that introduced the module framework.
-                                //   If you need something newer, name the PRE-RELEASE:
-                                //   "1.5.0-beta.1", never a bare "1.5.0". Semver ranks a
-                                //   pre-release below its release, so a bare "1.5.0" is
-                                //   refused on every 1.5.0 beta — i.e. on the builds beta
-                                //   users run. Helpers + `schedules` need 1.5.0-beta.1.
+                                //   Declare the OLDEST build that genuinely works, not the
+                                //   newest available: too high locks people out for nothing.
+                                //   Always name the PRE-RELEASE — "1.5.0-beta.1", never a
+                                //   bare "1.5.0". Semver ranks a pre-release below its
+                                //   release, so a bare "1.5.0" is refused on every 1.5.0
+                                //   beta, i.e. on the builds beta users actually run.
+                                //   Raise it only for what you use: `schedules`/`helpers`
+                                //   need "1.5.0-beta.1"; a 2nd migration needs "1.4.1-beta.1".
     permissions: string[];      // the FEWEST that work — see below
     adminOnly?: boolean;        // true = only full admins see any of it
     settings?: { key: string; label: string; type: "string"|"text"|"number"|"boolean";
@@ -73,6 +76,21 @@ THE ModuleDefinition (module.ts):
                                    //   them), and only once the module is enabled. Put anything
                                    //   richer than a flat settings list here.
     migrations?: string;           // e.g. "./migrations"
+    helpers?: string[];            // first-party shared capability you depend on, e.g. ["scheduler"].
+                                   //   Installed automatically WITH your module; never install one
+                                   //   yourself. Required whenever you declare `schedules`.
+                                   //   DEFAULT TO NEITHER: a module that depends on nothing is
+                                   //   easier to install, review and keep working.
+    schedules?: { key: string; everyMs: number; skipOnBoot?: boolean;
+                  run(ctx): Promise<void> }[];
+                                   // Periodic work, DECLARED not started — your code only runs when
+                                   //   something renders it, so a timer started from a widget dies
+                                   //   the moment nobody is looking. The scheduler helper runs these
+                                   //   from server start, skips them while your module is disabled,
+                                   //   and never lets a slow run overlap itself. Keep each job cheap
+                                   //   and idempotent: it may be skipped, retried, or run right
+                                   //   after boot, so never assume exactly one run per interval.
+                                   //   Needs `helpers: ["scheduler"]` and minAppVersion 1.5.0-beta.1.
     onEnable?(ctx): Promise<void>; onDisable?(ctx): Promise<void>; onUninstall?(ctx): Promise<void>;
   }
 

@@ -27,17 +27,14 @@
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.5-beta.1",
-      "minAppVersion": "1.5.0-beta.1",
+      "version": "0.0.6",
+      "minAppVersion": "1.4.1-beta.1",
       "permissions": [
         "audit:write"
       ],
-      "helpers": [
-        "scheduler"
-      ],
       "path": "addons/template",
-      "tag": "template/v0.0.5-beta.1",
-      "notes": "Installable again on 1.5.0 betas: 0.0.4-beta.1 asked for \"1.5.0\", which semver ranks above every 1.5.0 beta, so it was refused on the builds beta users run."
+      "tag": "template/v0.0.6",
+      "notes": "The template depends on nothing again: the scheduler helper and its background job have been removed, so copying it gives you a module that installs on its own. Helpers are still documented as an option. Works on far more versions of JonDash than before."
     }
   ],
   "helpers": [

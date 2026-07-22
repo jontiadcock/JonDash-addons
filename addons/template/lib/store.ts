@@ -34,21 +34,6 @@ export async function toggleItem(db: Db, id: number): Promise<void> {
   await db.run(`UPDATE ${db.table("items")} SET done = 1 - done WHERE id = ?`, id);
 }
 
-/**
- * Delete items finished more than `days` ago. This is what the scheduled job does —
- * deliberately the shape background work should be: cheap, idempotent, and harmless if
- * it runs twice or is skipped.
- */
-export async function pruneDoneItems(db: Db, days: number): Promise<number> {
-  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString();
-  const doomed = await db.query<{ n: unknown }>(
-    `SELECT COUNT(*) AS n FROM ${db.table("items")} WHERE done = 1 AND createdAt < ?`,
-    cutoff,
-  );
-  await db.run(`DELETE FROM ${db.table("items")} WHERE done = 1 AND createdAt < ?`, cutoff);
-  return toNumber(doomed[0]?.n);
-}
-
 export async function countItems(db: Db): Promise<number> {
   const rows = await db.query<{ n: unknown }>(`SELECT COUNT(*) AS n FROM ${db.table("items")}`);
   return toNumber(rows[0]?.n);

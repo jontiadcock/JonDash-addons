@@ -7,10 +7,13 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.5-beta.1
-- **Minimum JonDash version:** `1.5.0-beta.1` — declared as the **pre-release** on purpose. Semver ranks
-  `1.5.0-beta.2` *below* `1.5.0`, so a bare `"1.5.0"` is refused on every 1.5.0 beta. Copy this habit.
+- **Version:** 0.0.6
+- **Minimum JonDash version:** `1.4.1-beta.1` — the oldest build that genuinely works, not the newest
+  available. Declared as the **pre-release** on purpose: semver ranks `1.4.1-beta.1` *below* `1.4.1`,
+  so naming the pre-release is what lets it install on that series' betas too. Copy this habit.
 - **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
+- **Depends on:** nothing. No helpers, no background work — copy this and you get a module that
+  installs entirely on its own. Helpers are covered below as an option, not used here.
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
   a page, and add/delete forms that write through a Server Action
@@ -152,8 +155,9 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module can actually be installed — see the note at the top. 0.0.4-beta.1 was refused on every build that existed. No code change. |
-| 0.0.4-beta.1 | **Uninstallable — use 0.0.5-beta.1.** Declares the `scheduler` helper and a `schedules` entry — a six-hourly tidy of finished items. Shows how a module gets background work that actually runs, and how a helper arrives automatically as a dependency. Requires JonDash 1.5.0. |
+| 0.0.6 | **The template depends on nothing again.** The `scheduler` helper and the six-hourly `tidy` schedule added in 0.0.4-beta.1 are gone: a starter module should not drag a dependency in with it, and copying this now gives you something that installs entirely on its own. Helpers and `schedules` are still documented — as an option, with the syntax, in `module.ts` and in `AI-PROMPT.md` — just not used. `minAppVersion` drops back to `1.4.1-beta.1`, the genuine floor (migration 002), so the template works on far more installs. First version published to **both** channels since 0.0.1. |
+| 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module could actually be installed — 0.0.4-beta.1 was refused on every build that existed. No code change. |
+| 0.0.4-beta.1 | **Uninstallable — never use.** Declared the `scheduler` helper and a `schedules` entry (a six-hourly tidy of finished items). Removed again in 0.0.6. Required JonDash 1.5.0. |
 | 0.0.3 | The AI prompt now covers the whole job, not just the writing: how to stand up a throwaway JonDash, run the same verifier the installer uses, run the module's own tests, start the app and click through it — plus the `server-only` trap and an instruction to report honestly what was and was not tested. |
 | 0.0.2 | Adds a `done` toggle, which demonstrates the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission (`audit:write`) that the code actually uses. Requires JonDash 1.4.1-beta.1, the first build that runs a module's migrations after an update. |
 | 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |
