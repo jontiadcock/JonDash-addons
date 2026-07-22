@@ -1,7 +1,7 @@
 # Helpers
 
-**The scheduler helper is published on the beta channel. The filesystem helper is agreed in principle
-and not yet specified.**
+**Live as of JonDash 1.5.0.** The `scheduler` helper is published on both channels. A filesystem helper
+is agreed in principle and not yet specified.
 
 A **helper** is first-party shared capability that modules can depend on. Where a module is written by
 anyone and is deliberately fenced in, a helper is written by the JonDash project and is trusted to do
@@ -11,7 +11,7 @@ running code at server start.
 That is the whole point. It means a new capability can arrive without waiting for a core release, and
 without loosening what an arbitrary third-party module is allowed to do.
 
-## The rules we are building to
+## The rules
 
 - **First-party only.** Helpers live here, in the official addons repository, and are installable only
   from the official source. This is enforced by the installer, not by convention — otherwise anyone

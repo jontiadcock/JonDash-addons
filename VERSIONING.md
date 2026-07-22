@@ -46,7 +46,7 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
       "name": "Health monitoring",
       "description": "One line.",
       "version": "1.0.0",              // the latest version on THIS channel
-      "minAppVersion": "1.5.0",        // minimum JonDash version
+      "minAppVersion": "1.5.0-beta.1", // minimum JonDash version — see the warning below
       "permissions": ["network:outbound"],
       "path": "addons/health-monitor",
       "tag": "health-monitor/v1.0.0",  // the tag to download this version from
@@ -55,6 +55,20 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
   ]
 }
 ```
+
+### `minAppVersion` — name the pre-release, not the release
+
+**A bare `"1.5.0"` makes an addon uninstallable on every 1.5.0 beta.** Semver ranks a pre-release
+*below* its release (`1.5.0-beta.2 < 1.5.0`), and the installer refuses anything whose
+`minAppVersion` is newer than the running build. Beta-channel users are, by definition, running
+pre-releases — so a bare release number excludes exactly the people the beta channel is for.
+
+If your addon needs something that lands in `X.Y.Z`, declare **`X.Y.Z-beta.1`**. It still keeps out
+every build older than that series, and it works on the betas as well as the final release. Keep the
+value identical in `addons.json` and in the addon's own `module.ts` / `helper.ts`.
+
+This is not hypothetical: `template@0.0.4-beta.1` and `scheduler@0.0.1-beta.1` both shipped with a
+bare `"1.5.0"` and could not be installed by anyone, on any build that existed.
 
 ### `notes` — what changed, for the update screen
 
@@ -65,7 +79,7 @@ characters maximum** and no control characters (JonDash caps and strips them, bu
 Update it whenever you bump a version — it describes *that* version, not the module in general. Leaving
 it out is fine; the card simply shows the version numbers.
 
-## How JonDash consumes it (the Phase 2 installer)
+## How JonDash consumes it
 
 - **Discover:** read `addons.json` from `main` (stable). For any add-on the user opted into beta, read that
   add-on's entry from `beta` too.
@@ -92,6 +106,34 @@ equivalent of JonDash's own beta channel, but chosen per module.
 
 **Promote a beta to stable:** bring X's beta version into `main` (merge or copy the folder), set version to
 the release `A.B.C`, update the stable `addons.json`, commit, tag `X/vA.B.C`, push `main` + tag.
+
+## Helpers — different rules on purpose
+
+**Live as of JonDash 1.5.0.** See [`helpers/README.md`](helpers/README.md).
+
+Helpers are first-party shared capability living in `helpers/<id>/` in this repository. They are
+published like add-ons but consumed differently:
+
+- **Same publishing mechanics.** A `helpers` array in `addons.json` on each channel branch, semver per
+  helper, and one immutable tag per published version in the **same `<id>/v<version>` namespace** as
+  add-ons (e.g. `scheduler/v0.0.2`, `scheduler/v0.0.2-beta.1`).
+- **No version negotiation.** A user gets whatever version the channel publishes — no ranges, no
+  resolution, no conflicts. A helper never breaks its own API; both sides of the contract belong to the
+  same project, which is what makes that promise keepable rather than aspirational.
+- **The channel is inherited, not chosen.** JonDash resolves a helper on the channel of the module
+  pulling it in, from the official manifest. There is no per-helper channel setting.
+- **Not user-installable.** They arrive automatically as dependencies of a module that declares them
+  (`helpers: ["scheduler"]` in both `module.ts` and the module's `addons.json` entry), and are listed
+  read-only under **Admin → Helpers**. There is no install, import or remove button.
+- **Official source only**, enforced by JonDash's installer — a `helpers` array published by any other
+  source is silently dropped. Otherwise a third party publishes a `helpers/` folder and inherits
+  privilege that modules are specifically denied.
+- **`minAppVersion` is enforced.** A helper needing a newer JonDash than the running build is refused,
+  and the module that declared it fails to install rather than installing in a state where it can never
+  work. The pre-release rule above applies here too.
+- **Their capabilities roll up** into the consent screen of any module that depends on them, described
+  by real-world effect rather than capability name.
+- **Removal keeps data.** Files go when nothing depends on a helper any more; anything it owns stays.
 
 ## Future: core modifications (MOD-07)
 
