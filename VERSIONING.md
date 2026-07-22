@@ -79,7 +79,7 @@ characters maximum** and no control characters (JonDash caps and strips them, bu
 Update it whenever you bump a version — it describes *that* version, not the module in general. Leaving
 it out is fine; the card simply shows the version numbers.
 
-## How JonDash consumes it (the Phase 2 installer)
+## How JonDash consumes it
 
 - **Discover:** read `addons.json` from `main` (stable). For any add-on the user opted into beta, read that
   add-on's entry from `beta` too.
@@ -109,24 +109,31 @@ the release `A.B.C`, update the stable `addons.json`, commit, tag `X/vA.B.C`, pu
 
 ## Helpers — different rules on purpose
 
-**Not fixed yet — the runtime is being built in the core app.** See [`helpers/README.md`](helpers/README.md).
+**Live as of JonDash 1.5.0.** See [`helpers/README.md`](helpers/README.md).
 
-Helpers are first-party shared capability living in `helpers/<id>/` in this repository. They are not
-add-ons and deliberately do not follow the scheme above:
+Helpers are first-party shared capability living in `helpers/<id>/` in this repository. They are
+published like add-ons but consumed differently:
 
-- **One version, always current.** No channels, no resolution, no version ranges — a helper never
-  breaks its own API, so there is nothing to pin. Both sides of the contract belong to the same
-  project, which is what makes that promise keepable rather than aspirational.
-- **Not user-installable.** They arrive automatically as dependencies of a module that declares them,
-  and are listed read-only. There is no install, import or remove button.
-- **Official source only**, enforced by the installer — otherwise a third party publishes a `helpers/`
-  folder and inherits privilege that modules are specifically denied.
+- **Same publishing mechanics.** A `helpers` array in `addons.json` on each channel branch, semver per
+  helper, and one immutable tag per published version in the **same `<id>/v<version>` namespace** as
+  add-ons (e.g. `scheduler/v0.0.2`, `scheduler/v0.0.2-beta.1`).
+- **No version negotiation.** A user gets whatever version the channel publishes — no ranges, no
+  resolution, no conflicts. A helper never breaks its own API; both sides of the contract belong to the
+  same project, which is what makes that promise keepable rather than aspirational.
+- **The channel is inherited, not chosen.** JonDash resolves a helper on the channel of the module
+  pulling it in, from the official manifest. There is no per-helper channel setting.
+- **Not user-installable.** They arrive automatically as dependencies of a module that declares them
+  (`helpers: ["scheduler"]` in both `module.ts` and the module's `addons.json` entry), and are listed
+  read-only under **Admin → Helpers**. There is no install, import or remove button.
+- **Official source only**, enforced by JonDash's installer — a `helpers` array published by any other
+  source is silently dropped. Otherwise a third party publishes a `helpers/` folder and inherits
+  privilege that modules are specifically denied.
+- **`minAppVersion` is enforced.** A helper needing a newer JonDash than the running build is refused,
+  and the module that declared it fails to install rather than installing in a state where it can never
+  work. The pre-release rule above applies here too.
 - **Their capabilities roll up** into the consent screen of any module that depends on them, described
   by real-world effect rather than capability name.
-- **Removal keeps data.** Files go when nothing depends on a helper; anything it owns stays.
-
-If helpers ever need their own tags, the namespace to use is `helper-<id>/v<version>`, kept distinct
-from add-on tags (`<id>/v<version>`) and from the reserved modification tags below.
+- **Removal keeps data.** Files go when nothing depends on a helper any more; anything it owns stays.
 
 ## Future: core modifications (MOD-07)
 
