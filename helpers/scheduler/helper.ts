@@ -18,10 +18,8 @@ const helper: HelperDefinition = {
   name: "Scheduler",
   description: "Runs modules' declared background work on time, starting when the server starts.",
   version: "0.0.2",
-  // The stable channel, so a plain release number: stable users run stable builds, and
-  // this correctly refuses to install on 1.4.x, which has no helper support at all.
-  // (The beta channel declares `1.5.0-beta.1` instead, so it installs on the 1.5.0 betas —
-  // semver ranks a pre-release BELOW its release, so a bare "1.5.0" would exclude them.)
+  // `-beta.1`, not a bare "1.5.0": semver ranks a pre-release below its release, so a bare
+  // "1.5.0" excludes every 1.5.0 beta — the builds this helper's users are actually running.
   minAppVersion: "1.5.0",
   provides: [], // nothing to consent to — it grants a module no new capability
   migrations: "./migrations",

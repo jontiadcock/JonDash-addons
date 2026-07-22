@@ -4,6 +4,11 @@ Copy **everything in the box below** into a capable AI agent (Claude, or similar
 or two at the end describing the module you want. The prompt is self-contained — the AI does not need
 to know anything about JonDash beforehand, and does not need this repository.
 
+**If the agent can run commands, it can do the whole job.** The prompt tells it how to download a
+throwaway JonDash, install the module, run the same verifier the installer uses, run its own tests,
+start the app and click through the result — so what comes back should be tested, not just written.
+If it has no shell, it will still produce a correct module; you'll be the one installing it.
+
 If the AI has access to your JonDash folder, tell it to read `modules/template/` as a working
 reference; if it doesn't, the prompt alone is enough.
 
@@ -48,7 +53,15 @@ THE ModuleDefinition (module.ts):
     name: string;               // shown to the admin
     description: string;        // one honest sentence
     version: string;            // semver; "0.0.1-beta.1" for a first beta
-    minAppVersion: string;      // "1.4.0" — the release that introduced the module framework
+    minAppVersion: string;      // "1.4.0" — the release that introduced the module framework.
+                                //   Declare the OLDEST build that genuinely works, not the
+                                //   newest available: too high locks people out for nothing.
+                                //   Always name the PRE-RELEASE — "1.5.0-beta.1", never a
+                                //   bare "1.5.0". Semver ranks a pre-release below its
+                                //   release, so a bare "1.5.0" is refused on every 1.5.0
+                                //   beta, i.e. on the builds beta users actually run.
+                                //   Raise it only for what you use: `schedules`/`helpers`
+                                //   need "1.5.0-beta.1"; a 2nd migration needs "1.4.1-beta.1".
     permissions: string[];      // the FEWEST that work — see below
     adminOnly?: boolean;        // true = only full admins see any of it
     settings?: { key: string; label: string; type: "string"|"text"|"number"|"boolean";
@@ -63,6 +76,21 @@ THE ModuleDefinition (module.ts):
                                    //   them), and only once the module is enabled. Put anything
                                    //   richer than a flat settings list here.
     migrations?: string;           // e.g. "./migrations"
+    helpers?: string[];            // first-party shared capability you depend on, e.g. ["scheduler"].
+                                   //   Installed automatically WITH your module; never install one
+                                   //   yourself. Required whenever you declare `schedules`.
+                                   //   DEFAULT TO NEITHER: a module that depends on nothing is
+                                   //   easier to install, review and keep working.
+    schedules?: { key: string; everyMs: number; skipOnBoot?: boolean;
+                  run(ctx): Promise<void> }[];
+                                   // Periodic work, DECLARED not started — your code only runs when
+                                   //   something renders it, so a timer started from a widget dies
+                                   //   the moment nobody is looking. The scheduler helper runs these
+                                   //   from server start, skips them while your module is disabled,
+                                   //   and never lets a slow run overlap itself. Keep each job cheap
+                                   //   and idempotent: it may be skipped, retried, or run right
+                                   //   after boot, so never assume exactly one run per interval.
+                                   //   Needs `helpers: ["scheduler"]` and minAppVersion 1.5.0-beta.1.
     onEnable?(ctx): Promise<void>; onDisable?(ctx): Promise<void>; onUninstall?(ctx): Promise<void>;
   }
 
@@ -130,19 +158,103 @@ HARD RULES — an install is refused if you break these:
 WRITING SQL MIGRATIONS: whole-line comments are stripped and statements are split on ";" at the end of
 a line — one statement at a time, no trailing comments after code, no triggers or BEGIN…END blocks.
 SQLite has no boolean or date type: use INTEGER 0/1 and ISO-8601 TEXT.
+CHANGING THE SCHEMA IN A LATER VERSION: never edit a migration that has shipped — it has already run
+on other installs and will not run again. Add a higher-numbered file (002_..., 003_...), give every
+added column a DEFAULT, and treat migrations as forward-only.
 
 LOOKING NATIVE: reuse the app's own classes (card, btn, btn-primary, btn-danger, input) and CSS
 variables (var(--muted), var(--primary), var(--danger), var(--border)) so the module matches light and
 dark mode without any styling of its own.
 
+ONE MORE TRAP, because it produces a confusing error: a "use client" component must not import
+anything that itself imports "server-only" — directly or further down the chain. The build fails with
+a misleading message about the Pages Router. Keep constants and types a client component needs in a
+plain file with no server imports.
+
 DELIVERABLES
 1. modules/<id>/module.ts
 2. modules/<id>/MODULE.md
 3. Any widget.tsx / page.tsx / actions.ts / lib/*.ts / migrations/*.sql / tests/*.test.ts it needs.
-Keep it small and single-purpose. Explain how to test it: put the folder in modules/<id>/ (or zip the
-folder and use Admin -> Modules -> Import your own module), rebuild and restart, enable it in
-Admin -> Modules after reviewing the permission prompt, check the widget/page/settings work, then
-confirm that disabling hides it and uninstalling removes all of its data.
+Keep it small and single-purpose.
+
+STANDING IT UP AND TESTING IT — do this yourself, and do not hand over work you have not run.
+If you have a shell, everything below is doable without help. Use a THROWAWAY JonDash, never one
+somebody depends on, and never the default port if something is already using it.
+
+1. Get a JonDash to test against (skip if you already have a disposable one):
+     git clone --depth 1 --branch v1.4.1-beta.1 https://github.com/jontiadcock/JonDash jondash-test
+     cd jondash-test && rm -rf .git && npm install
+   Use the newest release tag you can see on that repository. Node must be on PATH.
+
+2. Put your module in place:
+     mkdir -p modules && cp -r /path/to/<id> modules/<id>
+
+3. Check it compiles and lints BEFORE anything else — the install refuses a module that fails either:
+     npx tsc --noEmit
+     npx eslint modules/<id> --ext .ts,.tsx
+   Fix everything they report. Warnings about unused imports matter; they mean dead code.
+
+4. Run it against the REAL installer verifier before you trust it. Write this as verify.mts in the
+   APP ROOT — not inside your module, because it imports core internals your module may not:
+     import fs from "node:fs";
+     import path from "node:path";
+     import { verifyModuleFiles, formatIssues } from "./lib/modules/verify";
+     const dir = path.resolve("modules/<id>");
+     const files: { path: string; text?: string; bytes: number }[] = [];
+     (function walk(d: string, prefix = "") {
+       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+         const full = path.join(d, e.name);
+         const rel = prefix ? `${prefix}/${e.name}` : e.name;
+         if (e.isDirectory()) walk(full, rel);
+         else { const b = fs.readFileSync(full); files.push({ path: rel, text: b.toString("utf8"), bytes: b.length }); }
+       }
+     })(dir);
+     const r = verifyModuleFiles("<id>", files as never, ["<your declared permissions>"] as never);
+     console.log("ok=" + r.ok);
+     console.log(r.issues.length ? formatIssues(r.issues) : "no issues");
+   Run it with:  npx tsx verify.mts       then delete verify.mts.
+   This is the same check the installer runs. If it says ok=true you will not be refused at install.
+
+5. Run your own tests. The app's vitest only looks in tests/**, so a module's tests are NOT picked up
+   by default. Write vitest.module.config.ts in the APP ROOT (it must live there, or "vitest/config"
+   cannot resolve) and delete it afterwards:
+     import { defineConfig } from "vitest/config";
+     import path from "node:path";
+     const root = process.cwd();
+     export default defineConfig({
+       test: { environment: "node", include: ["modules/*/tests/**/*.test.ts"], fileParallelism: false,
+         env: { NODE_ENV: "test", ENCRYPTION_KEY: "0".repeat(64) } },
+       resolve: { alias: { "@": root, "server-only": path.resolve(root, "tests/stubs/server-only.ts") } },
+     });
+   Then:  npx vitest run --config vitest.module.config.ts
+
+6. Build and start it on a free port, with a throwaway database:
+     DATABASE_URL="file:./test.db" npx prisma migrate deploy
+     DATABASE_URL="file:./test.db" npm run build
+     DATABASE_URL="file:./test.db" npx next start -p 3020
+   A failed build here is a failed install — read the error, fix it, rebuild.
+
+7. First run needs an administrator. Open http://127.0.0.1:3020 — it redirects to /welcome. Create an
+   account, then it shows an authenticator secret. Turn that into a code with:
+     node -e "const {authenticator}=require('otplib'); console.log(authenticator.generate('THESECRET'))"
+   Enter it, save the recovery codes, and you are in.
+
+8. Now actually exercise the module:
+   - Admin -> Modules: your module is listed. Read the permission warnings — they should match what
+     you declared and nothing more. Enable it.
+   - The widget appears on the dashboard; the page loads at /m/<id>; settings save and survive a reload.
+   - Every button and form you added does what it says, including the failure cases: submit something
+     invalid and check the message explains what to do.
+   - If you ship migrations, confirm your tables exist. List every table and filter in JavaScript
+     rather than with SQL LIKE — in LIKE, "_" is a single-character wildcard, so 'mod_%' also matches
+     core tables such as Module, and escaping it through the shell is more trouble than it is worth.
+     Substitute your own id with dashes turned into underscores:
+       DATABASE_URL="file:./test.db" node -e "const {PrismaClient}=require('@prisma/client');const p=new PrismaClient();p.$queryRawUnsafe(\"SELECT name FROM sqlite_master WHERE type='table'\").then(r=>console.log(r.map(x=>x.name).filter(n=>n.startsWith('mod_<id>_')))).finally(()=>p.$disconnect())"
+   - Disable it: the widget and page disappear and the rest of the app is untouched.
+   - Uninstall it: your mod_<id>_* tables and settings are gone.
+
+9. Report honestly what you ran and what you did NOT. If something is untested, say so plainly rather
+   than implying it works. "Compiles" is not "works".
 
 NOW BUILD THIS MODULE:
 <<< describe what you want here: what it should show or do, any external service it should talk to,

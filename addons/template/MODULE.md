@@ -7,9 +7,13 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.1
-- **Minimum JonDash version:** 1.4.0
-- **Permissions requested:** none
+- **Version:** 0.0.6
+- **Minimum JonDash version:** `1.4.1-beta.1` — the oldest build that genuinely works, not the newest
+  available. Declared as the **pre-release** on purpose: semver ranks `1.4.1-beta.1` *below* `1.4.1`,
+  so naming the pre-release is what lets it install on that series' betas too. Copy this habit.
+- **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
+- **Depends on:** nothing. No helpers, no background work — copy this and you get a module that
+  installs entirely on its own. Helpers are covered below as an option, not used here.
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
   a page, and add/delete forms that write through a Server Action
@@ -30,11 +34,12 @@ you. It needs no other context.
 | `page.tsx` | no | Your own page at `/m/<id>`. |
 | `actions.ts` | no | Server Actions — how a form changes data. The one part worth reading twice. |
 | `migrations/001_init.sql` | no | Your own `mod_<id>_*` tables. |
+| `migrations/002_add_done.sql` | no | How to add a column in a LATER version. Read it before you ship a schema change. |
 | `lib/store.ts` | no | Every query in one place. |
 | `lib/text.ts` | no | Pure helpers, easy to test. |
 | `lib/constants.ts` | no | The module id in one place. |
 | `tests/text.test.ts` | no | Example test. Ships with the module — see the warning inside it. |
-| `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write your module. Delete it from your copy. |
+| `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write, test and verify a module. Delete it from your copy. |
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
@@ -79,6 +84,29 @@ Declaring anything else gets it stripped, which makes your manifest disagree wit
 the install is refused. There is no permission for reading users, sessions, other core tables or the
 filesystem — a module keeps its own data in `ctx.db` and `ctx.store`. Ask for the fewest that make your
 module work; over-asking gets modules declined.
+
+**This template declares exactly one: `audit:write`**, because `actions.ts` records added and deleted
+items in JonDash's audit log. That is the only reason it's there — delete the audit calls and the list
+should go back to empty. Notice the code writes `if (ctx.audit)` rather than assuming: a capability you
+didn't declare, or that the admin didn't approve, simply isn't on `ctx`.
+
+**Adding a permission in a later version is not free.** When someone updates, JonDash shows them what
+the new version additionally wants and makes them approve it before the update applies. Every extra
+entry is a question you're asking a person to answer, so earn it.
+
+## Changing your database later
+
+`migrations/002_add_done.sql` exists to show the pattern, because getting it wrong breaks other
+people's installs:
+
+- **Never edit a migration that has shipped.** `001` has already run elsewhere and won't run again —
+  JonDash records applied files per module. Add a new, higher-numbered file.
+- An existing install runs only the new file; a fresh install runs `001` then `002`. Both end up
+  identical.
+- **Give every added column a `DEFAULT`** — rows already exist and SQLite needs something to put in them.
+- Forward-only. There is no "down"; if you get it wrong, ship `003` that fixes it.
+- Migrations run when the module is enabled, and — from JonDash 1.4.1 — after an update too. On older
+  builds an updated module's new migration doesn't run, which is why this version requires 1.4.1.
 
 ## What will get your module refused
 
@@ -127,4 +155,9 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.6 | **The template depends on nothing again.** The `scheduler` helper and the six-hourly `tidy` schedule added in 0.0.4-beta.1 are gone: a starter module should not drag a dependency in with it, and copying this now gives you something that installs entirely on its own. Helpers and `schedules` are still documented — as an option, with the syntax, in `module.ts` and in `AI-PROMPT.md` — just not used. `minAppVersion` drops back to `1.4.1-beta.1`, the genuine floor (migration 002), so the template works on far more installs. First version published to **both** channels since 0.0.1. |
+| 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module could actually be installed — 0.0.4-beta.1 was refused on every build that existed. No code change. |
+| 0.0.4-beta.1 | **Uninstallable — never use.** Declared the `scheduler` helper and a `schedules` entry (a six-hourly tidy of finished items). Removed again in 0.0.6. Required JonDash 1.5.0. |
+| 0.0.3 | The AI prompt now covers the whole job, not just the writing: how to stand up a throwaway JonDash, run the same verifier the installer uses, run the module's own tests, start the app and click through it — plus the `server-only` trap and an instruction to report honestly what was and was not tested. |
+| 0.0.2 | Adds a `done` toggle, which demonstrates the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission (`audit:write`) that the code actually uses. Requires JonDash 1.4.1-beta.1, the first build that runs a module's migrations after an update. |
 | 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |

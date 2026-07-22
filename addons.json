@@ -8,28 +8,33 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.4",
-      "minAppVersion": "1.4.0",
+      "version": "0.0.5",
+      "minAppVersion": "1.5.0",
       "permissions": [
         "network:outbound",
         "crypto:use",
         "email:send",
         "audit:write"
       ],
+      "helpers": [
+        "scheduler"
+      ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.4",
-      "notes": "Checks are now added and changed in Admin -> Modules -> Health monitoring, and the module page is display-only. The form adapts to what you are checking: website, ping, port, DNS or SSL certificate."
+      "tag": "health-monitor/v0.0.5",
+      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting has been removed - it never controlled how often anything was actually checked."
     },
     {
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.1",
-      "minAppVersion": "1.4.0",
-      "permissions": [],
+      "version": "0.0.6",
+      "minAppVersion": "1.4.1-beta.1",
+      "permissions": [
+        "audit:write"
+      ],
       "path": "addons/template",
-      "tag": "template/v0.0.1",
-      "notes": "First release. A complete working module to copy when building your own, with a file-by-file guide, a rename checklist and a paste-in AI prompt included."
+      "tag": "template/v0.0.6",
+      "notes": "The template depends on nothing: no helpers and no background work, so copying it gives you a module that installs on its own. Adds a done toggle (showing a follow-up migration and a permission the code actually uses), and a much fuller guide - including a paste-in AI prompt that covers building, testing and verifying a module end to end."
     }
   ],
   "helpers": [

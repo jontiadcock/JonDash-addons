@@ -154,7 +154,6 @@ export type RollupRow = {
 
 /** The module's settings, resolved and coerced from the framework's setting store. */
 export type ModuleSettings = {
-  pollSeconds: number;
   defaultIntervalSec: number;
   defaultTimeoutMs: number;
   defaultRetries: number;

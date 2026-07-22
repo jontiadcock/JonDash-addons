@@ -1,5 +1,5 @@
 import type { ModulePageProps } from "@/lib/modules/types";
-import { addItemAction, deleteItemAction } from "./actions";
+import { addItemAction, deleteItemAction, toggleItemAction } from "./actions";
 import { listItems } from "./lib/store";
 import { MAX_ITEM_LENGTH } from "./lib/text";
 
@@ -66,17 +66,35 @@ export default async function TemplatePage({ ctx, path }: ModulePageProps) {
           {items.map((item) => (
             <li key={item.id} className="card flex items-center justify-between gap-3 p-3">
               <span className="min-w-0">
-                <span className="block truncate text-sm">{item.text}</span>
+                <span
+                  className="block truncate text-sm"
+                  style={
+                    item.done
+                      ? { textDecoration: "line-through", color: "var(--muted)" }
+                      : undefined
+                  }
+                >
+                  {item.text}
+                </span>
                 <span className="text-xs" style={{ color: "var(--muted)" }}>
                   {new Date(item.createdAt).toLocaleString()}
                 </span>
               </span>
-              <form action={deleteItemAction} className="flex-none">
-                <input type="hidden" name="id" value={item.id} />
-                <button className="btn btn-danger" type="submit">
-                  Delete
-                </button>
-              </form>
+              <span className="flex flex-none items-center gap-2">
+                {/* `done` came from migration 002 — proof a later migration applied. */}
+                <form action={toggleItemAction}>
+                  <input type="hidden" name="id" value={item.id} />
+                  <button className="btn btn-ghost" type="submit">
+                    {item.done ? "Undo" : "Done"}
+                  </button>
+                </form>
+                <form action={deleteItemAction}>
+                  <input type="hidden" name="id" value={item.id} />
+                  <button className="btn btn-danger" type="submit">
+                    Delete
+                  </button>
+                </form>
+              </span>
             </li>
           ))}
         </ul>

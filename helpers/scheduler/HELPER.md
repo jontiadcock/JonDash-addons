@@ -1,17 +1,8 @@
 # Scheduler helper
 
-**Status: published on BOTH channels — 0.0.2 (stable) and 0.0.2-beta.1 (beta). Same runtime; the two
-differ only in `minAppVersion`. Proven end to end on 2026-07-22 (see the version history).**
-
-> **Nothing on the stable channel can use this yet.** Helpers arrived in JonDash **1.5.0**, and stable
-> is still **1.4.0** — which has no helper support at all. This is published ahead of time so the
-> modules that need it have somewhere to resolve from the moment 1.5.0 ships. Until then it is inert
-> on stable, and correctly refuses to install (`minAppVersion: 1.5.0`).
->
-> **This being present on `main` does NOT mean a module that needs it can be promoted to stable.**
-> The real precondition is JonDash **1.5.0 on the stable channel**. Promoting `health-monitor`
-> 0.0.5+ to stable before then would leave 1.4.x users with no poller and no helper — monitoring
-> would silently stop.
+**Status: published, version 0.0.2-beta.1 (beta channel). The runtime lives here and is maintained
+here. Proven end to end on 2026-07-22 (see the version history) — `health-monitor` still has its own
+poller and migrates onto this next.**
 
 Lets a module run work on a schedule **from the moment the server starts**, rather than the first time
 somebody happens to open a page.
@@ -102,6 +93,5 @@ the module looked for due work and never how often anything was actually checked
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.2 (stable) | Same runtime as 0.0.2-beta.1, published to the stable channel ahead of the modules that depend on it. `minAppVersion` is a plain `1.5.0` here — stable users run stable builds, and it must refuse on 1.4.x, which has no helper support. |
 | 0.0.2-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`. Runtime unchanged. A bare `1.5.0` ranks *above* every 1.5.0 beta in semver, so nothing could install it. **First end-to-end proof, on a pristine 1.5.0-beta.2 install:** a declared job ran ~5s after a server restart with **nobody signed in and no page opened** — the cold-start gap this helper exists to close — and was skipped entirely while its module was disabled. Two core defects found in the process (helpers were never installed with a module, and never pruned when the last dependent went), both reported; neither is in this runtime. |
 | 0.0.1-beta.1 | First release. Runtime moved into this repo by the core session and now maintained here. Fixed before publishing: jobs were collected once at boot, so a module enabled afterwards never ran — and with no schedules present at boot the scheduler gave up entirely, which is the state of every fresh install. |

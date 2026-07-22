@@ -93,13 +93,11 @@ export const SETTING_FIELDS: ModuleSettingField[] = [
     default: 2,
     help: "Individual checks older than this become hourly summaries. Uptime figures stay accurate; the minute-by-minute detail goes.",
   },
-  {
-    key: "pollSeconds",
-    label: "How often to look for due checks (seconds)",
-    type: "number",
-    default: 15,
-    help: "Advanced. How often the module wakes up to see what needs checking — not how often each thing is checked.",
-  },
+  // `pollSeconds` was removed in 0.0.5-beta.1. Scheduled work now runs on the `scheduler`
+  // helper, whose interval is fixed when the module is defined, so a user-tunable value
+  // could no longer take effect. Nothing real is lost: it only controlled how often the
+  // module LOOKED for due work, never how often anything was actually checked, and the
+  // scan is fixed at 15s — shorter than the shortest interval a monitor can be given.
   {
     key: "maxConcurrent",
     label: "Checks to run at the same time",
@@ -133,7 +131,6 @@ function list(v: unknown): string[] {
 export async function readSettings(ctx: ModuleContext): Promise<ModuleSettings> {
   const s = await ctx.settings.all();
   return {
-    pollSeconds: num(s.pollSeconds, 15, 5, 3600),
     defaultIntervalSec: num(s.defaultIntervalSec, 60, 10, 86_400),
     defaultTimeoutMs: num(s.defaultTimeoutMs, 10_000, 500, 120_000),
     defaultRetries: num(s.defaultRetries, 2, 0, 10),
