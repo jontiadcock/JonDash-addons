@@ -7,7 +7,7 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.2
+- **Version:** 0.0.3
 - **Minimum JonDash version:** 1.4.1-beta.1
 - **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
@@ -35,7 +35,7 @@ you. It needs no other context.
 | `lib/text.ts` | no | Pure helpers, easy to test. |
 | `lib/constants.ts` | no | The module id in one place. |
 | `tests/text.test.ts` | no | Example test. Ships with the module — see the warning inside it. |
-| `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write your module. Delete it from your copy. |
+| `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write, test and verify a module. Delete it from your copy. |
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
@@ -151,5 +151,6 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.3 | The AI prompt now covers the whole job, not just the writing: how to stand up a throwaway JonDash, run the same verifier the installer uses, run the module's own tests, start the app and click through it — plus the `server-only` trap and an instruction to report honestly what was and was not tested. |
 | 0.0.2 | Adds a `done` toggle, which demonstrates the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission (`audit:write`) that the code actually uses. Requires JonDash 1.4.1-beta.1, the first build that runs a module's migrations after an update. |
 | 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |
