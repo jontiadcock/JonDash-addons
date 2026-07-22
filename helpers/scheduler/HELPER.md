@@ -1,8 +1,8 @@
 # Scheduler helper
 
-**Status: published, version 0.0.2-beta.1 (beta channel). The runtime lives here and is maintained
-here. Proven end to end on 2026-07-22 (see the version history) — `health-monitor` still has its own
-poller and migrates onto this next.**
+**Status: published on BOTH channels — `0.0.2` on stable, `0.0.2-beta.1` on beta. The runtime lives here
+and is maintained here. Proven end to end on 2026-07-22 (see the version history), and `health-monitor`
+now runs on it — its in-module poller is gone as of 0.0.5.**
 
 Lets a module run work on a schedule **from the moment the server starts**, rather than the first time
 somebody happens to open a page.
@@ -84,10 +84,10 @@ should catch.
 
 ## First consumer
 
-`health-monitor` will drop its in-module poller for this. That poller is the worked example of the
-problem: a `setInterval` started from a widget render, with a documented cold-start gap that this
-helper removes. The migration also deletes its `pollSeconds` setting, which only controlled how often
-the module looked for due work and never how often anything was actually checked.
+`health-monitor` **has migrated** — as of **0.0.5** its in-module poller is gone and its work runs from
+here. That poller was the worked example of the problem: a `setInterval` started from a widget render,
+with a cold-start gap this helper removes. The migration also deleted its `pollSeconds` setting, which
+only controlled how often the module looked for due work and never how often anything was checked.
 
 ## Version history
 

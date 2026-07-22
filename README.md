@@ -18,7 +18,7 @@ Installing from a source is live as of **JonDash 1.4.0**; **helpers** need **1.5
 
 ## Installing from here
 
-Nothing is cloned or downloaded by hand. In JonDash: **Admin → Settings → Modules → Browse modules**.
+Nothing is cloned or downloaded by hand. In JonDash: **Admin → Modules → Browse modules**.
 This source is already configured, so the list is populated on a fresh install. Tick one or more modules
 and install them together — one rebuild and one restart for the batch.
 
