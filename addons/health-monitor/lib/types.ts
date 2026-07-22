@@ -4,6 +4,9 @@ export const MODULE_ID = "health-monitor";
 /** Where this module's pages live. */
 export const MODULE_PATH = `/m/${MODULE_ID}`;
 
+/** Where the module's settings — and its management UI — are rendered by JonDash. */
+export const ADMIN_PATH = `/admin/modules/${MODULE_ID}`;
+
 /** What an action reports back to the page, to be shown to the person who did it. */
 export type ActionResult = { ok: boolean; message: string };
 

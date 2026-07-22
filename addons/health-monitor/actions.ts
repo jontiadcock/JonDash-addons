@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { moduleAction } from "@/lib/modules/api";
-import { MODULE_ID, MODULE_PATH, type ActionResult } from "./lib/types";
+import { ADMIN_PATH, MODULE_ID, MODULE_PATH, type ActionResult } from "./lib/types";
 import {
   deleteChannel,
   deleteMonitor,
@@ -85,6 +85,7 @@ export const saveMonitorAction = moduleAction(
     if (!existing) await markDue(ctx.db, id);
     await catchUp(ctx, true);
 
+    revalidatePath(ADMIN_PATH);
     revalidatePath(MODULE_PATH);
     revalidatePath(`${MODULE_PATH}/monitor/${id}`);
     return { ok: true, message: existing ? `Saved “${input.name}”.` : `Now watching “${input.name}”.` };
@@ -102,6 +103,7 @@ export const deleteMonitorAction = moduleAction(
     await deleteMonitor(ctx.db, id);
     if (ctx.audit) await ctx.audit("monitor.delete", monitor.name);
 
+    revalidatePath(ADMIN_PATH);
     revalidatePath(MODULE_PATH);
     return { ok: true, message: `Removed “${monitor.name}” and its history.` };
   },
@@ -120,6 +122,7 @@ export const checkNowAction = moduleAction(
     const state = await checkMonitor(ctx, monitor, settings);
     const after = await getMonitor(ctx.db, id);
 
+    revalidatePath(ADMIN_PATH);
     revalidatePath(MODULE_PATH);
     revalidatePath(`${MODULE_PATH}/monitor/${id}`);
     return {
@@ -152,7 +155,7 @@ export const saveChannelAction = moduleAction(
     });
     if (ctx.audit) await ctx.audit("channel.save", `${input.name} (${input.kind})`);
 
-    revalidatePath(`${MODULE_PATH}/channels`);
+    revalidatePath(ADMIN_PATH);
     return { ok: true, message: `Saved “${input.name}”. Send a test to check it works.` };
   },
 );
@@ -168,7 +171,7 @@ export const deleteChannelAction = moduleAction(
     await deleteChannel(ctx.db, id);
     if (ctx.audit) await ctx.audit("channel.delete", channel.name);
 
-    revalidatePath(`${MODULE_PATH}/channels`);
+    revalidatePath(ADMIN_PATH);
     return { ok: true, message: `Removed “${channel.name}”.` };
   },
 );
@@ -176,8 +179,8 @@ export const deleteChannelAction = moduleAction(
 /** Apply whatever is in the bulk-import box. Adds and updates only — never deletes. */
 export const importConfigAction = moduleAction(MODULE_ID, async (ctx): Promise<ActionResult> => {
   const outcome = await importConfigJson(ctx);
+  revalidatePath(ADMIN_PATH);
   revalidatePath(MODULE_PATH);
-  revalidatePath(`${MODULE_PATH}/channels`);
   if (!outcome.applied) return { ok: false, message: outcome.error ?? "Nothing was imported." };
   return {
     ok: true,
@@ -206,7 +209,7 @@ export const testChannelAction = moduleAction(
       settings.notifyEmails,
     );
 
-    revalidatePath(`${MODULE_PATH}/channels`);
+    revalidatePath(ADMIN_PATH);
     return result.ok
       ? { ok: true, message: `Test sent to “${channel.name}”. Check it arrived.` }
       : { ok: false, message: `“${channel.name}” failed: ${result.error ?? "unknown error"}` };

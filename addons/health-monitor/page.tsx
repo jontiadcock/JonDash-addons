@@ -1,44 +1,25 @@
 import Link from "next/link";
 import type { ModulePageProps } from "@/lib/modules/types";
 import { ensureRunning } from "./lib/scheduler";
-import { lastConfigError } from "./lib/config";
 import {
   getMonitor,
   hourlyBuckets,
-  listChannels,
   listIncidents,
   listMonitors,
   recentResults,
-  routeIdsFor,
-  parseConfig,
   uptimeWindow,
   type HourBucket,
 } from "./lib/store";
 import { formatAgo, formatDuration, formatMs, formatUptime, stateColour, STATE_LABEL, worstState } from "./lib/format";
-import { CHANNEL_CHOICES, KIND_CHOICES } from "./lib/forms";
-import { MODULE_PATH, type ChannelRow, type MonitorRow } from "./lib/types";
+import { KIND_CHOICES } from "./lib/forms";
+import { ADMIN_PATH, MODULE_PATH, type MonitorRow } from "./lib/types";
 import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/parts";
-import { ActionForm, Field } from "./ui/form";
-import { CheckForm } from "./ui/check-form";
-import {
-  checkNowAction,
-  deleteChannelAction,
-  deleteMonitorAction,
-  importConfigAction,
-  saveChannelAction,
-  saveMonitorAction,
-  testChannelAction,
-} from "./actions";
-
-const SETTINGS_PATH = `${MODULE_PATH}/settings`;
 
 /**
  * The module's pages, split so that looking and changing are different places:
  *
  *   /m/health-monitor                → what's up and what isn't. Display only.
  *   /m/health-monitor/monitor/<id>   → one check's history and outages. Display only.
- *   /m/health-monitor/settings       → add, change and remove checks; alert destinations.
- *   /m/health-monitor/settings/<id>  → change one check.
  *
  * Nothing on a display page changes anything, so a dashboard can be left open without a
  * misplaced click reconfiguring the monitoring.
@@ -48,15 +29,6 @@ export default async function HealthPage({ ctx, path }: ModulePageProps) {
   const db = ctx.db;
   if (!db) {
     return <p className="text-sm" style={{ color: "var(--muted)" }}>The module has no database.</p>;
-  }
-
-  if (path[0] === "settings") {
-    if (path[1]) {
-      const monitor = await getMonitor(db, path[1]);
-      if (!monitor) return <NotFound />;
-      return <EditCheck ctx={ctx} monitor={monitor} />;
-    }
-    return <SettingsPage ctx={ctx} />;
   }
 
   if (path[0] === "monitor" && path[1]) {
@@ -125,7 +97,7 @@ async function Overview({ ctx }: { ctx: ModulePageProps["ctx"] }) {
                   : `All ${active.length} up.`}
           </p>
         </div>
-        <Link href={SETTINGS_PATH} className="btn btn-ghost">
+        <Link href={ADMIN_PATH} className="btn btn-ghost">
           Manage checks
         </Link>
       </section>
@@ -138,7 +110,7 @@ async function Overview({ ctx }: { ctx: ModulePageProps["ctx"] }) {
             SSL certificate.
           </p>
           <p className="mt-3">
-            <Link href={SETTINGS_PATH} className="btn btn-primary">
+            <Link href={ADMIN_PATH} className="btn btn-primary">
               Add a check
             </Link>
           </p>
@@ -230,7 +202,7 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
             </p>
           ) : null}
         </div>
-        <Link href={`${SETTINGS_PATH}/${monitor.id}`} className="btn btn-ghost">
+        <Link href={ADMIN_PATH} className="btn btn-ghost">
           Change this check
         </Link>
       </section>
@@ -302,235 +274,6 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
             </li>
           ))}
         </ul>
-      </section>
-    </div>
-  );
-}
-
-/* --------------------------------------------------------------- settings */
-
-async function SettingsPage({ ctx }: { ctx: ModulePageProps["ctx"] }) {
-  const db = ctx.db!;
-  const monitors = await listMonitors(db);
-  const channels: ChannelRow[] = await listChannels(db);
-  const configError = await lastConfigError(ctx);
-  const kindName = new Map(KIND_CHOICES.map((k) => [k.value, k.label]));
-  const channelName = new Map(CHANNEL_CHOICES.map((c) => [c.value, c.label]));
-
-  return (
-    <div className="hm flex flex-col gap-6">
-      <HealthStyles />
-      <section>
-        <BackLink href={MODULE_PATH} label="← Health" />
-        <h1 className="mb-1 mt-1 text-2xl font-semibold tracking-tight">Manage checks</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          Everything you monitor, and where alerts go. Defaults like timeouts and how long history is
-          kept live in Admin → Modules → Health monitoring.
-        </p>
-      </section>
-
-      {configError ? (
-        <div className="card p-3 text-sm" style={{ borderColor: "var(--danger)" }}>
-          <span style={{ color: "var(--danger)" }}>Last bulk import failed:</span> {configError}
-        </div>
-      ) : null}
-
-      <section>
-        <h2 className="mb-2 text-lg font-semibold tracking-tight">Your checks</h2>
-        {monitors.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--muted)" }}>
-            None yet. Add one below.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {monitors.map((m) => (
-              <li key={m.id} className="card flex flex-wrap items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 font-medium">
-                    <StatusDot state={m.enabled === 1 ? m.status : "unknown"} size={8} />
-                    <span className="truncate">{m.name}</span>
-                  </p>
-                  <p className="truncate text-xs" style={{ color: "var(--muted)" }}>
-                    {kindName.get(m.kind) ?? m.kind} · {m.target}
-                    {m.port ? `:${m.port}` : ""}
-                    {m.enabled === 1 ? "" : " · paused"}
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <ActionForm action={checkNowAction} submitLabel="Check now" variant="ghost" inline>
-                    <input type="hidden" name="id" value={m.id} />
-                  </ActionForm>
-                  <Link href={`${SETTINGS_PATH}/${m.id}`} className="btn btn-ghost">
-                    Change
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="card p-4">
-        <h2 className="mb-1 text-lg font-semibold tracking-tight">Add a check</h2>
-        <p className="mb-3 text-sm" style={{ color: "var(--muted)" }}>
-          Pick what kind of check it is and the rest of the form follows.
-        </p>
-        <CheckForm
-          action={saveMonitorAction}
-          channels={channels}
-          others={monitors.map((m) => ({ id: m.id, name: m.name }))}
-          submitLabel="Add this check"
-        />
-      </section>
-
-      <section>
-        <h2 className="mb-1 text-lg font-semibold tracking-tight">Where alerts go</h2>
-        <p className="mb-3 text-sm" style={{ color: "var(--muted)" }}>
-          Add a destination, send it a test, then tick it on the checks that should use it.
-        </p>
-
-        {channels.length === 0 ? (
-          <p className="mb-3 text-sm" style={{ color: "var(--muted)" }}>
-            Nothing set up — you will not be told when something breaks.
-          </p>
-        ) : (
-          <ul className="mb-4 flex flex-col gap-2">
-            {channels.map((c) => (
-              <li key={c.id} className="card flex flex-wrap items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="font-medium">{c.name}</p>
-                  <p className="text-xs" style={{ color: "var(--muted)" }}>
-                    {channelName.get(c.kind) ?? c.kind} · stored encrypted, not shown again
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <ActionForm action={testChannelAction} submitLabel="Send a test" variant="ghost" inline>
-                    <input type="hidden" name="id" value={c.id} />
-                  </ActionForm>
-                  <ActionForm
-                    action={deleteChannelAction}
-                    submitLabel="Remove"
-                    variant="danger"
-                    inline
-                    confirm={`Remove “${c.name}”? Checks using it will stop alerting there.`}
-                  >
-                    <input type="hidden" name="id" value={c.id} />
-                  </ActionForm>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="card p-4">
-          <h3 className="mb-3 font-medium">Add a destination</h3>
-          <ActionForm action={saveChannelAction} submitLabel="Add it">
-            <Field label="Name" help="How you'll recognise it — “My phone”, “Team chat”.">
-              <input className="input" name="name" maxLength={80} required />
-            </Field>
-
-            <Field label="Send to">
-              <select className="input" name="kind" defaultValue="email">
-                {CHANNEL_CHOICES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="card p-3 text-xs" style={{ color: "var(--muted)" }}>
-              <p className="mb-1 font-medium" style={{ color: "var(--foreground)" }}>
-                What each one needs
-              </p>
-              <ul className="flex flex-col gap-1">
-                {CHANNEL_CHOICES.map((c) => (
-                  <li key={c.value}>
-                    <strong>{c.label}:</strong> {c.needs}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <Field label="URL" help="Where alerts are posted. Not needed for email or Telegram.">
-              <input className="input" name="url" type="url" placeholder="https://…" maxLength={500} />
-            </Field>
-
-            <Field label="Secret or token" help="A bot token, an app token, or a value sent as an Authorization header. Stored encrypted.">
-              <input className="input" name="secret" maxLength={300} />
-            </Field>
-
-            <Field label="Topic or chat" help="The ntfy topic, or the Telegram chat id.">
-              <input className="input" name="topic" maxLength={200} />
-            </Field>
-
-            <Field label="Email addresses" help="Email only. Comma-separated. Blank uses the recipients in the module's settings.">
-              <input className="input" name="recipients" maxLength={500} placeholder="you@example.com" />
-            </Field>
-          </ActionForm>
-        </div>
-      </section>
-
-      <details className="card p-4">
-        <summary className="cursor-pointer text-sm font-medium">Bulk import</summary>
-        <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
-          To add a lot at once, or restore a configuration you kept a copy of: paste it into the
-          module&apos;s bulk import setting in Admin → Modules → Health monitoring, then press this. It
-          only adds and updates — nothing is ever removed this way.
-        </p>
-        <div className="mt-3">
-          <ActionForm action={importConfigAction} submitLabel="Run the import" variant="ghost" />
-        </div>
-      </details>
-    </div>
-  );
-}
-
-async function EditCheck({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; monitor: MonitorRow }) {
-  const db = ctx.db!;
-  const channels = await listChannels(db);
-  const routedTo = await routeIdsFor(db, monitor.id);
-  const others = (await listMonitors(db)).filter((m) => m.id !== monitor.id);
-
-  return (
-    <div className="hm flex flex-col gap-6">
-      <HealthStyles />
-      <section>
-        <BackLink href={SETTINGS_PATH} label="← Manage checks" />
-        <h1 className="mb-1 mt-1 text-2xl font-semibold tracking-tight">{monitor.name}</h1>
-        <p className="text-sm" style={{ color: "var(--muted)" }}>
-          <Link href={`${MODULE_PATH}/monitor/${monitor.id}`} style={{ color: "var(--primary)" }}>
-            See its history
-          </Link>
-        </p>
-      </section>
-
-      <section className="card p-4">
-        <CheckForm
-          action={saveMonitorAction}
-          monitor={monitor}
-          config={parseConfig(monitor)}
-          channels={channels}
-          routedTo={routedTo}
-          others={others.map((m) => ({ id: m.id, name: m.name }))}
-          submitLabel="Save changes"
-        />
-      </section>
-
-      <section className="card p-4">
-        <h2 className="mb-1 text-lg font-semibold tracking-tight">Remove this check</h2>
-        <p className="mb-3 text-sm" style={{ color: "var(--muted)" }}>
-          Deletes it and everything recorded about it. To stop checking without losing the history,
-          untick <em>Checking is switched on</em> above.
-        </p>
-        <ActionForm
-          action={deleteMonitorAction}
-          submitLabel="Delete this check"
-          variant="danger"
-          confirm={`Delete “${monitor.name}” and all of its history? This cannot be undone.`}
-        >
-          <input type="hidden" name="id" value={monitor.id} />
-        </ActionForm>
       </section>
     </div>
   );

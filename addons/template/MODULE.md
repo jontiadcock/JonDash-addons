@@ -66,9 +66,19 @@ Every module, with no permissions declared:
 - **`ctx.user`** — who is viewing, or `null` in background work.
 
 Anything more is a **permission**, declared in `module.ts` and shown to the admin as a plain-language
-warning before they enable you: `network:outbound` (→ `ctx.fetch`, `ctx.net`), `crypto:use` (→ `ctx.crypto`),
-`email:send` (→ `ctx.email`), `audit:write` (→ `ctx.audit`), and the `db:*`, `files:*` and `sessions:*`
-family. Ask for the fewest that make your module work — over-asking gets modules declined.
+warning before they enable you. There are exactly four, each tied to the capability it unlocks:
+
+| Permission | What appears on `ctx` |
+| ---------- | --------------------- |
+| `network:outbound` | `ctx.fetch`, `ctx.net.ping`, and raw TCP / DNS / TLS connections |
+| `crypto:use` | `ctx.crypto.encrypt` / `.decrypt` |
+| `audit:write` | `ctx.audit(action, detail?)` |
+| `email:send` | `ctx.email.send({ to, subject, text?, html? })` |
+
+Declaring anything else gets it stripped, which makes your manifest disagree with your `module.ts` and
+the install is refused. There is no permission for reading users, sessions, other core tables or the
+filesystem — a module keeps its own data in `ctx.db` and `ctx.store`. Ask for the fewest that make your
+module work; over-asking gets modules declined.
 
 ## What will get your module refused
 

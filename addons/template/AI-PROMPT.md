@@ -74,11 +74,14 @@ THE CONTEXT (ctx) — only what your permissions granted is present:
   ctx.audit?    // "audit:write": (action, detail?) => Promise<void>
   Free, no permission needed: your settings, your store, your own mod_<id>_* tables.
 
-PERMISSIONS — each is shown to the admin as a plain-language warning before they enable you. Declare
-the fewest that make it work; over-asking gets a module declined:
-  network:outbound | db:users:read | db:users:write | db:core:read | db:core:write | crypto:use |
-  crypto:key:read (DANGEROUS — avoid) | sessions:read | sessions:manage | files:read | files:write |
-  audit:write | email:send
+PERMISSIONS — there are exactly FOUR, and each is shown to the admin as a plain-language warning
+before they enable you. Declare the fewest that make it work; over-asking gets a module declined:
+  network:outbound  → ctx.fetch, ctx.net, and raw TCP/DNS/TLS connections
+  crypto:use        → ctx.crypto
+  audit:write       → ctx.audit
+  email:send        → ctx.email
+Anything else is refused at install. There is no permission for reading users, sessions, other core
+tables, or the filesystem — a module keeps its own data in ctx.db and ctx.store.
 
 SAVING CHANGES — the only sanctioned way:
   // actions.ts

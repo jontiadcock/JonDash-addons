@@ -4,6 +4,7 @@ import HealthPage from "./page";
 import { MODULE_ID } from "./lib/types";
 import { SETTING_FIELDS } from "./lib/settings";
 import { HealthIcon } from "./ui/icon";
+import HealthSettingsPanel from "./ui/settings-panel";
 import { ensureRunning, stopScheduler } from "./lib/scheduler";
 import { importConfigJson } from "./lib/config";
 import { listMonitors } from "./lib/store";
@@ -22,8 +23,8 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.3-beta.1",
-  minAppVersion: "1.4.0-beta.7",
+  version: "0.0.4-beta.1",
+  minAppVersion: "1.4.0-beta.11",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.
@@ -39,6 +40,10 @@ const healthMonitor: ModuleDefinition = {
 
   /** Shown beside the module name; inherits the theme colour. */
   icon: HealthIcon,
+
+  /** Adding and changing checks happens here, in Admin -> Modules, below the settings
+   *  fields above. The module's own pages stay read-only. */
+  SettingsPanel: HealthSettingsPanel,
   DashboardWidget: HealthWidget,
   Page: HealthPage,
   migrations: "./migrations",

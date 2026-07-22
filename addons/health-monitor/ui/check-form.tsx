@@ -36,9 +36,24 @@ export function CheckForm({
   others,
   submitLabel,
 }: Props) {
+  const isNew = !monitor;
   const [kind, setKind] = useState<MonitorKind>(monitor?.kind ?? "http");
+
+  /**
+   * React clears an uncontrolled form by itself once a form action succeeds — but the
+   * chosen kind lives in state, so on an "add" form it has to be put back too. Without
+   * this the dropdown snaps back to the first option while the fields below still follow
+   * the previous kind: "HTTPS / website check" above a port box and a "Hostname" label.
+   *
+   * Resetting here rather than in an effect keeps it part of the submission instead of a
+   * second render pass. An edit form keeps its values, because they are still what's saved.
+   */
   const [result, formAction, pending] = useActionState<ActionResult | null, FormData>(
-    async (_previous, formData) => action(formData),
+    async (_previous, formData) => {
+      const outcome = await action(formData);
+      if (isNew && outcome.ok) setKind("http");
+      return outcome;
+    },
     null,
   );
 
