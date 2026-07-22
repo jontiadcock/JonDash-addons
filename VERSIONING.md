@@ -93,6 +93,27 @@ equivalent of JonDash's own beta channel, but chosen per module.
 **Promote a beta to stable:** bring X's beta version into `main` (merge or copy the folder), set version to
 the release `A.B.C`, update the stable `addons.json`, commit, tag `X/vA.B.C`, push `main` + tag.
 
+## Helpers — different rules on purpose
+
+**Not fixed yet — the runtime is being built in the core app.** See [`helpers/README.md`](helpers/README.md).
+
+Helpers are first-party shared capability living in `helpers/<id>/` in this repository. They are not
+add-ons and deliberately do not follow the scheme above:
+
+- **One version, always current.** No channels, no resolution, no version ranges — a helper never
+  breaks its own API, so there is nothing to pin. Both sides of the contract belong to the same
+  project, which is what makes that promise keepable rather than aspirational.
+- **Not user-installable.** They arrive automatically as dependencies of a module that declares them,
+  and are listed read-only. There is no install, import or remove button.
+- **Official source only**, enforced by the installer — otherwise a third party publishes a `helpers/`
+  folder and inherits privilege that modules are specifically denied.
+- **Their capabilities roll up** into the consent screen of any module that depends on them, described
+  by real-world effect rather than capability name.
+- **Removal keeps data.** Files go when nothing depends on a helper; anything it owns stays.
+
+If helpers ever need their own tags, the namespace to use is `helper-<id>/v<version>`, kept distinct
+from add-on tags (`<id>/v<version>`) and from the reserved modification tags below.
+
 ## Future: core modifications (MOD-07)
 
 Higher-trust add-ons that *can modify the base app* live in the **same repo** but are kept separate:
