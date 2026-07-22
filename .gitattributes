@@ -1,0 +1,7 @@
+# Normalise line endings: LF in the repo, whatever the OS checking out.
+# Without this, a Windows checkout can rewrite files to CRLF, which has already broken
+# a test run once (esbuild can't strip a shebang from a CRLF file).
+* text=auto eol=lf
+
+# Windows launchers must stay CRLF to run under cmd.exe.
+*.bat text eol=crlf
