@@ -49,11 +49,21 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
       "minAppVersion": "1.5.0",        // minimum JonDash version
       "permissions": ["network:outbound"],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v1.0.0"   // the tag to download this version from
+      "tag": "health-monitor/v1.0.0",  // the tag to download this version from
+      "notes": "What changed in this version, in one line."   // optional
     }
   ]
 }
 ```
+
+### `notes` — what changed, for the update screen
+
+Optional, one short line per entry, shown on the module's card in **Admin → Updates** so someone can see
+why a version is worth taking before they take it. Keep it to what changed and who cares; **300
+characters maximum** and no control characters (JonDash caps and strips them, but write it clean).
+
+Update it whenever you bump a version — it describes *that* version, not the module in general. Leaving
+it out is fine; the card simply shows the version numbers.
 
 ## How JonDash consumes it (the Phase 2 installer)
 

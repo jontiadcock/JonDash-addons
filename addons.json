@@ -17,7 +17,8 @@
         "audit:write"
       ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.4"
+      "tag": "health-monitor/v0.0.4",
+      "notes": "Checks are now added and changed in Admin -> Modules -> Health monitoring, and the module page is display-only. The form adapts to what you are checking: website, ping, port, DNS or SSL certificate."
     },
     {
       "id": "template",
@@ -27,7 +28,8 @@
       "minAppVersion": "1.4.0",
       "permissions": [],
       "path": "addons/template",
-      "tag": "template/v0.0.1"
+      "tag": "template/v0.0.1",
+      "notes": "First release. A complete working module to copy when building your own, with a file-by-file guide, a rename checklist and a paste-in AI prompt included."
     }
   ]
 }
