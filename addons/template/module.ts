@@ -2,6 +2,7 @@ import type { ModuleDefinition } from "@/lib/modules/types";
 import TemplateWidget from "./widget";
 import TemplatePage from "./page";
 import { MODULE_ID } from "./lib/constants";
+import { pruneDoneItems } from "./lib/store";
 
 /**
  * The one required file: it default-exports a ModuleDefinition, and that is the whole
@@ -24,10 +25,10 @@ const template: ModuleDefinition = {
     "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
 
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
-  version: "0.0.3",
+  version: "0.0.4-beta.1",
 
   /** The oldest JonDash this module works on. The migration in 002 needs 1.4.1. */
-  minAppVersion: "1.4.1-beta.1",
+  minAppVersion: "1.5.0",
 
   /**
    * Ask for NOTHING you don't use — every entry becomes a warning the admin reads before
@@ -70,6 +71,34 @@ const template: ModuleDefinition = {
 
   /** Optional. Point at a folder of NNN_name.sql files to get your own tables. */
   migrations: "./migrations",
+
+  /**
+   * Helpers you depend on. They are first-party shared capability, installed
+   * automatically alongside your module — you never install one yourself.
+   * Required whenever you declare schedules.
+   */
+  helpers: ["scheduler"],
+
+  /**
+   * Periodic work, DECLARED not started. A module cannot reliably run anything by
+   * itself: its code only executes when something renders it, so work started from a
+   * widget stops the moment nobody is looking. Declaring it hands that problem to the
+   * scheduler, which runs from server start.
+   *
+   * Keep a job cheap and idempotent — it may be skipped, retried, or run right after
+   * boot, so never assume it ran exactly once per interval.
+   */
+  schedules: [
+    {
+      key: "tidy",
+      everyMs: 6 * 60 * 60 * 1000, // six hours; nothing here is urgent
+      run: async (ctx) => {
+        if (!ctx.db) return;
+        const removed = await pruneDoneItems(ctx.db, 7);
+        if (removed > 0) console.log(`[template] tidied ${removed} finished item(s)`);
+      },
+    },
+  ],
 
   /**
    * Optional lifecycle hooks. Migrations have already run before onEnable.
