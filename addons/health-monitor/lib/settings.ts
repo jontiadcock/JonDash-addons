@@ -112,7 +112,7 @@ export const SETTING_FIELDS: ModuleSettingField[] = [
     label: "Bulk import — JSON",
     type: "text",
     default: "",
-    help: "Optional. Paste a saved configuration here and press Import on the Health monitoring page. It only adds and updates — it never deletes. You do not need this to add monitors; use Add a monitor on that page.",
+    help: "Optional. For adding a lot at once or restoring a saved copy: paste it here, then press Run the import on the module page under Manage checks. It only adds and updates — it never deletes. Individual checks are added under Manage checks, not here.",
   },
 ];
 

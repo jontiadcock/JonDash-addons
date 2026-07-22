@@ -8,13 +8,82 @@ import type { ChannelKind, MonitorKind } from "./types";
  * reused if a monitor ever arrives from somewhere other than a form.
  */
 
-/** What a person picks from the "what to check" menu, in plain language. */
-export const KIND_CHOICES: { value: MonitorKind; label: string; hint: string }[] = [
-  { value: "http", label: "Website or web app", hint: "Loads a URL and checks it answers properly" },
-  { value: "tcp", label: "Port", hint: "Opens a connection to a port — databases, SSH, game servers" },
-  { value: "ping", label: "Ping", hint: "For a device that answers nothing else — a router or a printer" },
-  { value: "dns", label: "Domain name", hint: "Checks a name still resolves to an address" },
-  { value: "tls", label: "HTTPS certificate", hint: "Warns you before a certificate expires" },
+/**
+ * The kinds of check, described the way someone picking from a menu would say them, and
+ * with the address field relabelled to suit — asking for a "Web address" and asking for
+ * a "Hostname or IP" are different questions, and one generic box for both is what makes
+ * a form feel clunky.
+ */
+export type KindChoice = {
+  value: MonitorKind;
+  /** What the dropdown says. */
+  label: string;
+  /** One line under the dropdown once chosen. */
+  hint: string;
+  /** Label for the address box for this kind. */
+  addressLabel: string;
+  addressPlaceholder: string;
+  addressHelp: string;
+  /** Whether a port is required, optional, or meaningless for this kind. */
+  port: "required" | "optional" | "none";
+  portHelp?: string;
+  /** Whether the HTTP-only extras apply. */
+  httpOptions?: boolean;
+  /** Whether the self-signed certificate option is worth offering. */
+  tlsOptions?: boolean;
+};
+
+export const KIND_CHOICES: KindChoice[] = [
+  {
+    value: "http",
+    label: "HTTPS / website check",
+    hint: "Loads the page and checks it answers properly, and how quickly.",
+    addressLabel: "Web address",
+    addressPlaceholder: "https://example.com",
+    addressHelp: "The full address, including https:// — the same thing you'd type in a browser.",
+    port: "none",
+    httpOptions: true,
+    tlsOptions: true,
+  },
+  {
+    value: "ping",
+    label: "Ping check",
+    hint: "Asks the device to answer a ping. For anything that offers nothing else.",
+    addressLabel: "Hostname or IP address",
+    addressPlaceholder: "192.168.1.1",
+    addressHelp: "No http:// — just the name or address, like 192.168.1.1 or nas.local.",
+    port: "none",
+  },
+  {
+    value: "tcp",
+    label: "Port check",
+    hint: "Opens a connection to a port. For databases, SSH, game servers — anything not a website.",
+    addressLabel: "Hostname or IP address",
+    addressPlaceholder: "192.168.1.20",
+    addressHelp: "No http:// — just the name or address of the machine.",
+    port: "required",
+    portHelp: "Which port to connect to — 5432 for PostgreSQL, 22 for SSH, 3306 for MySQL.",
+  },
+  {
+    value: "dns",
+    label: "DNS check",
+    hint: "Checks the name still resolves to an address.",
+    addressLabel: "Domain name",
+    addressPlaceholder: "example.com",
+    addressHelp: "The name to look up.",
+    port: "none",
+  },
+  {
+    value: "tls",
+    label: "SSL certificate check",
+    hint: "Warns you well before the certificate expires, and if it stops being trusted.",
+    addressLabel: "Hostname",
+    addressPlaceholder: "example.com",
+    addressHelp: "The name on the certificate — no https:// and no path.",
+    port: "optional",
+    portHelp: "Leave blank for 443, the normal HTTPS port.",
+    tlsOptions: true,
+  },
 ];
 
 /** Intervals worth offering. Seconds under the hood, sentences on screen. */

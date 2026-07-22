@@ -8,11 +8,11 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.2-beta.1",
-      "minAppVersion": "1.4.0-beta.6",
+      "version": "0.0.3-beta.1",
+      "minAppVersion": "1.4.0-beta.7",
       "permissions": ["network:outbound", "crypto:use", "email:send", "audit:write"],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.2-beta.1"
+      "tag": "health-monitor/v0.0.3-beta.1"
     },
     {
       "id": "template",

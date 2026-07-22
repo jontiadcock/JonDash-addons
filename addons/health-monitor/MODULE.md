@@ -4,8 +4,8 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 0.0.2-beta.1
-- **Minimum JonDash version:** 1.4.0-beta.6
+- **Version:** 0.0.3-beta.1
+- **Minimum JonDash version:** 1.4.0-beta.7
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Visibility:** admins only (`adminOnly: true`)
 
@@ -76,11 +76,14 @@ own alert.
 
 ### On the dashboard
 
-The widget shows one line when everything is up and detail when it isn't: per-monitor status, latest
-latency, and a 24-hour strip where each bar is an hour and failures show red. The module's own page at
-`/m/health-monitor` lists every monitor and, per monitor, its uptime over 24 hours / 7 days / 30 days,
-average and 95th-percentile latency, a latency sparkline, recent checks and the incident log. All of it
-is drawn as plain SVG — no charting library, no new dependencies.
+The widget leads with whatever needs attention, then fills up to four rows and says how many are left,
+so it stays readable when a user resizes it down to a single cell. Each row is a status dot, the latest
+response time and a 24-hour strip where every bar is an hour and failures show red.
+
+The module page shows the same list in more detail, and each check has its own page: uptime over 24
+hours, 7 days and 30 days, typical and 95th-percentile response times, a latency trace, its outage
+history and its recent checks. All drawn as plain SVG — no charting library, no new dependencies. None
+of it has any controls; see [Configuring](#configuring).
 
 ---
 
@@ -184,25 +187,30 @@ download — never parsed, never rendered, never executed.
 
 ## Configuring
 
-Everything is set up on the module's own page at `/m/health-monitor` — there is no JSON to write.
+**Looking and changing are separate places.** `/m/health-monitor` and the dashboard widget show status
+and history and contain no controls at all — a dashboard can be left open on a wall without a stray
+click reconfiguring anything. Everything that changes something lives under **Manage checks**
+(`/m/health-monitor/settings`), reached from the button on the page.
 
-**To watch something:** open the page, fill in *Add something to watch* — a name, what kind of thing
-it is, its address, and how often to check — and press the button. It is checked immediately, so you
-know within seconds whether the address was right. Ports, timeouts, retries, a dependency and a note
-are all under *More options*, and every one of them falls back to a sensible default.
+**To add a check:** Manage checks → *Add a check*. Pick the kind first — *HTTPS / website check*,
+*Ping check*, *Port check*, *DNS check* or *SSL certificate check* — and the rest of the form follows
+it: the address box is relabelled to suit, a port appears only where one is meaningful, and
+HTTP-specific options only show for a website check. It runs immediately on save, so a wrong address
+tells you in seconds. Timeouts, retries, a dependency and a note are under *More options*, each
+falling back to a sensible default.
 
-**To be told when it breaks:** go to *Alerts*, add a destination, and send it a test before you rely
-on it. Then tick that destination on each monitor that should use it. A monitor with no destinations
-records outages but tells nobody, and the page says so.
+**To be told when it breaks:** on the same page, add a destination under *Where alerts go*, send it a
+test, then tick it on the checks that should use it. A check with no destination records outages but
+tells nobody.
 
-**To change or remove one:** open it from the list. The same form edits it, *Check it now* runs it on
-demand, and deleting asks first — it takes the history with it. To stop checking without losing the
-history, untick *Checking is switched on*.
+**To change, pause or remove one:** Manage checks → *Change*. The same form edits it. Untick *Checking
+is switched on* to pause without losing the history; *Delete this check* asks first and takes the
+history with it. *Check now* on each row runs it on demand.
 
-**Bulk import** is still there for restoring a saved configuration or adding a lot at once: paste it
-into the module's *Bulk import* setting and press the button on the page. It **only adds and
-updates — it never deletes**, so it can't quietly undo something you set up in the interface. The
-format is in [`CONFIG.md`](CONFIG.md).
+**Defaults and limits** — how long to wait, how many failures before alerting, how long history is
+kept — are in **Admin → Modules → Health monitoring**, along with an optional bulk import for
+restoring a saved configuration ([`CONFIG.md`](CONFIG.md)). That import **only adds and updates; it
+never deletes**, so an old copy can't undo what you set up in the interface.
 
 ---
 
@@ -263,5 +271,6 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
+| 0.0.3-beta.1 | Looking and changing split apart: the module page and widget are now display-only, and everything that changes something moved to a Manage checks page. The add/edit form adapts to the kind of check chosen — plain-language options (HTTPS / website, Ping, Port, DNS, SSL certificate), the address box relabelled to match, and a port field only where it means something. Needs JonDash 1.4.0-beta.7. |
 | 0.0.2-beta.1 | Set-up moved out of JSON and into the interface: add, edit, pause and delete monitors from the module page, manage alert destinations with a test-send button, and run a check on demand. Every setting reworded in plain English with an explanation. Bulk import kept for restoring a saved configuration, and it no longer deletes anything. Custom icon; the widget now leads with whatever needs attention and stays useful when resized small. Needs JonDash 1.4.0-beta.6. |
 | 0.0.1-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |
