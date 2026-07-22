@@ -53,7 +53,12 @@ THE ModuleDefinition (module.ts):
     name: string;               // shown to the admin
     description: string;        // one honest sentence
     version: string;            // semver; "0.0.1-beta.1" for a first beta
-    minAppVersion: string;      // "1.4.0" — the release that introduced the module framework
+    minAppVersion: string;      // "1.4.0" — the release that introduced the module framework.
+                                //   If you need something newer, name the PRE-RELEASE:
+                                //   "1.5.0-beta.1", never a bare "1.5.0". Semver ranks a
+                                //   pre-release below its release, so a bare "1.5.0" is
+                                //   refused on every 1.5.0 beta — i.e. on the builds beta
+                                //   users run. Helpers + `schedules` need 1.5.0-beta.1.
     permissions: string[];      // the FEWEST that work — see below
     adminOnly?: boolean;        // true = only full admins see any of it
     settings?: { key: string; label: string; type: "string"|"text"|"number"|"boolean";

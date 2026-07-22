@@ -1,13 +1,14 @@
 # Scheduler helper
 
-**Status: published, version 0.0.1-beta.1 (beta channel). The runtime lives here and is maintained
-here. Not yet exercised end to end — that happens when `health-monitor` migrates onto it.**
+**Status: published, version 0.0.2-beta.1 (beta channel). The runtime lives here and is maintained
+here. Proven end to end on 2026-07-22 (see the version history) — `health-monitor` still has its own
+poller and migrates onto this next.**
 
 Lets a module run work on a schedule **from the moment the server starts**, rather than the first time
 somebody happens to open a page.
 
 - **Helper id:** `scheduler`
-- **Requires:** JonDash 1.5.0
+- **Requires:** JonDash 1.5.0 — declared as `1.5.0-beta.1`, so it installs on the 1.5.0 betas too
 - **Grants:** nothing new. A scheduled job receives the module's own scoped context, so this helper
   adds **no permission and nothing to the consuming module's consent screen**.
 
@@ -92,4 +93,5 @@ the module looked for due work and never how often anything was actually checked
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.2-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`. Runtime unchanged. A bare `1.5.0` ranks *above* every 1.5.0 beta in semver, so nothing could install it. **First end-to-end proof, on a pristine 1.5.0-beta.2 install:** a declared job ran ~5s after a server restart with **nobody signed in and no page opened** — the cold-start gap this helper exists to close — and was skipped entirely while its module was disabled. Two core defects found in the process (helpers were never installed with a module, and never pruned when the last dependent went), both reported; neither is in this runtime. |
 | 0.0.1-beta.1 | First release. Runtime moved into this repo by the core session and now maintained here. Fixed before publishing: jobs were collected once at boot, so a module enabled afterwards never ran — and with no schedules present at boot the scheduler gave up entirely, which is the state of every fresh install. |

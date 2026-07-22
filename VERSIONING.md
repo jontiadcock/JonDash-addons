@@ -46,7 +46,7 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
       "name": "Health monitoring",
       "description": "One line.",
       "version": "1.0.0",              // the latest version on THIS channel
-      "minAppVersion": "1.5.0",        // minimum JonDash version
+      "minAppVersion": "1.5.0-beta.1", // minimum JonDash version — see the warning below
       "permissions": ["network:outbound"],
       "path": "addons/health-monitor",
       "tag": "health-monitor/v1.0.0",  // the tag to download this version from
@@ -55,6 +55,20 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
   ]
 }
 ```
+
+### `minAppVersion` — name the pre-release, not the release
+
+**A bare `"1.5.0"` makes an addon uninstallable on every 1.5.0 beta.** Semver ranks a pre-release
+*below* its release (`1.5.0-beta.2 < 1.5.0`), and the installer refuses anything whose
+`minAppVersion` is newer than the running build. Beta-channel users are, by definition, running
+pre-releases — so a bare release number excludes exactly the people the beta channel is for.
+
+If your addon needs something that lands in `X.Y.Z`, declare **`X.Y.Z-beta.1`**. It still keeps out
+every build older than that series, and it works on the betas as well as the final release. Keep the
+value identical in `addons.json` and in the addon's own `module.ts` / `helper.ts`.
+
+This is not hypothetical: `template@0.0.4-beta.1` and `scheduler@0.0.1-beta.1` both shipped with a
+bare `"1.5.0"` and could not be installed by anyone, on any build that existed.
 
 ### `notes` — what changed, for the update screen
 

@@ -24,14 +24,14 @@
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.4-beta.1",
-      "minAppVersion": "1.5.0",
+      "version": "0.0.5-beta.1",
+      "minAppVersion": "1.5.0-beta.1",
       "permissions": [
         "audit:write"
       ],
       "path": "addons/template",
-      "tag": "template/v0.0.4-beta.1",
-      "notes": "Declares the scheduler helper and a periodic job, so a module can have background work that runs from server start rather than only while somebody is looking."
+      "tag": "template/v0.0.5-beta.1",
+      "notes": "Installable again on 1.5.0 betas: 0.0.4-beta.1 asked for \"1.5.0\", which semver ranks above every 1.5.0 beta, so it was refused on the builds beta users run."
     }
   ],
   "helpers": [
@@ -39,12 +39,12 @@
       "id": "scheduler",
       "name": "Scheduler",
       "description": "Runs modules' declared background work on time, starting when the server starts rather than when someone opens a page.",
-      "version": "0.0.1-beta.1",
-      "minAppVersion": "1.5.0",
+      "version": "0.0.2-beta.1",
+      "minAppVersion": "1.5.0-beta.1",
       "provides": [],
       "path": "helpers/scheduler",
-      "tag": "scheduler/v0.0.1-beta.1",
-      "notes": "First release. Declared schedules run from server start, with catch-up after downtime, staggered starts, no overlap and isolated failures."
+      "tag": "scheduler/v0.0.2-beta.1",
+      "notes": "Same runtime as 0.0.1-beta.1, with minAppVersion corrected to the 1.5.0 pre-release. Proven end to end: a declared job ran at server start with nobody signed in, and was skipped while its module was disabled."
     }
   ]
 }

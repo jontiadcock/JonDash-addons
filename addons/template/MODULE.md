@@ -7,8 +7,9 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.4-beta.1
-- **Minimum JonDash version:** 1.5.0
+- **Version:** 0.0.5-beta.1
+- **Minimum JonDash version:** `1.5.0-beta.1` — declared as the **pre-release** on purpose. Semver ranks
+  `1.5.0-beta.2` *below* `1.5.0`, so a bare `"1.5.0"` is refused on every 1.5.0 beta. Copy this habit.
 - **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
@@ -151,7 +152,8 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.4-beta.1 | Declares the `scheduler` helper and a `schedules` entry — a six-hourly tidy of finished items. Shows how a module gets background work that actually runs, and how a helper arrives automatically as a dependency. Requires JonDash 1.5.0. |
+| 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module can actually be installed — see the note at the top. 0.0.4-beta.1 was refused on every build that existed. No code change. |
+| 0.0.4-beta.1 | **Uninstallable — use 0.0.5-beta.1.** Declares the `scheduler` helper and a `schedules` entry — a six-hourly tidy of finished items. Shows how a module gets background work that actually runs, and how a helper arrives automatically as a dependency. Requires JonDash 1.5.0. |
 | 0.0.3 | The AI prompt now covers the whole job, not just the writing: how to stand up a throwaway JonDash, run the same verifier the installer uses, run the module's own tests, start the app and click through it — plus the `server-only` trap and an instruction to report honestly what was and was not tested. |
 | 0.0.2 | Adds a `done` toggle, which demonstrates the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission (`audit:write`) that the code actually uses. Requires JonDash 1.4.1-beta.1, the first build that runs a module's migrations after an update. |
 | 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |
