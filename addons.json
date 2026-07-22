@@ -31,5 +31,18 @@
       "tag": "template/v0.0.1",
       "notes": "First release. A complete working module to copy when building your own, with a file-by-file guide, a rename checklist and a paste-in AI prompt included."
     }
+  ],
+  "helpers": [
+    {
+      "id": "scheduler",
+      "name": "Scheduler",
+      "description": "Runs modules' declared background work on time, starting when the server starts rather than when someone opens a page.",
+      "version": "0.0.2",
+      "minAppVersion": "1.5.0",
+      "provides": [],
+      "path": "helpers/scheduler",
+      "tag": "scheduler/v0.0.2",
+      "notes": "Published ahead of the modules that need it. Requires JonDash 1.5.0 — helper support does not exist in 1.4.x, so nothing on the stable channel can use it until 1.5.0 ships."
+    }
   ]
 }
