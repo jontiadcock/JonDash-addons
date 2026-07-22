@@ -130,6 +130,9 @@ HARD RULES — an install is refused if you break these:
 WRITING SQL MIGRATIONS: whole-line comments are stripped and statements are split on ";" at the end of
 a line — one statement at a time, no trailing comments after code, no triggers or BEGIN…END blocks.
 SQLite has no boolean or date type: use INTEGER 0/1 and ISO-8601 TEXT.
+CHANGING THE SCHEMA IN A LATER VERSION: never edit a migration that has shipped — it has already run
+on other installs and will not run again. Add a higher-numbered file (002_..., 003_...), give every
+added column a DEFAULT, and treat migrations as forward-only.
 
 LOOKING NATIVE: reuse the app's own classes (card, btn, btn-primary, btn-danger, input) and CSS
 variables (var(--muted), var(--primary), var(--danger), var(--border)) so the module matches light and

@@ -7,9 +7,9 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.1
-- **Minimum JonDash version:** 1.4.0
-- **Permissions requested:** none
+- **Version:** 0.0.2
+- **Minimum JonDash version:** 1.4.1-beta.1
+- **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
 - **What it does:** keeps a list of short text items — one setting, its own table, a dashboard widget,
   a page, and add/delete forms that write through a Server Action
@@ -30,6 +30,7 @@ you. It needs no other context.
 | `page.tsx` | no | Your own page at `/m/<id>`. |
 | `actions.ts` | no | Server Actions — how a form changes data. The one part worth reading twice. |
 | `migrations/001_init.sql` | no | Your own `mod_<id>_*` tables. |
+| `migrations/002_add_done.sql` | no | How to add a column in a LATER version. Read it before you ship a schema change. |
 | `lib/store.ts` | no | Every query in one place. |
 | `lib/text.ts` | no | Pure helpers, easy to test. |
 | `lib/constants.ts` | no | The module id in one place. |
@@ -80,6 +81,29 @@ the install is refused. There is no permission for reading users, sessions, othe
 filesystem — a module keeps its own data in `ctx.db` and `ctx.store`. Ask for the fewest that make your
 module work; over-asking gets modules declined.
 
+**This template declares exactly one: `audit:write`**, because `actions.ts` records added and deleted
+items in JonDash's audit log. That is the only reason it's there — delete the audit calls and the list
+should go back to empty. Notice the code writes `if (ctx.audit)` rather than assuming: a capability you
+didn't declare, or that the admin didn't approve, simply isn't on `ctx`.
+
+**Adding a permission in a later version is not free.** When someone updates, JonDash shows them what
+the new version additionally wants and makes them approve it before the update applies. Every extra
+entry is a question you're asking a person to answer, so earn it.
+
+## Changing your database later
+
+`migrations/002_add_done.sql` exists to show the pattern, because getting it wrong breaks other
+people's installs:
+
+- **Never edit a migration that has shipped.** `001` has already run elsewhere and won't run again —
+  JonDash records applied files per module. Add a new, higher-numbered file.
+- An existing install runs only the new file; a fresh install runs `001` then `002`. Both end up
+  identical.
+- **Give every added column a `DEFAULT`** — rows already exist and SQLite needs something to put in them.
+- Forward-only. There is no "down"; if you get it wrong, ship `003` that fixes it.
+- Migrations run when the module is enabled, and — from JonDash 1.4.1 — after an update too. On older
+  builds an updated module's new migration doesn't run, which is why this version requires 1.4.1.
+
 ## What will get your module refused
 
 The installer scans every `.ts`/`.tsx` file before it will install. It refuses:
@@ -127,4 +151,5 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.2 | Adds a `done` toggle, which demonstrates the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission (`audit:write`) that the code actually uses. Requires JonDash 1.4.1-beta.1, the first build that runs a module's migrations after an update. |
 | 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |

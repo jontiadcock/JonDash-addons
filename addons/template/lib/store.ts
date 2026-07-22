@@ -14,7 +14,8 @@ import type { ModuleContext } from "@/lib/modules/types";
 
 type Db = NonNullable<ModuleContext["db"]>;
 
-export type Item = { id: number; text: string; createdAt: string };
+/** `done` arrived in migration 002 — SQLite has no boolean, so it's 0 or 1. */
+export type Item = { id: number; text: string; createdAt: string; done: number };
 
 /** SQLite returns COUNT() as a BigInt often enough that coercing is always right. */
 function toNumber(value: unknown): number {
@@ -23,9 +24,14 @@ function toNumber(value: unknown): number {
 
 export async function listItems(db: Db, limit = 50): Promise<Item[]> {
   return db.query<Item>(
-    `SELECT id, text, createdAt FROM ${db.table("items")} ORDER BY id DESC LIMIT ?`,
+    `SELECT id, text, createdAt, done FROM ${db.table("items")} ORDER BY done ASC, id DESC LIMIT ?`,
     limit,
   );
+}
+
+/** Flip an item between done and not done. */
+export async function toggleItem(db: Db, id: number): Promise<void> {
+  await db.run(`UPDATE ${db.table("items")} SET done = 1 - done WHERE id = ?`, id);
 }
 
 export async function countItems(db: Db): Promise<number> {

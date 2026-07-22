@@ -24,22 +24,27 @@ const template: ModuleDefinition = {
     "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
 
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
-  version: "0.0.1",
+  version: "0.0.2",
 
   /** The oldest JonDash this module works on. Everything here needs 1.4.0. */
-  minAppVersion: "1.4.0",
+  minAppVersion: "1.4.1-beta.1",
 
   /**
-   * Ask for NOTHING you don't use — every entry becomes a warning the admin reads, and
-   * the installer refuses a module that reaches for a capability it didn't declare.
-   * This template needs none: a module always gets its own settings, its own key/value
-   * store, and its own `mod_<id>_*` tables without asking.
+   * Ask for NOTHING you don't use — every entry becomes a warning the admin reads before
+   * they enable you, and the installer refuses a module that reaches for a capability it
+   * didn't declare.
    *
-   * Add entries here only when you use the matching part of `ctx`:
+   * A module already gets its own settings, its own key/value store and its own
+   * `mod_<id>_*` tables without asking for anything. This one declares exactly one
+   * permission, `audit:write`, because `actions.ts` records added and deleted items in
+   * JonDash's audit log — and that is the only reason to declare it. Remove the audit
+   * calls and this list should go back to being empty.
+   *
+   * The four that exist, and what each puts on `ctx`:
    *   "network:outbound" → ctx.fetch, ctx.net       "crypto:use"  → ctx.crypto
    *   "email:send"       → ctx.email                "audit:write" → ctx.audit
    */
-  permissions: [],
+  permissions: ["audit:write"],
 
   /** true = only full admins see the widget, the page and the settings. */
   adminOnly: false,

@@ -24,12 +24,14 @@
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.1",
-      "minAppVersion": "1.4.0",
-      "permissions": [],
+      "version": "0.0.2",
+      "minAppVersion": "1.4.1-beta.1",
+      "permissions": [
+        "audit:write"
+      ],
       "path": "addons/template",
-      "tag": "template/v0.0.1",
-      "notes": "First release. A complete working module to copy when building your own, with a file-by-file guide, a rename checklist and a paste-in AI prompt included."
+      "tag": "template/v0.0.2",
+      "notes": "Adds a done toggle. Shows the two things authors get wrong in a second version: a follow-up SQL migration, and declaring a permission the code actually uses."
     }
   ]
 }
