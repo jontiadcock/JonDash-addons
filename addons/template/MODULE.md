@@ -7,7 +7,7 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.1-beta.1
+- **Version:** 0.0.1
 - **Minimum JonDash version:** 1.4.0
 - **Permissions requested:** none
 - **Where the files are:** `modules/template/` inside your JonDash folder, once installed
@@ -127,4 +127,4 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.1-beta.1 | First version: settings, own table, widget, page, Server Action forms, example test. |
+| 0.0.1 | First version: settings, own table, widget, page, Server Action forms, example test. |

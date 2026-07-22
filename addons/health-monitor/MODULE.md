@@ -4,7 +4,7 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 0.0.4-beta.1
+- **Version:** 0.0.4
 - **Minimum JonDash version:** 1.4.0
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Visibility:** admins only (`adminOnly: true`)
@@ -271,7 +271,7 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
-| 0.0.4-beta.1 | Adding and changing checks moved into Admin → Modules → Health monitoring, using the framework's settings panel, with each check expanding in place to edit. The module page and widget stay display-only. Needs JonDash 1.4.0. |
+| 0.0.4 | Adding and changing checks moved into Admin → Modules → Health monitoring, using the framework's settings panel, with each check expanding in place to edit. The module page and widget stay display-only. Needs JonDash 1.4.0. |
 | 0.0.3-beta.1 | Looking and changing split apart: the module page and widget are now display-only, and everything that changes something moved to a Manage checks page. The add/edit form adapts to the kind of check chosen — plain-language options (HTTPS / website, Ping, Port, DNS, SSL certificate), the address box relabelled to match, and a port field only where it means something. Needs JonDash 1.4.0-beta.7. |
 | 0.0.2-beta.1 | Set-up moved out of JSON and into the interface: add, edit, pause and delete monitors from the module page, manage alert destinations with a test-send button, and run a check on demand. Every setting reworded in plain English with an explanation. Bulk import kept for restoring a saved configuration, and it no longer deletes anything. Custom icon; the widget now leads with whatever needs attention and stays useful when resized small. Needs JonDash 1.4.0-beta.6. |
 | 0.0.1-beta.1 | First release. Five check types, scheduler, incidents, retention, eight notification channels, widget and page. Ships 23 tests; verified end to end against a real JonDash 1.4.0-beta.3 — every check type run against live targets, alerts delivered, uninstall clean. Add/edit screens still to come. |

@@ -8,21 +8,21 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.4-beta.1",
+      "version": "0.0.4",
       "minAppVersion": "1.4.0",
       "permissions": ["network:outbound", "crypto:use", "email:send", "audit:write"],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.4-beta.1"
+      "tag": "health-monitor/v0.0.4"
     },
     {
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.1",
       "minAppVersion": "1.4.0",
       "permissions": [],
       "path": "addons/template",
-      "tag": "template/v0.0.1-beta.1"
+      "tag": "template/v0.0.1"
     }
   ]
 }
