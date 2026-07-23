@@ -40,7 +40,7 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.1.1-beta.1",
+      "version": "0.1.1-beta.2",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "filesystem:read",
@@ -55,8 +55,8 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.1.1-beta.1",
-      "notes": "Fixes the dashboard tile, which was drawing no card of its own — so instead of looking like the other tiles it appeared as loose text on the dashboard background, with nothing naming which module it belonged to. It now matches the rest, with a title and a link into the module."
+      "tag": "backup-manager/v0.1.1-beta.2",
+      "notes": "Installable again: beta.1 shipped a test file the installer refuses, so the update failed with a verification error. That file has moved out of the module. Carries the same fix for the dashboard tile, which drew no card of its own and appeared as loose text on the dashboard background."
     }
   ],
   "helpers": [

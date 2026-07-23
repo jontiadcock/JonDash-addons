@@ -5,7 +5,7 @@ keeps dated copies if you want them, tidies old ones away, and tells you when a 
 healthy.
 
 - **Module id:** `backup-manager`
-- **Version:** `0.1.0` on stable, `0.1.1-beta.1` on beta
+- **Version:** `0.1.0` on stable, `0.1.1-beta.2` on beta
 - **Minimum JonDash version:** `1.5.2-beta.1` — the **pre-release**, deliberately. Semver ranks
   `1.5.2-beta.1` *below* `1.5.2`, so a bare `"1.5.2"` would be refused on every 1.5.2 beta, which is
   exactly what beta-channel users run. 1.5.2 is the release that added `ctx.can()` enforcement, which
@@ -118,7 +118,7 @@ backup's own `nextRunAt`. That is what makes "every night at 2am" possible witho
 
 | Version | Notes |
 | ------- | ----- |
-| 0.1.1 | Fixes the dashboard tile, which drew no card of its own. `WidgetFrame` supplies a grid cell and nothing else, so the tile had been rendering as loose text on the dashboard background next to properly framed ones, with nothing naming which module it was. It now draws its own card, titled, with a link into the module. It typechecked and built cleanly throughout, so the regression test asserts the rendered markup rather than the code compiling. |
+| 0.1.1 | Fixes the dashboard tile, which drew no card of its own. `WidgetFrame` supplies a grid cell and nothing else, so the tile had been rendering as loose text on the dashboard background next to properly framed ones, with nothing naming which module it was. It now draws its own card, titled, with a link into the module. It typechecked and built cleanly throughout, so the regression test asserts the rendered markup rather than the code compiling. *(`beta.1` of this version was refused by the installer — it shipped a test needing core internals, and a module's tests ship and are scanned. Fixed in `beta.2` by moving that test out of the module.)* |
 | 0.1.0 | A dashboard tile, a page per backup with history and an activity chart, and a warning when a run copies far less than usual. Day-of-week schedules ("2am on weekdays"), retry with backoff, a concurrency cap, cancel, clone, a destination reachability check before starting, and an optional weekly summary. Adds migration `002`. |
 | 0.0.1 | First release. Scheduled `sync` and `snapshot` copies, grandfather-father-son retention with a preview, per-run logs, and failure/stale alerts by email or webhook. |
 

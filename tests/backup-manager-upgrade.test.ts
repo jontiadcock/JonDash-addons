@@ -18,8 +18,19 @@ import type { ModuleDefinition } from "@/lib/modules/types";
  * So this drives core's real runner over the real SQL, in order, with real rows sitting in
  * the table across the upgrade — rather than asserting that the SQL parses.
  *
- * Run it from a JonDash checkout with this module installed:
- *   npx vitest run modules/backup-manager/tests/upgrade.test.ts
+ * ## Why this lives OUTSIDE addons/backup-manager/
+ *
+ * A module's whole folder ships, and **the installer's verifier scans every file in it,
+ * tests included**. This test needs `@/lib/db`, `@/lib/modules/migrate`, `node:fs` and
+ * `process.env` — four things a module is forbidden to touch. Kept inside the module it made
+ * the module fail verification and become uninstallable, which is exactly what happened to
+ * `0.1.1-beta.1`. It is a maintainer's test of core's behaviour, not part of the artifact.
+ *
+ * Run it by copying it into a JonDash checkout that has this module installed, since it
+ * needs core's own vitest config for the `@` alias, the `server-only` stub and a throwaway
+ * DATABASE_URL:
+ *   cp tests/backup-manager-upgrade.test.ts <jondash>/tests/
+ *   cd <jondash> && npx vitest run tests/backup-manager-upgrade.test.ts
  */
 
 const MODULE_ID = "backup-manager";

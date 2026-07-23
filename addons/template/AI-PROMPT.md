@@ -45,7 +45,20 @@ FOLDER LAYOUT — the folder name IS the module id (stable, lowercase-kebab):
     actions.ts                (optional) "use server" file for saving changes
     lib/*.ts                  (optional) your own helpers
     migrations/001_init.sql   (optional) your own tables
-    tests/*.test.ts           (optional) Vitest tests — these SHIP, and are scanned like any other file
+    tests/*.test.ts           (optional) Vitest tests — see the warning immediately below
+
+⚠ YOUR TESTS SHIP, AND THE INSTALLER SCANS THEM LIKE EVERY OTHER FILE.
+The whole module folder is the artifact. A test is not exempt from any rule below, so a test that
+imports "@/lib/db", touches node:fs, reads process.env, or otherwise reaches into the app makes the
+WHOLE MODULE fail verification and refuse to install. It will still typecheck, lint, build and pass
+under vitest — nothing you normally run models the installer.
+  - Test YOUR OWN pure logic: date maths, parsing, formatting, retention rules, rendering your widget.
+    Import your own files and "@/lib/modules/types". That is what module tests are for.
+  - A test that needs the app's internals — driving the real migration runner, using the real prisma
+    client — CANNOT live in your module. Keep it outside the module folder entirely; it is a
+    maintainer's test of the app, not part of what you ship.
+  - If in doubt, run the verifier (step 4 below) BEFORE you consider the module finished. It reads
+    every file, tests included.
 
 THE ModuleDefinition (module.ts):
   {
@@ -70,7 +83,14 @@ THE ModuleDefinition (module.ts):
                                    // "text" = multiline textarea; secret values are encrypted
     icon?: Component;              // optional inline SVG shown beside the module name;
                                    //   use stroke/fill "currentColor" so it follows the theme
-    DashboardWidget?: Component;   // props: { ctx }. Users can resize it, so stay useful when small
+    DashboardWidget?: Component;   // props: { ctx }. Users can resize it, so stay useful when small.
+                                   //   YOU DRAW YOUR OWN CARD. The dashboard gives your widget a grid
+                                   //   cell and nothing else — no card, no padding, no heading. Wrap
+                                   //   your top-level element in className="card p-4" and put your
+                                   //   module's name in it, or your widget renders as loose text on
+                                   //   the page background next to properly framed ones, with nothing
+                                   //   saying which module it is. This builds and typechecks happily,
+                                   //   so ONLY looking at the dashboard catches it.
     Page?: Component;              // props: { ctx, path: string[] }, served at /m/<id>
     SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Modules -> your module,
                                    //   BELOW the auto-generated settings fields (not instead of
@@ -239,8 +259,13 @@ somebody depends on, and never the default port if something is already using it
    Run it with:  npx tsx verify.mts       then delete verify.mts.
    This is the same check the installer runs. If it says ok=true you will not be refused at install.
 
-5. Run your own tests. The app's vitest only looks in tests/**, so a module's tests are NOT picked up
-   by default. Write vitest.module.config.ts in the APP ROOT (it must live there, or "vitest/config"
+   DO NOT SKIP THIS BECAUSE tsc, eslint, vitest AND next build ARE ALL GREEN. None of them models the
+   verifier, and a module that compiles perfectly can still be refused. The most common way this
+   happens is a TEST FILE inside the module reaching into the app — see the warning in FOLDER LAYOUT.
+   Read the file list it prints: if a file you thought was "just a test" is in there, it ships.
+
+5. Run your own tests. Remember they ship and are scanned — keep them to your own logic (see FOLDER
+   LAYOUT). The app's vitest only looks in tests/**, so a module's tests are NOT picked up by default. Write vitest.module.config.ts in the APP ROOT (it must live there, or "vitest/config"
    cannot resolve) and delete it afterwards:
      import { defineConfig } from "vitest/config";
      import path from "node:path";
@@ -266,7 +291,10 @@ somebody depends on, and never the default port if something is already using it
 8. Now actually exercise the module:
    - Admin -> Modules: your module is listed. Read the permission warnings — they should match what
      you declared and nothing more. Enable it.
-   - The widget appears on the dashboard; the page loads at /m/<id>; settings save and survive a reload.
+   - OPEN THE DASHBOARD ITSELF and look at your widget, both with data and with none. It must look
+     like the other tiles — its own card, its own title. This is the one screen easy to skip, because
+     the widget "works" either way and nothing you run will tell you it looks wrong.
+   - The page loads at /m/<id>; settings save and survive a reload.
    - Every button and form you added does what it says, including the failure cases: submit something
      invalid and check the message explains what to do.
    - If you ship migrations, confirm your tables exist. List every table and filter in JavaScript
