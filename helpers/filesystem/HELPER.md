@@ -1,9 +1,13 @@
 # Filesystem helper
 
-**Status: SHIPPED. `0.0.2` on the stable channel; `0.0.3-beta.1` built, tested and awaiting
-publish.** Proven end to end in a browser against real **1.5.1-beta.1** and **1.5.2** installs (see
-*Live test* below). 0.0.3 requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
+**Status: SHIPPED. `0.0.2` on the stable channel; `0.0.4-beta.1` on beta.** Proven end to end in a
+browser against real **1.5.1-beta.1**, **1.5.2** and **1.5.3-beta.5** installs (see *Live test*
+below). 0.0.3 onwards requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
 `readConfig`.
+
+**0.0.4 is a documentation release — the runtime is byte-identical to 0.0.3-beta.1.** It exists
+because the audit note under *Retention* was wrong for anyone on JonDash 1.5.3 or later, and a tag
+is immutable, so the correction could not reach an installed copy without a new version.
 
 | Piece | State |
 | ----- | ----- |
@@ -136,17 +140,21 @@ Layered guards, any one of which would nearly suffice:
 7. Every deletion is logged **before** it happens, and audited individually — *"what did it remove
    last night"* must be answerable.
 
-> **Caveat, and it is a real one: the AUDIT half of point 7 does not currently work for
-> scheduled runs.** Core's `audit()` calls `await headers()` inside the same `try` as the
-> database write, and `headers()` throws outside a request scope — so background work throws,
-> the catch swallows it, and no row is written. Proven with a probe: `audit()` called with no
-> request in scope wrote zero rows. This affects **every** module's scheduled work, not just
-> this helper.
+> **Point 7 depends on the JonDash version, and it is worth knowing which one you are on.**
 >
-> What still holds: the **run log file** records every deletion, before it happens, and the
-> consuming module's own run records persist normally. So *"what did it remove last night"* is
-> answerable from the log — just not from the audit trail. Raised with the core session; the
-> fix is to read the IP defensively rather than let it gate the write.
+> **1.5.3-beta.4 and later — works.** Core's `audit()` used to call `await headers()` inside
+> the same `try` as the database write; `headers()` throws outside a request scope, so
+> background work threw before the write and the catch swallowed it. No module's scheduled
+> work was audited at all. Core fixed it (BUG-29) by resolving the IP separately, and added an
+> `AuditLog.source` column so a background row reads **System** rather than being mistaken for
+> an unattributed user action. Confirmed here on 1.5.3-beta.5: a scheduled prune of five
+> snapshots wrote five individual `filesystem.prune.removed` rows, each marked System.
+>
+> **1.5.2 — the audit half does not work.** This helper still runs there, and the run log file
+> still records every deletion *before* it happens, so *"what did it remove last night"* stays
+> answerable. It simply will not appear in the Audit page. `minAppVersion` deliberately stays
+> at `1.5.2-beta.1`: the helper works on 1.5.2, and raising it would lock out installs that
+> function perfectly well in every other respect.
 
 A dry run (`planPrune`) is always available, and returns *why* each survivor was kept
 ("weekly 2026-W29"), so the log explains itself.

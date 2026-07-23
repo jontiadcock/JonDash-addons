@@ -75,7 +75,7 @@
       "id": "filesystem",
       "name": "Files and folders",
       "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-      "version": "0.0.3-beta.1",
+      "version": "0.0.4-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         {
@@ -92,8 +92,8 @@
         }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.3-beta.1",
-      "notes": "Permissions are now enforced, not just described: a module that asks for less than it uses is refused and told what it forgot to declare, instead of quietly getting more than you approved. Adds dated-snapshot backups with grandfather-father-son retention — keep a week of daily copies, a month of weekly ones and a year of monthly ones, and older copies are tidied away automatically. Retention only ever removes folders it created itself, never the newest copy, and never anything of yours that happens to sit alongside them; you can preview exactly what would go before anything does, and every removal is listed in the log and the audit trail. Permission screens now name the actual folders you approved rather than saying 'the folders you allow'. Needs JonDash 1.5.2."
+      "tag": "filesystem/v0.0.4-beta.1",
+      "notes": "A documentation fix only — the helper itself is unchanged. Its claim that every copy removed by retention reaches the audit trail holds on JonDash 1.5.3 and later, and never did before it. It now says so, and what still holds on older versions: the log records every removal either way."
     }
   ]
 }

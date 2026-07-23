@@ -86,7 +86,7 @@ const helper: HelperDefinition = {
   name: "Files and folders",
   description:
     "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-  version: "0.0.3-beta.1",
+  version: "0.0.4-beta.1",
   // Raised for 0.0.3: `ctx.can()` and `HelperDefinition.readConfig` arrived in 1.5.2, and
   // this release uses both. Declaring 1.5.1 would install on a build where enforcement
   // silently does nothing, which is the quiet weakening this release exists to remove.
