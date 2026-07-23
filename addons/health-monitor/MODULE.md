@@ -4,8 +4,10 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 0.0.5
-- **Minimum JonDash version:** 1.5.0 — the release that introduced helpers.
+- **Version:** `0.0.5` on stable, `0.0.5-beta.1` on beta — the same code on both
+- **Minimum JonDash version:** JonDash 1.5.0, the release that introduced helpers. The beta-channel
+  entry declares it as the **pre-release** `1.5.0-beta.1`, deliberately: semver ranks `1.5.0-beta.4`
+  *below* `1.5.0`, so a bare `"1.5.0"` is refused on every 1.5.0 beta — the builds beta users run.
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
 - **Helper required:** `scheduler` — installed automatically with the module. It grants no extra
   capability, so it adds nothing to the permissions above.
@@ -272,7 +274,7 @@ must match its `addons.json` entry exactly.
 
 | Version      | Notes                                                              |
 | ------------ | ------------------------------------------------------------------ |
-| 0.0.5 | **Monitoring now runs from server start.** The module's own poller is gone, replaced by two jobs declared on the `scheduler` helper: a 15s scan for due checks, and hourly history maintenance. Previously the timer only started when something *rendered* the widget or page — so a restart at 03:00 with nobody watching meant nothing was monitored until someone opened the dashboard. **`pollSeconds` has been removed**: the helper fixes an interval when the module is defined, so a tunable value could no longer take effect, and it only ever controlled how often the module *looked* for work — never how often anything was checked. The scan is fixed at 15s, shorter than the shortest interval a monitor can be given (30s), so every choice is honoured. Needs JonDash 1.5.0. |
+| 0.0.5 | **Monitoring now runs from server start.** The module's own poller is gone, replaced by two jobs declared on the `scheduler` helper: a 15s scan for due checks, and hourly history maintenance. Previously the timer only started when something *rendered* the widget or page — so a restart at 03:00 with nobody watching meant nothing was monitored until someone opened the dashboard. **`pollSeconds` has been removed**: the helper fixes an interval when the module is defined, so a tunable value could no longer take effect, and it only ever controlled how often the module *looked* for work — never how often anything was checked. The scan is fixed at 15s, shorter than the shortest interval a monitor can be given (30s), so every choice is honoured. Needs JonDash 1.5.0-beta.1. |
 | 0.0.4 | Adding and changing checks moved into Admin → Modules → Health monitoring, using the framework's settings panel, with each check expanding in place to edit. The module page and widget stay display-only. Needs JonDash 1.4.0. |
 | 0.0.3-beta.1 | Looking and changing split apart: the module page and widget are now display-only, and everything that changes something moved to a Manage checks page. The add/edit form adapts to the kind of check chosen — plain-language options (HTTPS / website, Ping, Port, DNS, SSL certificate), the address box relabelled to match, and a port field only where it means something. Needs JonDash 1.4.0-beta.7. |
 | 0.0.2-beta.1 | Set-up moved out of JSON and into the interface: add, edit, pause and delete monitors from the module page, manage alert destinations with a test-send button, and run a check on demand. Every setting reworded in plain English with an explanation. Bulk import kept for restoring a saved configuration, and it no longer deletes anything. Custom icon; the widget now leads with whatever needs attention and stays useful when resized small. Needs JonDash 1.4.0-beta.6. |
