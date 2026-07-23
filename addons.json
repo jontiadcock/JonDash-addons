@@ -40,7 +40,7 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.0.2-beta.1",
+      "version": "0.1.0-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "filesystem:read",
@@ -55,8 +55,8 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.0.2-beta.1",
-      "notes": "A much fuller version. There's now a dashboard tile telling you at a glance whether your backups are healthy, and each backup gets its own page with its history, how long it typically takes, and the dated copies it has kept. A backup that's running now shows what it's copying as it goes, and you can stop it. You can look inside your approved folders to pick a sub-folder rather than typing the path, and ask any backup what it WOULD copy before it copies anything. Scheduling is no longer just 'every so many hours' — you can say 'at 2am on weekdays'. A failed backup can retry on its own, backing off rather than hammering a NAS that's rebooting. You can cap how many run at once so they don't fight over one disk, pause everything at once, and duplicate a backup instead of retyping it. Before starting, it checks the destination is actually there and writable, so an unplugged drive gives you a clear message instead of a copy that dies halfway. Needs JonDash 1.5.2."
+      "tag": "backup-manager/v0.1.0-beta.1",
+      "notes": "Adds the things that tell you a backup is actually healthy. A dashboard tile gives you a verdict at a glance, and each backup gets its own page with its history, a chart of recent runs, and the dated copies it holds — the chart is there because a backup that suddenly copies far less than usual still reports success, and that shape is what a missing source looks like. A running backup shows what it is copying and can be stopped. You can look inside your approved folders instead of typing a path, and ask any backup what it WOULD copy first. Schedules can be 'at 2am on weekdays', not just 'every so many hours'. Failures retry on their own with a backoff, you can cap how many run at once, pause everything, and duplicate a backup. Before starting it checks the destination is reachable, so an unplugged drive says so instead of failing halfway. And there is an optional weekly summary — the one email sent when nothing is wrong, so that silence stops being ambiguous. Needs JonDash 1.5.2."
     }
   ],
   "helpers": [
@@ -78,9 +78,18 @@
       "version": "0.0.3-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
-        { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
-        { "id": "filesystem:write", "label": "Create and change files in the locations you allow" },
-        { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
+        {
+          "id": "filesystem:read",
+          "label": "Look at files and folders in the locations you allow"
+        },
+        {
+          "id": "filesystem:write",
+          "label": "Create and change files in the locations you allow"
+        },
+        {
+          "id": "filesystem:delete",
+          "label": "Delete files in the locations you allow"
+        }
       ],
       "path": "helpers/filesystem",
       "tag": "filesystem/v0.0.3-beta.1",

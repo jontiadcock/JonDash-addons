@@ -13,6 +13,7 @@ import {
   saveJob,
   setAllEnabled,
   setConcurrency,
+  setDigestEmail,
   type Job,
 } from "./lib/store";
 import { runJob } from "./module";
@@ -315,6 +316,19 @@ export const setConcurrencyAction = moduleAction(MODULE_ID, async (ctx, form: Fo
   const n = await setConcurrency(ctx.db, int(form, "concurrency", 1));
   await ctx.audit?.("backup.settings.concurrency", String(n));
   await ctx.store?.set("lastConcurrency", `Saved — up to ${n} backup${n === 1 ? "" : "s"} at once.`);
+  revalidatePath(ADMIN_PATH);
+});
+
+/** Where the weekly summary goes. Empty turns it off. */
+export const setDigestAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const email = str(form, "digestEmail");
+  await setDigestEmail(ctx.db, email);
+  await ctx.audit?.("backup.settings.digest", email || "(off)");
+  await ctx.store?.set(
+    "lastDigest",
+    email ? `Weekly summary will go to ${email}.` : "Weekly summary turned off.",
+  );
   revalidatePath(ADMIN_PATH);
 });
 

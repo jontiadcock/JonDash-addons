@@ -15,6 +15,7 @@ import {
 import { cancelRunAction, runNowAction, viewLogAction } from "../actions";
 import { describeSchedule } from "../lib/schedule";
 import LiveRefresh from "./live";
+import Activity from "./activity";
 
 /**
  * One backup, in detail — its own history, its live progress, its snapshots.
@@ -173,6 +174,8 @@ export default async function JobDetail({ ctx, jobId }: { ctx: ModuleContext; jo
           )}
         </section>
       )}
+
+      <Activity runs={runs} />
 
       {/* ------------------------------------------------------------------ history */}
       <section className="flex flex-col gap-2">

@@ -3,17 +3,21 @@ import filesystem from "@/helpers/filesystem/api";
 import BackupPage from "./page";
 import BackupSettingsPanel from "./ui/settings-panel";
 import BackupWidget from "./ui/widget";
-import { MODULE_ID } from "./lib/constants";
-import { failureAlert, send, shouldNotify, staleAlert, type Alert } from "./lib/notify";
+import { MODULE_ID, formatBytes } from "./lib/constants";
+import { digest, failureAlert, send, shouldNotify, staleAlert, type Alert, type DigestLine } from "./lib/notify";
 import { nextRetry } from "./lib/schedule";
 import {
   computeNextRun,
   dueJobs,
   finishRun,
+  digestLines,
   getConcurrency,
+  getDigestEmail,
+  getDigestSentAt,
   getJob,
   lastSuccessAt,
   listJobs,
+  markDigestSent,
   markNotified,
   markRun,
   policyOf,
@@ -35,13 +39,25 @@ import {
  * helper, which confines every operation to a folder the administrator approved and
  * excludes JonDash's own secrets by file identity. This module decides WHAT to copy and
  * WHEN, records what happened, and shouts when something didn't.
+ *
+ * ## No restore, deliberately (owner's decision, 2026-07-23)
+ *
+ * What this produces is *plain files*: `sync` leaves an ordinary mirror, `snapshot` leaves
+ * ordinary dated folders. Both are already usable — you open the destination and copy back
+ * whatever you want, with the same tools you'd use for anything else.
+ *
+ * A restore button would add the single most dangerous operation this module could have,
+ * writing old data over current data, to save a drag-and-drop. That trade is only worth
+ * making once the backup format stops being directly readable — compressed, encrypted, or
+ * deduplicated. Until then it buys convenience and costs the possibility of destroying
+ * someone's work. Revisit only if the format changes.
  */
 const backupManager: ModuleDefinition = {
   id: MODULE_ID,
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.0.2-beta.1",
+  version: "0.1.0-beta.1",
   // `ctx.can()` enforcement and GFS retention arrived in filesystem 0.0.3, which needs
   // JonDash 1.5.2. The pre-release, not a bare "1.5.2" — semver ranks a pre-release below
   // its release, so a bare number is refused on every 1.5.2 beta.
@@ -109,6 +125,7 @@ const backupManager: ModuleDefinition = {
         // just ended stops counting as running and becomes eligible again.
         await reconcileRuns(ctx);
         await checkForStaleJobs(ctx);
+        await maybeSendDigest(ctx);
 
         // How many may copy at once. Firing five jobs at 2am against one disk takes longer
         // in total than running them in turn, and makes the machine unusable meanwhile.
@@ -345,6 +362,54 @@ async function checkForStaleJobs(ctx: ModuleContext): Promise<void> {
     if (age < job.staleAfterHours * 3_600_000) continue;
 
     await alert(ctx, job, staleAlert(job, job.staleAfterHours, last));
+  }
+}
+
+/**
+ * The weekly summary — the only message sent when nothing is wrong.
+ *
+ * Everything else here fires on failure, which means silence is ambiguous: it reads the same
+ * whether all is well or the alerting itself has broken. A digest that arrives on schedule
+ * makes silence meaningful, because its absence becomes the signal.
+ */
+const DIGEST_DAYS = 7;
+
+async function maybeSendDigest(ctx: ModuleContext): Promise<void> {
+  if (!ctx.db) return;
+  const to = await getDigestEmail(ctx.db);
+  if (!to || !ctx.email) return;
+
+  const last = await getDigestSentAt(ctx.db);
+  const dueAfter = Date.now() - DIGEST_DAYS * 86_400_000;
+  if (last && Date.parse(last) > dueAfter) return;
+
+  const since = new Date(dueAfter).toISOString();
+  const rows = await digestLines(ctx.db, since);
+  if (rows.length === 0) return;
+
+  const lines: DigestLine[] = rows.map((r) => ({
+    name: String(r.name),
+    runs: Number(r.runs ?? 0),
+    failures: Number(r.failures ?? 0),
+    bytes: Number(r.bytes ?? 0),
+    lastSuccess: (r.lastSuccess as string | null) ?? null,
+    paused: !Number(r.enabled ?? 0),
+  }));
+
+  const anyFailures = lines.some((l) => l.failures > 0);
+  try {
+    await ctx.email.send({
+      to,
+      subject: anyFailures ? "Backups: weekly summary (with failures)" : "Backups: weekly summary — all well",
+      text: digest(lines, DIGEST_DAYS, formatBytes),
+    });
+    await markDigestSent(ctx.db);
+    await ctx.audit?.("backup.digest.sent", to);
+  } catch (e) {
+    // Mark it anyway. A mail server that is down would otherwise make every tick retry, and
+    // a week of backups is not worth a thousand failed sends.
+    await markDigestSent(ctx.db);
+    await ctx.audit?.("backup.digest.failed", String((e as Error)?.message ?? e).slice(0, 200));
   }
 }
 

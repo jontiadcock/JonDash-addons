@@ -1,7 +1,7 @@
 import type { ModuleSettingsPanelProps } from "@/lib/modules/types";
 import filesystem from "@/helpers/filesystem/api";
 import { listJobs, type Job } from "../lib/store";
-import { formatTime } from "../lib/constants";
+import { formatBytes, formatTime } from "../lib/constants";
 import {
   addRootAction,
   assessPathAction,
@@ -17,8 +17,8 @@ import {
 import FolderPicker from "./folder-picker";
 import { jobPath } from "../lib/constants";
 import { WEEKDAY_NAMES, describeSchedule, parseDays } from "../lib/schedule";
-import { cloneJobAction, setAllEnabledAction, setConcurrencyAction } from "../actions";
-import { getConcurrency } from "../lib/store";
+import { cloneJobAction, setAllEnabledAction, setConcurrencyAction, setDigestAction } from "../actions";
+import { getConcurrency, getDigestEmail } from "../lib/store";
 
 /**
  * Everything that changes a backup lives here, in Admin → Modules → Backup Manager. The
@@ -86,6 +86,8 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
   const lastJobSave = String(await get("lastJobSave"));
   const lastConcurrency = String(await get("lastConcurrency"));
   const concurrency = db ? await getConcurrency(db) : 1;
+  const digestEmail = db ? await getDigestEmail(db) : "";
+  const lastDigest = String(await get("lastDigest"));
 
   const muted = { color: "var(--muted)" } as const;
 
@@ -334,6 +336,25 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
           {lastLogRetention && <p className="w-full text-sm">{lastLogRetention}</p>}
         </form>
       </section>
+
+      {/* ------------------------------------------------------------ weekly summary */}
+      <section className="flex flex-col gap-2">
+        <h3 className="font-medium">Weekly summary</h3>
+        <p className="text-sm" style={muted}>
+          The one message that gets sent when nothing is wrong. Everything else here only emails you
+          on failure, which means silence reads the same whether all is well or the alerting itself
+          has broken. A summary that arrives every week makes its own absence a signal.
+        </p>
+        <form action={setDigestAction} className="card flex flex-wrap items-end gap-2 p-3">
+          <label className="min-w-64 flex-1 text-sm">
+            Send it to
+            <input className="input mt-1 w-full" type="email" name="digestEmail" defaultValue={digestEmail} placeholder="you@example.com" />
+          </label>
+          <button className="btn" type="submit">Save</button>
+          <p className="w-full text-xs" style={muted}>Leave empty for no summary.</p>
+          {lastDigest && <p className="w-full text-sm">{lastDigest}</p>}
+        </form>
+      </section>
     </div>
   );
 }
@@ -351,10 +372,21 @@ function BackupOutcome({ preview }: { preview: BackupPreview }) {
       <p className="font-medium">
         {create + update === 0
           ? "Nothing to copy — the destination is already up to date."
-          : `Would copy ${create} new and ${update} changed file(s), ${Math.round((preview.bytes ?? 0) / 1024)} KB in total.`}
+          : `Would copy ${create} new and ${update} changed file(s).`}
       </p>
       {(preview.unchanged ?? 0) > 0 && (
         <p style={{ color: "var(--muted)" }}>{preview.unchanged} already identical, left alone.</p>
+      )}
+      {/*
+        Reported separately, and as the SOURCE total — because that is what it is. The
+        helper's plan sums every file it walked, not just the ones due to be copied, so
+        printing it beside "1 new and 1 changed" read as "this will copy 94 MB" when the
+        real answer was 64 KB. Putting a true number in a misleading place is still a lie.
+      */}
+      {(preview.bytes ?? 0) > 0 && (
+        <p className="text-xs" style={{ color: "var(--muted)" }}>
+          The source folder holds {formatBytes(preview.bytes ?? 0)} altogether.
+        </p>
       )}
       {(preview.sample ?? []).length > 0 && (
         <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>

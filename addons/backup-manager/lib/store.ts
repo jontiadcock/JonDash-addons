@@ -272,6 +272,55 @@ export async function setConcurrency(db: Db, n: number): Promise<number> {
   return safe;
 }
 
+/** Where the weekly summary goes. Empty = don't send one. */
+export async function getDigestEmail(db: Db): Promise<string> {
+  const rows = await db.query<{ value: string }>(
+    `SELECT value FROM ${db.table("settings")} WHERE key = 'digestEmail'`,
+  );
+  return String(rows[0]?.value ?? "").trim();
+}
+
+export async function setDigestEmail(db: Db, email: string): Promise<void> {
+  await db.run(
+    `INSERT INTO ${db.table("settings")} (key, value) VALUES ('digestEmail', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    email.trim(),
+  );
+}
+
+/** When the last summary went out, so one goes weekly rather than on every tick. */
+export async function getDigestSentAt(db: Db): Promise<string | null> {
+  const rows = await db.query<{ value: string }>(
+    `SELECT value FROM ${db.table("settings")} WHERE key = 'digestSentAt'`,
+  );
+  return rows[0]?.value ?? null;
+}
+
+export async function markDigestSent(db: Db): Promise<void> {
+  await db.run(
+    `INSERT INTO ${db.table("settings")} (key, value) VALUES ('digestSentAt', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    new Date().toISOString(),
+  );
+}
+
+/** Per-job totals over a window, for the weekly summary. */
+export async function digestLines(db: Db, sinceIso: string) {
+  return db.query<Record<string, unknown>>(
+    `SELECT j.name AS name,
+            j.enabled AS enabled,
+            COUNT(r.id) AS runs,
+            SUM(CASE WHEN r.state <> 'done' AND r.finishedAt IS NOT NULL THEN 1 ELSE 0 END) AS failures,
+            SUM(COALESCE(r.bytesCopied, 0)) AS bytes,
+            MAX(CASE WHEN r.state = 'done' THEN r.startedAt END) AS lastSuccess
+       FROM ${db.table("jobs")} j
+       LEFT JOIN ${db.table("runs")} r ON r.jobId = j.id AND r.startedAt >= ?
+      GROUP BY j.id
+      ORDER BY j.name`,
+    sinceIso,
+  );
+}
+
 /** Turn every job on or off in one go — for "we're moving the NAS this weekend". */
 export async function setAllEnabled(db: Db, enabled: boolean): Promise<void> {
   await db.run(`UPDATE ${db.table("jobs")} SET enabled = ?`, enabled ? 1 : 0);
