@@ -8,8 +8,8 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.5",
-      "minAppVersion": "1.5.0",
+      "version": "0.0.6",
+      "minAppVersion": "1.5.0-beta.1",
       "permissions": [
         "network:outbound",
         "crypto:use",
@@ -20,8 +20,8 @@
         "scheduler"
       ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.5",
-      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting is gone — it never controlled how often anything was checked."
+      "tag": "health-monitor/v0.0.6",
+      "notes": "Housekeeping only — monitoring behaves exactly as before. Corrects the JonDash version this module says it needs, which named the release where it should have named the pre-release, and repairs a shipped test that no longer compiled against JonDash 1.5.2."
     },
     {
       "id": "template",
@@ -64,12 +64,12 @@
       "id": "scheduler",
       "name": "Scheduler",
       "description": "Runs modules' declared background work on time, starting when the server starts rather than when someone opens a page.",
-      "version": "0.0.2",
-      "minAppVersion": "1.5.0",
+      "version": "0.0.3",
+      "minAppVersion": "1.5.0-beta.1",
       "provides": [],
       "path": "helpers/scheduler",
-      "tag": "scheduler/v0.0.2",
-      "notes": "Published ahead of the modules that need it. Requires JonDash 1.5.0 — helper support does not exist in 1.4.x, so nothing on the stable channel can use it until 1.5.0 ships."
+      "tag": "scheduler/v0.0.3",
+      "notes": "Corrects the JonDash version this helper says it needs, which named the release where it should have named the pre-release. The helper itself is unchanged."
     },
     {
       "id": "filesystem",
@@ -78,9 +78,18 @@
       "version": "0.0.4",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
-        { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
-        { "id": "filesystem:write", "label": "Create and change files in the locations you allow" },
-        { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
+        {
+          "id": "filesystem:read",
+          "label": "Look at files and folders in the locations you allow"
+        },
+        {
+          "id": "filesystem:write",
+          "label": "Create and change files in the locations you allow"
+        },
+        {
+          "id": "filesystem:delete",
+          "label": "Delete files in the locations you allow"
+        }
       ],
       "path": "helpers/filesystem",
       "tag": "filesystem/v0.0.4",

@@ -1,7 +1,7 @@
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import type { ModuleContext } from "@/lib/modules/types";
+import type { DeclaredPermission, ModuleContext } from "@/lib/modules/types";
 import { runCheck, sanitise } from "../lib/checks";
 
 /**
@@ -11,11 +11,23 @@ import { runCheck, sanitise } from "../lib/checks";
  * reaches the network without the `network:outbound` grant.
  */
 
-/** A context with only what runCheck looks at; `fetch` present = permission granted. */
+/**
+ * A context with only what runCheck looks at; `fetch` present = permission granted.
+ *
+ * `grants` and `can` are required members of `ModuleContext` as of JonDash 1.5.2 — this
+ * stub omitted them and stopped compiling against any current build. Nothing catches that
+ * on the way in: the installer's verifier does not typecheck, and core's own build sets
+ * `typescript.ignoreBuildErrors`, so a module's tests can rot silently while it installs
+ * and runs perfectly. They are kept honest here rather than stubbed out, so the fake
+ * context answers `can()` the same way the real one would.
+ */
 function ctx(granted = true): ModuleContext {
+  const grants: DeclaredPermission[] = granted ? ["network:outbound"] : [];
   return {
     moduleId: "health-monitor",
     user: null,
+    grants,
+    can: (p) => grants.includes(p),
     settings: { get: async () => undefined, set: async () => {}, all: async () => ({}) },
     store: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
     ...(granted ? { fetch: globalThis.fetch } : {}),

@@ -17,10 +17,15 @@ const helper: HelperDefinition = {
   id: "scheduler",
   name: "Scheduler",
   description: "Runs modules' declared background work on time, starting when the server starts.",
-  version: "0.0.2",
+  version: "0.0.3",
   // `-beta.1`, not a bare "1.5.0": semver ranks a pre-release below its release, so a bare
   // "1.5.0" excludes every 1.5.0 beta — the builds this helper's users are actually running.
-  minAppVersion: "1.5.0",
+  //
+  // The same value on BOTH channels, deliberately: a helper's channel is inherited from the
+  // module that pulls it in, so a beta-app user can end up holding the stable build. 0.0.2
+  // declared the bare form on stable and this comment already said otherwise — 0.0.3 makes
+  // the value match the rule.
+  minAppVersion: "1.5.0-beta.1",
   provides: [], // nothing to consent to — it grants a module no new capability
   migrations: "./migrations",
   async onBoot(ctx) {
