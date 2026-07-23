@@ -40,7 +40,7 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "filesystem:read",
@@ -55,8 +55,8 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.0.1",
-      "notes": "First release. Copies folders you choose to somewhere else on a schedule — either keeping the destination up to date, or making a new dated copy each time. Dated copies can be tidied automatically on a grandfather-father-son schedule: keep a week of daily copies, a month of weekly ones and a year of monthly ones. Tidying DELETES old copies, so it is off until you turn it on for a particular backup, it never removes the most recent copy, it never touches anything of yours sitting alongside them, and you can preview exactly what would go first. Every run writes a log naming each file copied, skipped or failed on. It can email you or call a web address when a backup fails — and, if you ask it to, when nothing has succeeded for a while, which is the failure that otherwise goes unnoticed. JonDash's own secrets are never copied. One known gap while a JonDash fix lands: scheduled runs record everything in their own run log, but do not yet add entries to the Audit page — runs you start yourself do. Needs JonDash 1.5.2."
+      "tag": "backup-manager/v0.1.0",
+      "notes": "A far bigger release. A dashboard tile gives you a verdict at a glance, and each backup gets its own page with its history and a chart of recent runs — a run that copies far less than usual is flagged, because that shape is what a missing source looks like. Schedules can be \"2am on weekdays\"."
     }
   ],
   "helpers": [
@@ -75,7 +75,7 @@
       "id": "filesystem",
       "name": "Files and folders",
       "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
@@ -83,8 +83,8 @@
         { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.3",
-      "notes": "Copies and archives folders to another location — a network share, an external drive — within folders you approve, and nothing else: it exposes no way to read a file's contents. You can point it at broad locations, including a whole drive or the folder JonDash itself lives in, because it finds JonDash's encryption key, database and HTTPS keys wherever they actually are and steps over them; moving them doesn't defeat it. Choosing a wide folder warns you about what else is in there rather than blocking it. Permissions are now enforced rather than merely described, so a module that asks for less than it uses is refused and told what it forgot to declare. Adds dated-snapshot backups with grandfather-father-son retention — keep a week of daily copies, a month of weekly ones and a year of monthly ones. Retention only ever removes folders it created itself, never the newest copy, and never anything of yours sitting alongside them; you can preview exactly what would go first, and every removal is listed in the log and the audit trail. Needs JonDash 1.5.2."
+      "tag": "filesystem/v0.0.4",
+      "notes": "A documentation fix only — the helper itself is unchanged. Its claim that every copy removed by retention reaches the audit trail holds on JonDash 1.5.3 and later, and never did before it. It now says so, and what still holds on older versions: the log records every removal either way."
     }
   ]
 }

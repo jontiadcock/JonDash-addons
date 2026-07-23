@@ -112,6 +112,58 @@ export async function send(ctx: ModuleContext, alert: Alert): Promise<string[]> 
 }
 
 /**
+ * The weekly summary — the one message that is sent when nothing is wrong.
+ *
+ * Everything else here fires on failure, which leaves a gap people rarely notice: silence
+ * means "all well" and "the alerting broke" equally. A digest that arrives on schedule turns
+ * silence into evidence, because its absence is itself a signal.
+ *
+ * Sent module-wide rather than per job — nobody wants six emails — and deliberately leads
+ * with anything that went wrong rather than a cheerful total.
+ */
+export type DigestLine = {
+  name: string;
+  runs: number;
+  failures: number;
+  lastSuccess: string | null;
+  bytes: number;
+  paused: boolean;
+};
+
+export function digest(lines: DigestLine[], days: number, formatBytes: (n: number) => string): Alert["body"] {
+  const failing = lines.filter((l) => l.failures > 0);
+  const stale = lines.filter((l) => !l.paused && l.runs === 0);
+  const out: string[] = [];
+
+  out.push(
+    failing.length > 0
+      ? `${failing.length} of your ${lines.length} backups had failures in the last ${days} days.`
+      : `All ${lines.length} backups are healthy over the last ${days} days.`,
+  );
+  out.push("");
+
+  for (const l of lines) {
+    const bits = [
+      l.paused ? "paused" : `${l.runs} run${l.runs === 1 ? "" : "s"}`,
+      l.failures > 0 ? `${l.failures} FAILED` : null,
+      l.bytes > 0 ? `${formatBytes(l.bytes)} copied` : null,
+      l.lastSuccess ? `last success ${l.lastSuccess}` : "never succeeded",
+    ].filter(Boolean);
+    out.push(`  ${l.name} — ${bits.join(", ")}`);
+  }
+
+  if (stale.length > 0) {
+    out.push("");
+    out.push(`Not run at all in this period: ${stale.map((l) => l.name).join(", ")}.`);
+  }
+
+  out.push("");
+  out.push("This is the scheduled summary. If it stops arriving, something is wrong with the");
+  out.push("backups or with JonDash itself — that is rather the point of sending it.");
+  return out.join("\n");
+}
+
+/**
  * Has this job already been shouted about recently?
  *
  * A job that is broken stays broken, and a tick that fires every minute would otherwise

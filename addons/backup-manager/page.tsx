@@ -1,8 +1,18 @@
 import type { ModulePageProps } from "@/lib/modules/types";
 import filesystem from "@/helpers/filesystem/api";
-import { lastRunFor, listJobs, recentRuns, type Job, type Run } from "./lib/store";
-import { ADMIN_PATH, formatBytes, formatTime } from "./lib/constants";
-import { viewLogAction } from "./actions";
+import { lastRunFor, listJobs, recentRuns, runningRuns, scheduleOf, type Job, type Run } from "./lib/store";
+import {
+  ADMIN_PATH,
+  formatBytes,
+  formatRelative,
+  formatTime,
+  formatWhen,
+  jobPath,
+} from "./lib/constants";
+import { cancelRunAction, viewLogAction } from "./actions";
+import { describeSchedule } from "./lib/schedule";
+import JobDetail from "./ui/job-detail";
+import LiveRefresh from "./ui/live";
 
 /**
  * What happened — display only. Everything that CHANGES a backup lives in
@@ -31,16 +41,19 @@ function describeState(run: Run | null): { text: string; tone?: string } {
   }
 }
 
-const when = (iso: string | null) => {
-  if (!iso) return "—";
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? new Date(t).toLocaleString() : "—";
-};
+const when = formatWhen;
 
-export default async function BackupPage({ ctx }: ModulePageProps) {
+export default async function BackupPage({ ctx, path }: ModulePageProps) {
+  // /m/backup-manager/job/<id> — one backup in detail. The framework hands us the path
+  // segments, so a second view costs no new plumbing.
+  if (path[0] === "job" && path[1]) {
+    return <JobDetail ctx={ctx} jobId={path[1]} />;
+  }
+
   const db = ctx.db;
   const jobs = db ? await listJobs(db) : [];
   const runs = db ? await recentRuns(db, 20) : [];
+  const active = db ? await runningRuns(db) : [];
   const logs = await filesystem(ctx).logs();
   const lastLog = String((await ctx.store?.get("lastLog")) ?? "");
 
@@ -51,6 +64,9 @@ export default async function BackupPage({ ctx }: ModulePageProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Only poll while something is copying — an idle page does no work. */}
+      {active.length > 0 && <LiveRefresh everyMs={3000} />}
+
       <section>
         <h1 className="mb-1 text-2xl font-semibold">Backup Manager</h1>
         <p className="text-sm" style={muted}>
@@ -71,28 +87,48 @@ export default async function BackupPage({ ctx }: ModulePageProps) {
             {jobs.map((job: Job) => {
               const run = latest.get(job.id) ?? null;
               const state = describeState(run);
+              const live = active.find((r) => r.jobId === job.id) ?? null;
+              const progress = live?.helperRunId ? filesystem(ctx).progress(live.helperRunId) : null;
               return (
                 <li key={job.id} className="card flex flex-col gap-1 p-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium">
+                    <a href={jobPath(job.id)} className="text-sm font-medium underline">
                       {job.name}
-                      {!job.enabled && <span className="ml-2 text-xs" style={muted}>(paused)</span>}
-                    </span>
+                    </a>
                     <span className="text-sm" style={state.tone ? { color: state.tone } : undefined}>
-                      {state.text}
+                      {!job.enabled ? "Paused" : state.text}
                     </span>
                   </div>
                   <div className="text-xs" style={muted}>
                     {job.mode === "snapshot" ? "A new dated copy each time" : "Keeps the destination up to date"}
-                    {" · "}every {job.everyHours}h at {formatTime(job.atMinute)}
-                    {job.enabled ? <> · next {when(job.nextRunAt)}</> : null}
+                    {" · "}{describeSchedule(scheduleOf(job), formatTime)}
+                    {job.enabled ? <> · next {formatRelative(job.nextRunAt)}</> : null}
                   </div>
-                  {run && (
-                    <div className="text-xs" style={muted}>
-                      Last run {when(run.startedAt)} — {run.filesCopied} file(s), {formatBytes(run.bytesCopied)}
-                      {run.skippedCount > 0 ? <>, {run.skippedCount} skipped</> : null}
-                      {run.prunedCount > 0 ? <>, {run.prunedCount} old copy(ies) tidied</> : null}
+
+                  {live ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs">
+                        {progress
+                          ? <>Copying — {progress.filesDone} file(s), {formatBytes(progress.bytesDone)}</>
+                          : <>Starting up…</>}
+                      </span>
+                      {progress?.currentPath && (
+                        <span className="min-w-0 truncate text-xs" style={muted}>{progress.currentPath}</span>
+                      )}
+                      <form action={cancelRunAction}>
+                        <input type="hidden" name="runId" value={live.id} />
+                        <button className="btn btn-ghost text-xs" type="submit">Stop</button>
+                      </form>
                     </div>
+                  ) : (
+                    run && (
+                      <div className="text-xs" style={muted}>
+                        Last run {formatRelative(run.startedAt)} — {run.filesCopied} file(s),{" "}
+                        {formatBytes(run.bytesCopied)}
+                        {run.skippedCount > 0 ? <>, {run.skippedCount} skipped</> : null}
+                        {run.prunedCount > 0 ? <>, {run.prunedCount} old copy(ies) tidied</> : null}
+                      </div>
+                    )
                   )}
                 </li>
               );
