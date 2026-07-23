@@ -1,8 +1,9 @@
 # Filesystem helper
 
-**Status: SHIPPED. `0.0.3` on the stable channel, `0.0.3-beta.1` on beta.** Proven end to end
-in a browser against real 1.5.1-beta.1 and 1.5.2 installs (see *Live test* below). Requires JonDash
-**1.5.2-beta.1** — the release that added `ctx.can()` and `readConfig`.
+**Status: SHIPPED. `0.0.2` on the stable channel; `0.0.3-beta.1` built, tested and awaiting
+publish.** Proven end to end in a browser against real **1.5.1-beta.1** and **1.5.2** installs (see
+*Live test* below). 0.0.3 requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
+`readConfig`.
 
 | Piece | State |
 | ----- | ----- |
@@ -134,6 +135,18 @@ Layered guards, any one of which would nearly suffice:
    empty a destination is one typo from destroying everything.
 7. Every deletion is logged **before** it happens, and audited individually — *"what did it remove
    last night"* must be answerable.
+
+> **Caveat, and it is a real one: the AUDIT half of point 7 does not currently work for
+> scheduled runs.** Core's `audit()` calls `await headers()` inside the same `try` as the
+> database write, and `headers()` throws outside a request scope — so background work throws,
+> the catch swallows it, and no row is written. Proven with a probe: `audit()` called with no
+> request in scope wrote zero rows. This affects **every** module's scheduled work, not just
+> this helper.
+>
+> What still holds: the **run log file** records every deletion, before it happens, and the
+> consuming module's own run records persist normally. So *"what did it remove last night"* is
+> answerable from the log — just not from the audit trail. Raised with the core session; the
+> fix is to read the IP defensively rather than let it gate the write.
 
 A dry run (`planPrune`) is always available, and returns *why* each survivor was kept
 ("weekly 2026-W29"), so the log explains itself.
