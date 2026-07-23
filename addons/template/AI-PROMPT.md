@@ -60,8 +60,9 @@ THE ModuleDefinition (module.ts):
                                 //   bare "1.5.0". Semver ranks a pre-release below its
                                 //   release, so a bare "1.5.0" is refused on every 1.5.0
                                 //   beta, i.e. on the builds beta users actually run.
-                                //   Raise it only for what you use: `schedules`/`helpers`
-                                //   need "1.5.0-beta.1"; a 2nd migration needs "1.4.1-beta.1".
+                                //   Raise it only for what you use: a 2nd migration needs
+                                //   "1.4.1-beta.1"; `schedules`/`helpers` need "1.5.0-beta.1";
+                                //   a helper-provided permission needs "1.5.2-beta.1".
     permissions: string[];      // the FEWEST that work — see below
     adminOnly?: boolean;        // true = only full admins see any of it
     settings?: { key: string; label: string; type: "string"|"text"|"number"|"boolean";
@@ -76,9 +77,15 @@ THE ModuleDefinition (module.ts):
                                    //   them), and only once the module is enabled. Put anything
                                    //   richer than a flat settings list here.
     migrations?: string;           // e.g. "./migrations"
-    helpers?: string[];            // first-party shared capability you depend on, e.g. ["scheduler"].
+    helpers?: (string | { id: string; minVersion?: string })[];
+                                   // first-party shared capability you depend on, e.g. ["scheduler"]
+                                   //   or [{ id: "filesystem", minVersion: "0.0.3-beta.1" }].
                                    //   Installed automatically WITH your module; never install one
-                                   //   yourself. Required whenever you declare `schedules`.
+                                   //   yourself. Required whenever you declare `schedules`, and
+                                   //   whenever you declare a "<helperId>:<verb>" permission.
+                                   //   `minVersion` is honest documentation, not a guard: JonDash
+                                   //   uses it to warn which modules a helper update would break.
+                                   //   It does NOT refuse an install against an older helper.
                                    //   DEFAULT TO NEITHER: a module that depends on nothing is
                                    //   easier to install, review and keep working.
     schedules?: { key: string; everyMs: number; skipOnBoot?: boolean;
@@ -106,16 +113,33 @@ THE CONTEXT (ctx) — only what your permissions granted is present:
   ctx.crypto?   // "crypto:use": .encrypt(s) .decrypt(s)
   ctx.email?    // "email:send": .send({ to, subject, text?, html? }) — THROWS if mail isn't configured
   ctx.audit?    // "audit:write": (action, detail?) => Promise<void>
+  ctx.grants    // readonly list of the permissions you were actually granted (JonDash 1.5.2+)
+  ctx.can(p)    // whether a permission was granted (1.5.2+). Helpers call this to refuse work you
+                //   did not declare — you do not normally call it yourself.
   Free, no permission needed: your settings, your store, your own mod_<id>_* tables.
 
-PERMISSIONS — there are exactly FOUR, and each is shown to the admin as a plain-language warning
-before they enable you. Declare the fewest that make it work; over-asking gets a module declined:
+PERMISSIONS — each is shown to the admin as a plain-language warning before they enable you. Declare
+the fewest that make it work; over-asking gets a module declined.
+
+FOUR come from the app itself, and each one puts a field on ctx:
   network:outbound  → ctx.fetch, ctx.net, and raw TCP/DNS/TLS connections
   crypto:use        → ctx.crypto
   audit:write       → ctx.audit
   email:send        → ctx.email
-Anything else is refused at install. There is no permission for reading users, sessions, other core
-tables, or the filesystem — a module keeps its own data in ctx.db and ctx.store.
+
+MORE come from HELPERS you declare, named "<helperId>:<verb>". You may only use these if you also
+declare the helper in `helpers`. Today the `filesystem` helper provides three:
+  filesystem:read   → look at files and folders, within folders the admin approved
+  filesystem:write  → create and change files there
+  filesystem:delete → delete files there
+These are enforced, not just described: since JonDash 1.5.2 the helper checks ctx.can(permission) on
+every call and refuses one you did not declare, naming what you forgot. Declaring a helper permission
+needs minAppVersion "1.5.2-beta.1".
+
+Anything outside those two groups is refused at install. There is no permission for reading users,
+sessions or other core tables, and none for touching the filesystem DIRECTLY — a module keeps its own
+data in ctx.db and ctx.store, and reaches real files only through the filesystem helper, which never
+returns a file's contents to your code.
 
 SAVING CHANGES — the only sanctioned way:
   // actions.ts
@@ -182,7 +206,7 @@ If you have a shell, everything below is doable without help. Use a THROWAWAY Jo
 somebody depends on, and never the default port if something is already using it.
 
 1. Get a JonDash to test against (skip if you already have a disposable one):
-     git clone --depth 1 --branch v1.4.1-beta.1 https://github.com/jontiadcock/JonDash jondash-test
+     git clone --depth 1 --branch v1.5.2 https://github.com/jontiadcock/JonDash jondash-test
      cd jondash-test && rm -rf .git && npm install
    Use the newest release tag you can see on that repository. Node must be on PATH.
 

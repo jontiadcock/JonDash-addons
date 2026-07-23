@@ -4,7 +4,7 @@ Watches the services you care about and tells you when one stops answering. Runs
 schedule, keeps a history, and sends an alert when something goes down and again when it recovers.
 
 - **Module id:** `health-monitor`
-- **Version:** 0.0.5-beta.1
+- **Version:** `0.0.5` on stable, `0.0.5-beta.1` on beta — the same code on both
 - **Minimum JonDash version:** `1.5.0-beta.1` — the **pre-release**, deliberately. Semver ranks
   `1.5.0-beta.4` *below* `1.5.0`, so a bare `"1.5.0"` would be refused on every 1.5.0 beta.
 - **Permissions requested:** `network:outbound`, `crypto:use`, `email:send`, `audit:write`
