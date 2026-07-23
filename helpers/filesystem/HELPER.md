@@ -1,19 +1,22 @@
 # Filesystem helper
 
-**Status: SHIPPED. `0.0.2` on the stable channel, `0.0.2-beta.1` on beta. Proven end to end in a
-browser against a real 1.5.1-beta.1 install** (see *Live test* below). Requires JonDash
-**1.5.1-beta.1** — the release that let a helper name its own capabilities — and runs on every
-build since, stable or beta.
+**Status: SHIPPED. `0.0.3` on the stable channel, `0.0.3-beta.1` on beta.** Proven end to end
+in a browser against real 1.5.1-beta.1 and 1.5.2 installs (see *Live test* below). Requires JonDash
+**1.5.2-beta.1** — the release that added `ctx.can()` and `readConfig`.
 
 | Piece | State |
 | ----- | ----- |
-| `lib/paths.ts` — canonical form, deny-list, containment | **built + tested** |
+| `lib/paths.ts` — canonical form, write-side deny-list, containment | **built + tested** |
+| `lib/secrets.ts` — identity-based secret exclusion | **built + tested** |
+| `lib/risk.ts` — warnings for broad locations | **built + tested** |
 | `lib/probe.ts` — the explicit "Test this location" check | **built + tested** |
 | `lib/copy.ts` — `sync` and `snapshot` | **built + tested** |
-| `lib/roots.ts`, root registration, `api.ts`, run history | **built + tested** |
-| `mirror` mode (deletes) | **deliberately not started** |
+| `lib/logfile.ts` — per-run logs + retention | **built + tested** |
+| `lib/snapshots.ts` + `lib/prune.ts` — GFS retention | **built + tested (0.0.3)** |
+| `api.ts` — roots, browse, plan, start, status, prune | **built + tested** |
+| `mirror` mode (deletes at the destination to match the source) | **deliberately not started** |
 
-Lets a module copy, mirror and archive folders — and nothing else. It is the first consumer of
+Lets a module copy and archive folders — and nothing else. It is the first consumer of
 helper-named capabilities, so it is also the first real test of the consent roll-up.
 
 - **Helper id:** `filesystem`
@@ -71,7 +74,7 @@ summary.
 > something genuinely narrower is ever needed — a read-only log viewer, say — that is a **different
 > helper**, not a broader one.
 
-### Enforcement — fixed in core 1.5.2, to be adopted here
+### Enforcement — live since 0.0.3
 
 Through 0.0.2 these capabilities were **disclosed but not enforced**. `ModuleContext` carried no
 record of what a module was granted: core capabilities are enforced *structurally* (`ctx.fetch`
@@ -79,19 +82,61 @@ simply isn't there unless `network:outbound` was granted), but a helper API is i
 nothing can be withheld and the verifier's check is one binary gate on the whole helper. Verified
 live — the `Module` row granted read + write only, while every method stayed callable.
 
-Core **1.5.2-beta.1** adds `ctx.grants` (a frozen `readonly DeclaredPermission[]`) and
-`ctx.can(permission)`. Frozen deliberately: an unfrozen array could be pushed onto by the very module
-a helper is about to check it against.
+Core 1.5.2 added `ctx.grants` and `ctx.can(permission)`, and 0.0.3 uses them:
 
-**To adopt** (needs `minAppVersion: "1.5.2-beta.1"`, since `ctx.can` does not exist before it):
-`browse` and `plan` require `filesystem:read`; `start` requires `filesystem:write`; any future
-deletion requires `filesystem:delete`. A caller that didn't declare the capability is refused with a
-reason, and the refusal is audited like any other.
+| Call | Requires |
+| ---- | -------- |
+| `browse`, `plan`, `listSnapshots`, `planPrune` | `filesystem:read` |
+| `start` | `filesystem:write` |
+| `prune` | `filesystem:delete` |
 
-Note what this does and does not change. The admin was **already shown** all three capabilities at
+A caller that didn't declare the capability is refused with a message naming the permission to add,
+and the refusal is audited under the calling module's namespace. Proven live: a module declaring only
+`filesystem:read` could list roots, and was refused both a copy and a prune.
+
+> **It defends against mistakes, not malice — and it is an ADDITIONAL gate, never a replacement.**
+> Root confinement, the write-side deny-list and the secret registry all still run after it passes,
+> and none of them may ever be relaxed because this check exists. As for malice: `ctx` is a plain
+> object the *consuming module* hands over, so a module could pass `{...ctx, can: () => true}` and
+> this would believe it — freezing `grants` doesn't help, since a spread builds a new object. Core
+> documents the same limitation and keeps a test asserting the bypass still works, so it fails
+> loudly if that ever stops being true. What this genuinely buys is an honest module that
+> under-declared being told so, clearly.
+
+Note what enforcement does *not* change: the admin was **already shown** all three capabilities at
 install time (the browse screen rolls up — see above), so this was never an under-disclosure. It was
-that the disclosure had no teeth: a module could call past what it declared. Enforcement makes the
-declared subset mean something.
+that the disclosure had no teeth.
+
+---
+
+## Snapshot retention (GFS) — the only thing here that deletes
+
+`lib/snapshots.ts` decides, `lib/prune.ts` carries out. Added in 0.0.3, requires
+`filesystem:delete`.
+
+Four tiers, each keeping the **last** backup of each of the last N periods: `keepDaily`,
+`keepWeekly` (ISO weeks), `keepMonthly`, `keepYearly`. Defaults 7 / 4 / 12 / 0. Fine detail
+recently, coarse history for a long time, at a fraction of the disk.
+
+**`prune` takes a POLICY, never a list of paths.** It recomputes what to remove for itself, so a
+consuming module can name a destination but never a victim — there is no argument it could fill
+with `C:\Users\me\Documents`, because no such argument exists.
+
+Layered guards, any one of which would nearly suffice:
+
+1. The destination passes the **write-side** rules — deleting is writing.
+2. Only **direct children** of the destination. No recursive hunt for snapshots.
+3. Only names matching **exactly** the timestamp format the copy engine generates. An admin's own
+   folder in that destination is invisible to this code — *the strictness is the safety*.
+4. Only real directories, checked with `lstat` so a symlink is never followed into.
+5. Containment re-checked on the resolved path.
+6. **The newest snapshot is never removable**, even with every tier set to zero. A policy that can
+   empty a destination is one typo from destroying everything.
+7. Every deletion is logged **before** it happens, and audited individually — *"what did it remove
+   last night"* must be answerable.
+
+A dry run (`planPrune`) is always available, and returns *why* each survivor was kept
+("weekly 2026-W29"), so the log explains itself.
 
 ### The label is part of the API surface
 
@@ -405,5 +450,6 @@ Two defects found, both in this helper and both still open:
 
 | Version | Notes |
 | ------- | ----- |
-| 0.0.2-beta.1 *(unpublished)* | **Protection moved from paths to files.** A source may now be anything — a whole drive, JonDash's own folder — because the secrets inside are excluded by *file identity* resolved from the app's live configuration, so the exclusion follows a secret that has been moved. Writing stays strictly bounded. Adds warnings for broad locations, downloadable per-run logs with retention, `assessPath()`, and audit of the helper's own refusals. 77 tests. Two bugs fixed from the 0.0.1 live test (unaudited refusals; `UNKNOWN` leaking into an error message) and one found here: reading retention coerced before testing for absence, so `Number(null) === 0` turned "never configured" into "keep nothing" — caught in a browser, not by a unit test, and now pinned by one. |
-| 0.0.1-beta.1 *(unpublished)* | Path safety, location testing and the `sync`/`snapshot` copy engine, 38 tests. Three bugs found and fixed while writing them, all in path handling: a UNC share root was refused as if it were a whole drive (`path.parse()` reports a share as its own root); `path.normalize(String.raw`\\server`)` silently became `\server` on the *current drive*, so a missing share name became a real folder elsewhere; and validation was doing network I/O, per the section above. |
+| 0.0.3-beta.1 *(unpublished)* | **Capabilities are now enforced, not just disclosed** — `ctx.can()` per call, proven live by a module that declared only `filesystem:read` and was refused both a copy and a prune. Adds **GFS snapshot retention** (`prune`, the first operation here that deletes; takes a policy, never a path) and `readConfig`, so consent lines name the real approved folders instead of saying "the folders you allow". Deletes the mirrored copy of `dataDir()` now core exports it. 111 tests. One defect found by reading a real log: a deletion was recorded as `SKIPPED — removed by retention policy`, which states the opposite of what happened; now `REMOVED`, with a footer that counts removals rather than claiming nothing was copied. |
+| 0.0.2 *(stable)* / 0.0.2-beta.1 | **Protection moved from paths to files.** A source may now be anything — a whole drive, JonDash's own folder — because the secrets inside are excluded by *file identity* resolved from the app's live configuration, so the exclusion follows a secret that has been moved. Writing stays strictly bounded. Adds warnings for broad locations, downloadable per-run logs with retention, `assessPath()`, and audit of the helper's own refusals. 77 tests. Two bugs fixed from the 0.0.1 live test (unaudited refusals; `UNKNOWN` leaking into an error message) and one found here: reading retention coerced before testing for absence, so `Number(null) === 0` turned "never configured" into "keep nothing" — caught in a browser, not by a unit test, and now pinned by one. |
+| 0.0.1-beta.1 | Path safety, location testing and the `sync`/`snapshot` copy engine, 38 tests. Three bugs found and fixed while writing them, all in path handling: a UNC share root was refused as if it were a whole drive (`path.parse()` reports a share as its own root); `path.normalize(String.raw`\\server`)` silently became `\server` on the *current drive*, so a missing share name became a real folder elsewhere; and validation was doing network I/O, per the section above. |

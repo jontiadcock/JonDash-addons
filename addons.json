@@ -53,16 +53,16 @@
       "id": "filesystem",
       "name": "Files and folders",
       "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-      "version": "0.0.2",
-      "minAppVersion": "1.5.1-beta.1",
+      "version": "0.0.3",
+      "minAppVersion": "1.5.2-beta.1",
       "provides": [
         { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
         { "id": "filesystem:write", "label": "Create and change files in the locations you allow" },
         { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.2",
-      "notes": "First release on the stable channel. Copies and archives folders to another location — a network share, an external drive — within folders you approve, and nothing else: it exposes no way to read a file's contents. You can point it at broad locations, including a whole drive or the folder JonDash itself lives in, because it finds JonDash's encryption key, database and HTTPS keys wherever they actually are and steps over them — moving them doesn't defeat it. Choosing a wide folder warns you about what else is in there rather than blocking it. Every run writes a log naming exactly what it copied and what it skipped, kept for as long as you choose. Deletion is not built yet, so nothing at the destination is ever removed."
+      "tag": "filesystem/v0.0.3",
+      "notes": "Copies and archives folders to another location — a network share, an external drive — within folders you approve, and nothing else: it exposes no way to read a file's contents. You can point it at broad locations, including a whole drive or the folder JonDash itself lives in, because it finds JonDash's encryption key, database and HTTPS keys wherever they actually are and steps over them; moving them doesn't defeat it. Choosing a wide folder warns you about what else is in there rather than blocking it. Permissions are now enforced rather than merely described, so a module that asks for less than it uses is refused and told what it forgot to declare. Adds dated-snapshot backups with grandfather-father-son retention — keep a week of daily copies, a month of weekly ones and a year of monthly ones. Retention only ever removes folders it created itself, never the newest copy, and never anything of yours sitting alongside them; you can preview exactly what would go first, and every removal is listed in the log and the audit trail. Needs JonDash 1.5.2."
     }
   ]
 }

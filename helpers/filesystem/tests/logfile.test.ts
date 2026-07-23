@@ -53,6 +53,22 @@ describe("RunLog", () => {
     expect(text).toContain("Result        done");
   });
 
+  it("says REMOVED for a deletion, not SKIPPED", async () => {
+    // Caught by reading a real prune log: `SKIPPED — removed by retention policy` states
+    // the opposite of what happened, in the one log somebody reads after wondering where
+    // a backup went. A destructive line must not read like a cautious one.
+    const log = await RunLog.open({ ...header("run-prune"), mode: "prune" });
+    log!.removed("2026-01-01-02-00-00", "outside the retention policy");
+    await log!.close({ state: "done", filesCopied: 0, bytesCopied: 0, skipped: 1, errors: 0, kind: "prune" });
+
+    const text = (await readLog("run-prune"))!;
+    expect(text).toContain("REMOVED  2026-01-01-02-00-00");
+    expect(text).not.toContain("SKIPPED");
+    // And the footer counts removals, rather than claiming zero files were copied.
+    expect(text).toContain("Removed       1 backup(s)");
+    expect(text).not.toContain("Copied");
+  });
+
   it("puts the warnings the admin accepted in the header", async () => {
     const log = await RunLog.open({ ...header("run-warn"), warnings: ["high: this is an entire drive"] });
     await log!.close({ state: "done", filesCopied: 0, bytesCopied: 0, skipped: 0, errors: 0 });

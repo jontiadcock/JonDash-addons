@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { ModuleContext } from "@/lib/modules/types";
+import type { DeclaredPermission, ModuleContext } from "@/lib/modules/types";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
 import {
@@ -14,6 +14,8 @@ import {
 } from "./lib/paths";
 import { assessRoot, riskSummary, type RootRisk } from "./lib/risk";
 import { loadRegistry } from "./lib/secrets";
+import { planPrune, runPrune, type PrunePlan } from "./lib/prune";
+import { DEFAULT_GFS, describePolicy, toSnapshots, type GfsPolicy } from "./lib/snapshots";
 import {
   DEFAULT_RETENTION,
   RunLog,
@@ -229,6 +231,29 @@ export type FilesystemApi = {
   retention(): Promise<RetentionPolicy>;
   /** Change it, and apply the new policy immediately. */
   setRetention(policy: RetentionPolicy): Promise<{ removed: number }>;
+
+  /** Snapshot folders at a destination, newest first. Names and dates only. */
+  listSnapshots(rootId: string, subpath?: string): Promise<{ name: string; at: string }[]>;
+  /**
+   * What retention WOULD remove, having removed nothing. Always available to show an admin
+   * before they agree to anything being destroyed.
+   */
+  planPrune(
+    rootId: string,
+    policy: GfsPolicy,
+    subpath?: string,
+  ): Promise<{ ok: true; plan: PrunePlan } | { ok: false; reason: string }>;
+  /**
+   * Apply retention. Requires `filesystem:delete`.
+   *
+   * Takes a POLICY, never a list of paths — it recomputes what to remove for itself, so a
+   * module can name a destination but never a victim.
+   */
+  prune(
+    rootId: string,
+    policy: GfsPolicy,
+    subpath?: string,
+  ): Promise<{ ok: true; removed: string[]; kept: number; errors: number } | { ok: false; reason: string }>;
 };
 
 /** Resolve a spec's two ends, applying every path rule before anything is touched. */
@@ -244,6 +269,31 @@ async function resolveSpec(
 
   const warnings = [source.root.riskNote, dest.root.riskNote].filter((w): w is string => !!w);
   return { ok: true, source: source.path, dest: dest.path, warnings };
+}
+
+/**
+ * Capability enforcement, added in 0.0.3 against core 1.5.2's `ctx.can()`.
+ *
+ * **This is an ADDITIONAL gate. It never replaces one.** Root confinement, the write-side
+ * deny-list and the secret registry are the real boundaries and every one of them still
+ * runs after this passes. The danger of a check like this is not that it fails to stop an
+ * attacker — it cannot, see below — but that its presence later persuades somebody the
+ * checks underneath it are belt-and-braces. They are not.
+ *
+ * **It defends against mistakes, not malice.** `ctx` is a plain object the CONSUMING MODULE
+ * hands us, so a module that wanted to could pass `{...ctx, can: () => true}` and this
+ * would believe it; freezing `grants` doesn't help, because a spread builds a new object.
+ * Core documents the same limitation and has a test asserting the bypass still works, so it
+ * fails loudly if that ever changes. What this genuinely buys is an honest module that
+ * under-declared being told so, clearly, instead of silently getting more than its consent
+ * screen described.
+ */
+function requires(ctx: ModuleContext, permission: DeclaredPermission): string | null {
+  // Absent on cores older than 1.5.2. `minAppVersion` rules those out, but a helper that
+  // assumes a capability exists is one core downgrade from throwing on every call.
+  if (typeof ctx.can !== "function") return null;
+  if (ctx.can(permission)) return null;
+  return `This module asked to do something it didn't declare. Add "${permission}" to its permissions, then enable it again.`;
 }
 
 const api = (ctx: ModuleContext): FilesystemApi => ({
@@ -330,6 +380,7 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   testLocation: (input, opts) => probeLocation(input, opts),
 
   async browse(rootId, subpath) {
+    if (requires(ctx, "filesystem:read")) return [];
     const at = await resolveIn(rootId, "source", subpath);
     if (!at.ok) return [];
     const entries = await fsp.readdir(at.path, { withFileTypes: true }).catch(() => []);
@@ -349,6 +400,8 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   },
 
   async plan(spec) {
+    const denied = requires(ctx, "filesystem:read");
+    if (denied) return { ok: false, reason: denied };
     const r = await resolveSpec(spec);
     if (!r.ok) return r;
     const registry = await loadRegistry();
@@ -359,6 +412,13 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   },
 
   async start(spec) {
+    // A copy creates and changes files at the destination, so this is the write capability
+    // — checked before anything is resolved, let alone touched.
+    const denied = requires(ctx, "filesystem:write");
+    if (denied) {
+      await ctx.audit?.("filesystem.run.refused", denied);
+      return { ok: false, reason: denied };
+    }
     const r = await resolveSpec(spec);
     if (!r.ok) {
       await ctx.audit?.("filesystem.run.refused", r.reason);
@@ -488,6 +548,89 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
     );
     return pruneLogs(next);
   },
+
+  async listSnapshots(rootId, subpath) {
+    if (requires(ctx, "filesystem:read")) return [];
+    const at = await resolveIn(rootId, "dest", subpath);
+    if (!at.ok) return [];
+    const names = await fsp.readdir(at.path).catch(() => [] as string[]);
+    return toSnapshots(names).map((s) => ({ name: s.name, at: s.at.toISOString() }));
+  },
+
+  async planPrune(rootId, policy, subpath) {
+    // Reading only — this is what an admin looks at BEFORE agreeing to anything being
+    // destroyed, so it must be available to a module that can't actually delete.
+    const denied = requires(ctx, "filesystem:read");
+    if (denied) return { ok: false, reason: denied };
+    const at = await resolveIn(rootId, "dest", subpath);
+    if (!at.ok) return { ok: false, reason: at.reason };
+    return planPrune(at.path, clampPolicy(policy));
+  },
+
+  async prune(rootId, policy, subpath) {
+    const denied = requires(ctx, "filesystem:delete");
+    if (denied) {
+      await ctx.audit?.("filesystem.prune.refused", denied);
+      return { ok: false, reason: denied };
+    }
+    const at = await resolveIn(rootId, "dest", subpath);
+    if (!at.ok) return { ok: false, reason: at.reason };
+
+    const safe = clampPolicy(policy);
+    const log = await RunLog.open({
+      runId: randomUUID(),
+      moduleId: ctx.moduleId,
+      mode: `prune (${describePolicy(safe)})`,
+      source: at.path,
+      destination: at.path,
+    });
+
+    const outcome = await runPrune(at.path, safe, { log });
+    if (!outcome.ok) {
+      await log?.close({ state: "failed", filesCopied: 0, bytesCopied: 0, skipped: 0, errors: 1, error: outcome.reason, kind: "prune" });
+      await ctx.audit?.("filesystem.prune.refused", outcome.reason);
+      return outcome;
+    }
+
+    const { result, plan } = outcome;
+    await log?.close({
+      state: "done",
+      filesCopied: 0,
+      bytesCopied: 0,
+      skipped: result.removed.length,
+      errors: result.errors.length,
+      error: result.errors[0]?.reason ?? null,
+      kind: "prune",
+    });
+    // Individually, not as a count: "what did it remove last night" must be answerable.
+    for (const name of result.removed) {
+      await ctx.audit?.("filesystem.prune.removed", `${plan.destination} — ${name}`);
+    }
+    return {
+      ok: true,
+      removed: result.removed,
+      kept: plan.keep.length,
+      errors: result.errors.length,
+    };
+  },
 });
+
+/**
+ * Keep a policy inside sane bounds before anything acts on it.
+ *
+ * A negative or non-finite tier reads as zero, and zero means "this tier keeps nothing" —
+ * which, combined with the guarantee that the newest snapshot always survives, is the
+ * safest possible interpretation of nonsense.
+ */
+function clampPolicy(p: GfsPolicy): GfsPolicy {
+  const n = (v: number, dflt: number) =>
+    Number.isFinite(v) && v >= 0 ? Math.min(Math.trunc(v), 10_000) : dflt;
+  return {
+    keepDaily: n(p?.keepDaily, DEFAULT_GFS.keepDaily),
+    keepWeekly: n(p?.keepWeekly, DEFAULT_GFS.keepWeekly),
+    keepMonthly: n(p?.keepMonthly, DEFAULT_GFS.keepMonthly),
+    keepYearly: n(p?.keepYearly, DEFAULT_GFS.keepYearly),
+  };
+}
 
 export default api;
