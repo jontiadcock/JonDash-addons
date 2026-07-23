@@ -57,7 +57,7 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.1.0",
+  version: "0.1.1",
   // `ctx.can()` enforcement and GFS retention arrived in filesystem 0.0.3, which needs
   // JonDash 1.5.2. The pre-release, not a bare "1.5.2" — semver ranks a pre-release below
   // its release, so a bare number is refused on every 1.5.2 beta.

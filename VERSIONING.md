@@ -24,6 +24,23 @@ Each add-on has its **own semver**, independent of other add-ons and of JonDash:
 The version is recorded in the add-on's `MODULE.md`, its `module.ts` (`version`), and its `addons.json`
 entry on the channel branch it lives on.
 
+### Fixing a broken beta — increment `N`, never the version
+
+> **A beta that needs fixing becomes `X.Y.Z-beta.2`, not `X.Y.(Z+1)-beta.1`.** Owner's rule,
+> 2026-07-23. `X.Y.Z` names *the release being worked towards*; the `-beta.N` counter is what tracks
+> attempts at it. Bumping the version instead invents a release that never existed, so the history
+> stops saying "it took three goes to get 0.1.1 right" and starts implying three separate releases.
+>
+> Set by `backup-manager@0.1.1-beta.1`, which shipped uninstallable. The fix went out as
+> **`0.1.1-beta.2`** — same intended release, second attempt. `0.1.2-beta.1` would have been wrong.
+>
+> The version only moves when the *content of the intended release* changes: a further fix is a new
+> `-beta.N`, genuinely new work is a new `X.Y.Z` starting again at `-beta.1`.
+>
+> **A published tag stays put.** `backup-manager/v0.1.1-beta.1` still exists and still points at the
+> broken tree — tags are immutable and deleting one rewrites history someone may already have. The
+> manifest simply moves past it, and `MODULE.md` records that the attempt failed and why.
+
 ## Tags = one per published version, namespaced per add-on
 
 Every published version is tagged **`<id>/v<version>`** (the `/` namespaces tags by add-on in GitHub):

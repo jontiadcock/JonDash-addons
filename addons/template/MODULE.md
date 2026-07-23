@@ -38,8 +38,31 @@ you. It needs no other context.
 | `lib/store.ts` | no | Every query in one place. |
 | `lib/text.ts` | no | Pure helpers, easy to test. |
 | `lib/constants.ts` | no | The module id in one place. |
-| `tests/text.test.ts` | no | Example test. Ships with the module — see the warning inside it. |
+| `tests/text.test.ts` | no | Example test. **Ships with the module and is scanned like every other file** — see below. |
 | `AI-PROMPT.md` | no | A paste-in prompt for having an AI agent write, test and verify a module. Delete it from your copy. |
+
+> ### Your tests ship, and the installer scans them
+>
+> The whole folder is the artifact, so a test is not exempt from any rule. A test that imports
+> `@/lib/db`, touches `node:fs`, or reads `process.env` makes the **whole module fail verification and
+> refuse to install** — while still typechecking, linting, building and passing under Vitest. Nothing
+> you normally run models the installer.
+>
+> Test **your own** logic: parsing, date maths, formatting, rendering your widget. A test that needs
+> the app's internals — the real Prisma client, the real migration runner — is a maintainer's test of
+> JonDash, not part of your module, and belongs outside the module folder entirely.
+>
+> This is not hypothetical: `backup-manager@0.1.1-beta.1` shipped exactly this mistake and could not be
+> installed at all. Run the verifier before you call a module finished — see the AI prompt's step 4.
+
+> ### Your widget draws its own card
+>
+> The dashboard hands a widget a grid cell and nothing else — no card, no padding, no heading. Wrap
+> your top-level element in `className="card p-4"` and name your module inside it, or the widget
+> renders as loose text on the page background beside properly framed ones, with nothing saying which
+> module it belongs to. It builds and typechecks perfectly either way, so the **only** thing that
+> catches it is opening the dashboard and looking — or a test that renders the component and asserts
+> the markup.
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
