@@ -1,8 +1,8 @@
 # Filesystem helper
 
-**Status: SHIPPED. `0.0.2` on the stable channel; `0.0.4-beta.1` on beta.** Proven end to end in a
-browser against real **1.5.1-beta.1**, **1.5.2** and **1.5.3-beta.5** installs (see *Live test*
-below). 0.0.3 onwards requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
+**Status: SHIPPED. `0.0.4` on stable, `0.0.4-beta.1` on beta.** Proven end to end in a browser
+against real **1.5.1-beta.1**, **1.5.2** and **1.5.3-beta.5** installs (see *Live test* below).
+0.0.3 onwards requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
 `readConfig`.
 
 **0.0.4 is a documentation release — the runtime is byte-identical to 0.0.3-beta.1.** It exists

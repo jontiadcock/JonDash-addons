@@ -21,7 +21,7 @@
       ],
       "path": "addons/health-monitor",
       "tag": "health-monitor/v0.0.5-beta.1",
-      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting has been removed - it never controlled how often anything was actually checked."
+      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting is gone — it never controlled how often anything was checked."
     },
     {
       "id": "template",
@@ -56,7 +56,7 @@
       ],
       "path": "addons/backup-manager",
       "tag": "backup-manager/v0.1.0-beta.1",
-      "notes": "Adds the things that tell you a backup is actually healthy. A dashboard tile gives you a verdict at a glance, and each backup gets its own page with its history, a chart of recent runs, and the dated copies it holds — the chart is there because a backup that suddenly copies far less than usual still reports success, and that shape is what a missing source looks like. A running backup shows what it is copying and can be stopped. You can look inside your approved folders instead of typing a path, and ask any backup what it WOULD copy first. Schedules can be 'at 2am on weekdays', not just 'every so many hours'. Failures retry on their own with a backoff, you can cap how many run at once, pause everything, and duplicate a backup. Before starting it checks the destination is reachable, so an unplugged drive says so instead of failing halfway. And there is an optional weekly summary — the one email sent when nothing is wrong, so that silence stops being ambiguous. Needs JonDash 1.5.2."
+      "notes": "A far bigger release. A dashboard tile gives you a verdict at a glance, and each backup gets its own page with its history and a chart of recent runs — a run that copies far less than usual is flagged, because that shape is what a missing source looks like. Schedules can be \"2am on weekdays\"."
     }
   ],
   "helpers": [

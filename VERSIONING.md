@@ -73,8 +73,22 @@ bare `"1.5.0"` and could not be installed by anyone, on any build that existed.
 ### `notes` — what changed, for the update screen
 
 Optional, one short line per entry, shown on the module's card in **Admin → Updates** so someone can see
-why a version is worth taking before they take it. Keep it to what changed and who cares; **300
-characters maximum** and no control characters (JonDash caps and strips them, but write it clean).
+why a version is worth taking before they take it. Keep it to what changed and who cares.
+
+> **300 characters maximum, and JonDash TRUNCATES rather than refuses.**
+> `sanitizeModuleEntry` / `sanitizeHelperEntry` do `.slice(0, 300)`, so an over-length note is not
+> rejected, not warned about, and not logged — it simply reaches the admin cut off mid-sentence.
+> Control characters are stripped the same silent way.
+>
+> This is not hypothetical. On 2026-07-23 **four of the five stable entries were over the cap** —
+> `filesystem` at 1063 characters, `backup-manager` at 1026, `template` at 340, `health-monitor` at
+> 303 — so release notes that took real care to write had been rendering as fragments for weeks. The
+> rule was already on this page; nothing checked it.
+>
+> **`node scripts/check-manifest.mjs` now does.** Run it before every publish. It fails on an
+> over-length note and prints where the cut would land, and also checks that each `tag` names its
+> `version`, that the manifest version matches the addon's own `module.ts` / `helper.ts`, and that a
+> pre-release never appears on the stable channel.
 
 Update it whenever you bump a version — it describes *that* version, not the module in general. Leaving
 it out is fine; the card simply shows the version numbers.
