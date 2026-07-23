@@ -34,7 +34,7 @@
       ],
       "path": "addons/template",
       "tag": "template/v0.0.6",
-      "notes": "The template depends on nothing again: the scheduler helper and its background job have been removed, so copying it gives you a module that installs on its own. Helpers are still documented as an option. Works on far more versions of JonDash than before."
+      "notes": "The template depends on nothing: no helpers and no background work, so copying it gives you a module that installs on its own. Adds a done toggle — showing a follow-up migration and a permission the code actually uses — and a fuller guide, including a paste-in AI prompt for building a module."
     },
     {
       "id": "backup-manager",
