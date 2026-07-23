@@ -130,7 +130,7 @@ function isUnc(p: string): boolean {
  * most people back up to. A share root is a location; a drive root is a whole disk.
  * `\\server` alone is caught by `isBareUncServer` instead.
  */
-function isFilesystemRoot(p: string): boolean {
+export function isFilesystemRoot(p: string): boolean {
   if (isUnc(p)) return false;
   return path.parse(p).root === p;
 }
@@ -146,13 +146,18 @@ function isBareUncServer(p: string): boolean {
 }
 
 /**
- * Directories no backup may ever read from or write to, whatever an admin types.
+ * Directories a backup may never WRITE into, whatever an admin types.
  *
- * The install directory is first for a reason: a backup tool that can write into the app
- * is a backup tool that can replace the app, and `.data/secrets.json` inside it holds the
- * master encryption key. `process.cwd()` is the install root when the server runs.
+ * Write-side only, since 0.0.2. Reading is now governed by the secret registry
+ * (`secrets.ts`), which excludes the actual secrets by identity — so a source may be as
+ * broad as `C:\` and JonDash's key still never leaves the machine.
+ *
+ * Writing is different, and stays absolute. A backup tool that can write into the app is
+ * a backup tool that can REPLACE the app: overwrite `modules/`, drop something into
+ * `.next`, and the next restart runs it. No warning covers that, so it is refused outright.
+ * `process.cwd()` is the install root when the server runs.
  */
-export function forbiddenRoots(installDir = process.cwd()): string[] {
+export function writeForbiddenRoots(installDir = process.cwd()): string[] {
   const out: string[] = [];
   const add = (p?: string) => {
     if (!p) return;
@@ -176,29 +181,57 @@ export function forbiddenRoots(installDir = process.cwd()): string[] {
 }
 
 /**
- * The full check. Returns the canonical path, or a refusal with a reason an admin can act
- * on — never a silently narrowed path that happens to work.
+ * Rules shared by both directions: a path must be real, absolute and unambiguous before
+ * anyone asks what it is allowed to do.
  */
-export function assertUsable(input: string, installDir = process.cwd()): PathVerdict {
+function assertWellFormed(input: string): PathVerdict {
   const c = canonicalise(input);
+  if (!c.ok) return c;
+  if (isBareUncServer(c.path)) {
+    return refuse("Name the shared folder as well, like \\\\server\\backups.");
+  }
+  return c;
+}
+
+/**
+ * A folder to READ from. Deliberately permissive.
+ *
+ * Until 0.0.2 this refused drive roots and anything touching JonDash or the system, which
+ * meant "back up `C:\`" was simply impossible. That refusal was also weaker than it looked:
+ * it protected a *location*, so relocating the data directory walked straight around it.
+ *
+ * The protection now lives where it belongs — on the files themselves. `secrets.ts`
+ * resolves the live secrets from the app's own configuration and excludes them by file
+ * identity, wherever they have been moved to. So anything may be a source, and the admin
+ * is told what a broad choice really contains (`risk.ts`) rather than being stopped.
+ */
+export function assertUsableAsSource(input: string): PathVerdict {
+  return assertWellFormed(input);
+}
+
+/**
+ * A folder to WRITE into. Stricter, and not negotiable.
+ *
+ * A drive root IS allowed here — `E:\` is what an external backup disk looks like, and
+ * refusing it would rule out the most ordinary destination there is. What stays refused is
+ * anywhere that writing could alter this machine rather than merely fill it up: JonDash's
+ * own directory, and the operating system.
+ */
+export function assertUsableAsDestination(input: string, installDir = process.cwd()): PathVerdict {
+  const c = assertWellFormed(input);
   if (!c.ok) return c;
   const p = c.path;
 
-  if (isFilesystemRoot(p)) {
-    return refuse("Choose a folder rather than a whole drive — backing up a drive root is never what you want.");
-  }
-  if (isBareUncServer(p)) {
-    return refuse("Name the shared folder as well, like \\\\server\\backups.");
-  }
-
-  for (const forbidden of forbiddenRoots(installDir)) {
+  for (const forbidden of writeForbiddenRoots(installDir)) {
     if (contains(forbidden, p)) {
-      return refuse(`That location is part of the system or of JonDash itself (${forbidden}) and can't be used.`);
+      return refuse(
+        `Backups can't be written into ${forbidden} — that's JonDash's own folder or part of the system. Choose somewhere else.`,
+      );
     }
-    // Also refuse a parent OF a forbidden directory: backing up `C:\` by way of a folder
+    // Also refuse a parent OF a forbidden directory: writing to `C:\` by way of a folder
     // that contains Windows is the same mistake wearing a different hat.
     if (contains(p, forbidden)) {
-      return refuse(`That folder contains a protected location (${forbidden}). Choose something narrower.`);
+      return refuse(`That folder contains ${forbidden}, which backups can't write into. Choose something narrower.`);
     }
   }
   return { ok: true, path: p };

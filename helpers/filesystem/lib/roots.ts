@@ -1,4 +1,4 @@
-import { assertUsable, type PathVerdict } from "./paths";
+import { assertUsableAsSource, type PathVerdict } from "./paths";
 
 /**
  * Roots — the admin-approved locations this helper may touch.
@@ -7,14 +7,14 @@ import { assertUsable, type PathVerdict } from "./paths";
  * its own reach: every operation names a root by id and the helper resolves it. That is
  * what lets the consent screen honestly say "the folders you allow".
  *
- * NOTE: only the read side is implemented. Registration is deliberately still to be
- * written — see HELPER.md. `describe()` runs at enable time with the helper's config, so
- * the read path has to exist before anything can be registered against it.
+ * NOTE: this file is the CONFIG-shaped read side, used only by `describe()` for the
+ * consent sentence. The live roots — the ones operations actually resolve against — are
+ * rows in `hlp_filesystem_roots`, owned by `api.ts`.
  */
 
 export type Root = {
   id: string;
-  /** Canonical absolute path, as validated by `assertUsable`. */
+  /** Canonical absolute path, as validated by `assertUsableAsSource`. */
   path: string;
   /** What the admin called it, e.g. "NAS backups". */
   label: string;
@@ -44,7 +44,11 @@ export function listRootPaths(config: Record<string, unknown>): string[] {
 /**
  * Validate a path an admin has offered as a new root. Returns the canonical form, or a
  * refusal carrying a reason they can act on. Never narrows a bad path to a working one.
+ *
+ * Source rules: since 0.0.2 a root may be as broad as a whole drive. Breadth is warned
+ * about (`risk.ts`) and the secrets inside are excluded by identity (`secrets.ts`), rather
+ * than the folder being refused.
  */
 export function validateRootPath(input: string): PathVerdict {
-  return assertUsable(input);
+  return assertUsableAsSource(input);
 }

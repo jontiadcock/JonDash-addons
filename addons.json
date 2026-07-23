@@ -52,8 +52,8 @@
     {
       "id": "filesystem",
       "name": "Files and folders",
-      "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow.",
-      "version": "0.0.1-beta.1",
+      "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.5.1-beta.1",
       "provides": [
         { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
@@ -61,8 +61,8 @@
         { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.1-beta.1",
-      "notes": "First release. Copies and mirrors folders within locations an administrator approves, and nothing else — it exposes no way to read a file's contents. sync and snapshot modes only; deletion is not yet built. The first helper to name its own capabilities."
+      "tag": "filesystem/v0.0.2-beta.1",
+      "notes": "You can now back up broad locations — a whole drive, or the folder JonDash itself lives in. Rather than refusing them, it finds JonDash's encryption key, database and HTTPS keys wherever they actually are and steps over them, so moving them doesn't defeat it. Choosing a wide folder now warns you about what else is in there instead of blocking it. Every run writes a log naming exactly what it copied and what it skipped, kept for as long as you choose. Copies and archives only — it still exposes no way to read a file's contents, and deletion is not yet built."
     }
   ]
 }

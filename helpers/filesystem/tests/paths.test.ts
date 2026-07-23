@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { canonicalise, contains, assertUsable, assertDistinct } from "../lib/paths";
+import {
+  canonicalise,
+  contains,
+  assertUsableAsSource,
+  assertUsableAsDestination,
+  assertDistinct,
+} from "../lib/paths";
 
 /**
  * These tests are the reason the helper is allowed to delete anything.
@@ -66,46 +72,72 @@ describe("contains — segment-aware, not string-prefix", () => {
   });
 });
 
-describe("assertUsable — the deny-list", () => {
+/**
+ * 0.0.2 split one rule into two asymmetric ones. Reading is permissive — a source may be
+ * a whole drive, because the secrets inside it are excluded by identity rather than the
+ * folder being refused. Writing stays strict, because writing into JonDash can replace
+ * JonDash. These tests exist to catch the two rules being collapsed back together.
+ */
+describe("assertUsableAsSource — permissive, since protection moved to the files", () => {
+  it("ALLOWS a whole drive: that is the point of the redesign", () => {
+    const r = assertUsableAsSource(WIN ? "C:\\" : "/");
+    expect(r.ok).toBe(true);
+  });
+
+  it("ALLOWS the JonDash folder itself — its secrets are skipped during the copy", () => {
+    const install = WIN ? "C:\\Apps\\JonDash" : "/opt/jondash";
+    for (const p of [install, path.join(install, ".data")]) {
+      expect(assertUsableAsSource(p).ok, p).toBe(true);
+    }
+  });
+
+  it("ALLOWS system directories", () => {
+    expect(assertUsableAsSource(WIN ? "C:\\Windows\\System32" : "/etc").ok).toBe(true);
+  });
+
+  it("still refuses a path that is not a path at all", () => {
+    for (const bad of ["", "   ", "relative\\thing", "..\\escape"]) {
+      expect(assertUsableAsSource(bad).ok, bad).toBe(false);
+    }
+  });
+
+  it("accepts a UNC share but refuses a bare server name", () => {
+    if (!WIN) return;
+    expect(assertUsableAsSource("\\\\nas\\backups").ok).toBe(true);
+    const bare = assertUsableAsSource("\\\\nas");
+    expect(bare.ok).toBe(false);
+    if (!bare.ok) expect(bare.reason).toMatch(/shared folder/i);
+  });
+});
+
+describe("assertUsableAsDestination — strict, because writing can alter this machine", () => {
   const install = WIN ? "C:\\Apps\\JonDash" : "/opt/jondash";
 
   it("refuses the JonDash install directory and everything under it", () => {
-    for (const p of [install, path.join(install, ".data"), path.join(install, "prisma", "dev.db")]) {
-      const r = assertUsable(p, install);
+    for (const p of [install, path.join(install, ".data"), path.join(install, "modules")]) {
+      const r = assertUsableAsDestination(p, install);
       expect(r.ok, p).toBe(false);
       if (!r.ok) expect(r.reason).toMatch(/JonDash|system/i);
     }
   });
 
   it("refuses a folder that CONTAINS the install directory", () => {
-    // Backing up C:\Apps would sweep up JonDash — and its encryption key.
-    const parent = path.dirname(install);
-    const r = assertUsable(parent, install);
+    const r = assertUsableAsDestination(path.dirname(install), install);
     expect(r.ok).toBe(false);
-  });
-
-  it("refuses a bare drive or filesystem root", () => {
-    const r = assertUsable(WIN ? "C:\\" : "/", install);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reason).toMatch(/drive|folder/i);
   });
 
   it("refuses system directories", () => {
-    const sys = WIN ? "C:\\Windows\\System32" : "/etc";
-    expect(assertUsable(sys, install).ok).toBe(false);
+    expect(assertUsableAsDestination(WIN ? "C:\\Windows\\System32" : "/etc", install).ok).toBe(false);
   });
 
-  it("accepts an ordinary folder", () => {
-    const r = assertUsable(A, install);
+  it("ALLOWS a drive root: an external backup disk is exactly `E:\\`", () => {
+    // Deliberately not C:, which would contain the system directories above.
+    const r = assertUsableAsDestination(WIN ? "E:\\" : "/mnt", install);
     expect(r.ok).toBe(true);
   });
 
-  it("accepts a UNC share but refuses a bare server name", () => {
-    if (!WIN) return;
-    expect(assertUsable("\\\\nas\\backups", install).ok).toBe(true);
-    const bare = assertUsable("\\\\nas", install);
-    expect(bare.ok).toBe(false);
-    if (!bare.ok) expect(bare.reason).toMatch(/shared folder/i);
+  it("accepts an ordinary folder", () => {
+    expect(assertUsableAsDestination(A, install).ok).toBe(true);
   });
 
   it("refuses a symlink that points into a forbidden location", () => {
@@ -118,7 +150,7 @@ describe("assertUsable — the deny-list", () => {
     } catch {
       return; // no permission to create symlinks here; skip rather than false-pass
     }
-    const r = assertUsable(link, install);
+    const r = assertUsableAsDestination(link, install);
     expect(r.ok).toBe(false);
     fs.rmSync(tmp, { recursive: true, force: true });
   });

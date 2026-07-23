@@ -1,6 +1,6 @@
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { assertUsable } from "./paths";
+import { assertUsableAsSource } from "./paths";
 
 /**
  * "Test this location" — the explicit check an admin runs before saving a root.
@@ -28,6 +28,55 @@ export type ProbeResult = {
 /** Long enough for a sleeping USB disk to spin up; short enough not to feel broken. */
 const DEFAULT_TIMEOUT_MS = 10_000;
 
+/**
+ * Turn an OS error code into something an admin can act on.
+ *
+ * Added in 0.0.2 after live testing surfaced `Couldn't open that folder (UNKNOWN).` for an
+ * unreachable share. `UNKNOWN` is what Windows returns when it cannot resolve a UNC host —
+ * which is both the single most likely failure for a backup destination and, as a message,
+ * completely useless. Anything reaching the admin should say what to check next.
+ */
+export function explainCode(code: string | undefined, isNetwork: boolean, verb: "open" | "write"): string {
+  switch (code) {
+    case "ENOENT":
+      return isNetwork
+        ? "That shared folder wasn't found. Check the server name and the share name are spelled correctly."
+        : "That folder doesn't exist. Create it first, or check the spelling.";
+    case "EACCES":
+    case "EPERM":
+      return verb === "write"
+        ? "That folder exists, but JonDash isn't allowed to write to it. Check the permissions on the folder."
+        : "That folder exists, but JonDash isn't allowed to open it. Check the permissions on the folder.";
+    // Windows reports an unreachable UNC host as UNKNOWN; the network codes are what
+    // POSIX and resolved-but-unreachable hosts give.
+    case "UNKNOWN":
+    case "ENOTFOUND":
+    case "EHOSTUNREACH":
+    case "ENETUNREACH":
+    case "ETIMEDOUT":
+    case "ENETDOWN":
+      return isNetwork
+        ? "Couldn't reach that network location. Check the server is switched on, the name is right, and that this machine is signed in to it."
+        : "Couldn't reach that location. If it's a removable drive, check it's plugged in.";
+    case "ENOTDIR":
+      return "Part of that path is a file, not a folder.";
+    case "EBUSY":
+      return "That folder is in use by another program.";
+    case "ENOSPC":
+      return "There's no space left at that location.";
+    case "EROFS":
+      return "That location is read-only.";
+    case "ENAMETOOLONG":
+      return "That path is too long for this system.";
+    case "EINVAL":
+      return "That path isn't valid on this system. Check for characters a folder name can't contain.";
+    default:
+      return verb === "write"
+        ? `Couldn't write to that folder${code ? ` (${code})` : ""}.`
+        : `Couldn't open that folder${code ? ` (${code})` : ""}.`;
+  }
+}
+
 function timeout<T>(work: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     work,
@@ -50,9 +99,12 @@ export async function probeLocation(
     elapsedMs: Date.now() - started,
   });
 
-  // Never probe somewhere we would refuse anyway — that would reach out to a system
-  // directory or an unreachable host just to say "no".
-  const verdict = assertUsable(input);
+  const isNetwork = /^[\\/]{2}/.test(input.trim());
+
+  // Only that the path is well-formed. Since 0.0.2 a source may be anywhere, so this no
+  // longer rejects broad or system locations — it just declines to reach out on behalf of
+  // something that isn't a real path.
+  const verdict = assertUsableAsSource(input);
   if (!verdict.ok) {
     return done({ ok: false, message: verdict.reason, exists: false, writable: false });
   }
@@ -75,17 +127,11 @@ export async function probeLocation(
         message: `Couldn't reach that location within ${Math.round(timeoutMs / 1000)} seconds. If it's a network share, check the machine is on and you're signed in to it.`,
       });
     }
-    const code = (e as NodeJS.ErrnoException)?.code;
     return done({
       ok: false,
       exists: false,
       writable: false,
-      message:
-        code === "ENOENT"
-          ? "That folder doesn't exist. Create it first, or check the spelling."
-          : code === "EACCES" || code === "EPERM"
-            ? "That folder exists, but JonDash isn't allowed to open it."
-            : `Couldn't open that folder (${code ?? "unknown error"}).`,
+      message: explainCode((e as NodeJS.ErrnoException)?.code, isNetwork, "open"),
     });
   }
 
@@ -110,7 +156,7 @@ export async function probeLocation(
       message:
         why === "TIMEOUT"
           ? "The folder answered, but writing to it timed out. It may be very slow or briefly disconnected."
-          : "The folder exists, but JonDash can't write to it. Check the permissions on it.",
+          : explainCode((e as NodeJS.ErrnoException)?.code, isNetwork, "write"),
     });
   }
 }

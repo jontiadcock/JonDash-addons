@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { canonicalise, assertUsable } from "../lib/paths";
+import { canonicalise, assertUsableAsDestination } from "../lib/paths";
 import { probeLocation } from "../lib/probe";
 
 const WIN = process.platform === "win32";
@@ -28,7 +28,7 @@ describe("validation never touches the network", () => {
     expect(verdicts[0].ok).toBe(true); // shape is fine; whether it EXISTS is probe's job
   });
 
-  it("still resolves local symlinks, which is what the deny-list needs", () => {
+  it("still resolves local symlinks, which is what the write-side rule needs", () => {
     if (WIN) return; // symlink creation needs privilege on Windows
     const tmp = scratch();
     const link = path.join(tmp, "link-to-etc");
@@ -37,7 +37,7 @@ describe("validation never touches the network", () => {
     } catch {
       return;
     }
-    expect(assertUsable(link, "/opt/jondash").ok).toBe(false);
+    expect(assertUsableAsDestination(link, "/opt/jondash").ok).toBe(false);
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 });
@@ -73,10 +73,21 @@ describe("probeLocation — the explicit Test button", () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   });
 
-  it("refuses a forbidden location without ever touching the disk", async () => {
-    const r = await probeLocation(WIN ? "C:\\Windows\\System32" : "/etc");
-    expect(r.ok).toBe(false);
-    expect(r.exists).toBe(false); // never even stat'd — the deny-list answered first
+  it("refuses a malformed path without ever touching the disk", async () => {
+    // Narrowed in 0.0.2. This used to assert that a SYSTEM directory was refused before
+    // any I/O — but a source may now be anywhere, so probing `C:\Windows` and reporting
+    // that it exists is the correct new answer. What must still short-circuit is a path
+    // that isn't a path: there is nothing to reach out to on its behalf.
+    for (const bad of ["not-absolute", "", "  "]) {
+      const r = await probeLocation(bad);
+      expect(r.ok, bad).toBe(false);
+      expect(r.exists, bad).toBe(false);
+    }
+  });
+
+  it("now REPORTS on a system directory rather than refusing it", async () => {
+    const r = await probeLocation(WIN ? "C:\\Windows" : "/etc", { wantWritable: false });
+    expect(r.exists).toBe(true);
   });
 
   it("gives up on an unreachable share instead of hanging", async () => {
