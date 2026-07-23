@@ -2,12 +2,15 @@ import type { ModuleContext, ModuleDefinition } from "@/lib/modules/types";
 import filesystem from "@/helpers/filesystem/api";
 import BackupPage from "./page";
 import BackupSettingsPanel from "./ui/settings-panel";
+import BackupWidget from "./ui/widget";
 import { MODULE_ID } from "./lib/constants";
 import { failureAlert, send, shouldNotify, staleAlert, type Alert } from "./lib/notify";
+import { nextRetry } from "./lib/schedule";
 import {
   computeNextRun,
   dueJobs,
   finishRun,
+  getConcurrency,
   getJob,
   lastSuccessAt,
   listJobs,
@@ -15,9 +18,12 @@ import {
   markRun,
   policyOf,
   reconcileInterrupted,
+  recordOutcome,
   recordPruned,
   runningRunForJob,
+  runningRuns,
   runsAwaitingReconcile,
+  scheduleOf,
   startRun,
   type Job,
 } from "./lib/store";
@@ -35,7 +41,7 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.0.1-beta.1",
+  version: "0.0.2-beta.1",
   // `ctx.can()` enforcement and GFS retention arrived in filesystem 0.0.3, which needs
   // JonDash 1.5.2. The pre-release, not a bare "1.5.2" — semver ranks a pre-release below
   // its release, so a bare number is refused on every 1.5.2 beta.
@@ -104,10 +110,17 @@ const backupManager: ModuleDefinition = {
         await reconcileRuns(ctx);
         await checkForStaleJobs(ctx);
 
+        // How many may copy at once. Firing five jobs at 2am against one disk takes longer
+        // in total than running them in turn, and makes the machine unusable meanwhile.
+        const limit = await getConcurrency(ctx.db);
+        let inFlight = (await runningRuns(ctx.db)).length;
+
         for (const job of await dueJobs(ctx.db)) {
+          if (inFlight >= limit) break; // the rest keep their due time and go next tick
           // Re-stamp BEFORE starting: a job that fails must not retry every single minute.
           await markRun(ctx.db, job.id, computeNextRun(job));
-          await runJob(ctx, job.id);
+          const started = await runJob(ctx, job.id);
+          if (started) inFlight++;
         }
       },
     },
@@ -115,6 +128,14 @@ const backupManager: ModuleDefinition = {
 
   Page: BackupPage,
   SettingsPanel: BackupSettingsPanel,
+  /**
+   * A backup tool earns a dashboard tile by answering one question at a glance: *am I
+   * covered?* The tile leads with a verdict rather than a list, and the verdict is
+   * deliberately pessimistic — a tile reading "3 backups" while one has been failing for a
+   * week is worse than no tile. Core only renders this for admins, since the module is
+   * `adminOnly`.
+   */
+  DashboardWidget: BackupWidget,
   migrations: "./migrations",
 
   /** A run still marked `running` means the server stopped mid-copy — never a good backup. */
@@ -131,14 +152,31 @@ const backupManager: ModuleDefinition = {
  * its outcome; `reconcileRuns` picks the result up on a later tick. The same function serves
  * the schedule and the "Run now" button, so both behave identically.
  */
-export async function runJob(ctx: ModuleContext, jobId: string): Promise<void> {
-  if (!ctx.db) return;
+export async function runJob(ctx: ModuleContext, jobId: string): Promise<boolean> {
+  if (!ctx.db) return false;
 
   // Don't stack a second copy of a job whose last run is still going.
-  if (await runningRunForJob(ctx.db, jobId)) return;
+  if (await runningRunForJob(ctx.db, jobId)) return false;
 
   const job = await getJob(ctx.db, jobId);
-  if (!job) return;
+  if (!job) return false;
+
+  /**
+   * Pre-flight: is the destination actually there and writable?
+   *
+   * Without this, an unplugged drive or a sleeping NAS produces a run that starts, copies
+   * nothing, and fails somewhere in the middle with whatever error the first file hit. One
+   * cheap check up front turns that into a clear "the destination wasn't reachable", which
+   * is the difference between a useful alert and a confusing one.
+   */
+  const dest = (await filesystem(ctx).listRoots()).find((r) => r.id === job.destRootId);
+  if (dest) {
+    const probe = await filesystem(ctx).testLocation(dest.path);
+    if (!probe.ok) {
+      await failRun(ctx, job, `The destination isn't usable right now — ${probe.message}`);
+      return false;
+    }
+  }
 
   const started = await filesystem(ctx).start({
     sourceRootId: job.sourceRootId,
@@ -149,24 +187,52 @@ export async function runJob(ctx: ModuleContext, jobId: string): Promise<void> {
     exclude: job.excludeCsv ? job.excludeCsv.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
   });
 
-  const runId = crypto.randomUUID();
   if (!started.ok) {
     // Refused before it began — recorded as a failed run so the reason is visible, and
     // alerted on, because "it never started" is a failure like any other.
-    await startRun(ctx.db, runId, job.id, null);
-    await finishRun(ctx.db, runId, {
-      state: "failed",
-      filesCopied: 0,
-      bytesCopied: 0,
-      message: started.reason,
-    });
-    await ctx.audit?.("backup.run.failed", `${job.name}: ${started.reason}`);
-    await alert(ctx, job, failureAlert(job, started.reason));
-    return;
+    await failRun(ctx, job, started.reason);
+    return false;
   }
 
-  await startRun(ctx.db, runId, job.id, started.runId);
+  await startRun(ctx.db, crypto.randomUUID(), job.id, started.runId);
   await ctx.audit?.("backup.run.start", job.name);
+  return true;
+}
+
+/**
+ * Record a run that never got off the ground, and decide whether to try again sooner.
+ *
+ * Shared by the pre-flight check and a refusal from the helper, so both produce the same
+ * visible outcome: a failed run in the history with a readable reason, an alert, and a
+ * retry if the job asked for one.
+ */
+async function failRun(ctx: ModuleContext, job: Job, reason: string): Promise<void> {
+  if (!ctx.db) return;
+  const runId = crypto.randomUUID();
+  await startRun(ctx.db, runId, job.id, null);
+  await finishRun(ctx.db, runId, { state: "failed", filesCopied: 0, bytesCopied: 0, message: reason });
+  await ctx.audit?.("backup.run.failed", `${job.name}: ${reason}`);
+  await scheduleRetry(ctx, job);
+  await alert(ctx, job, failureAlert(job, reason));
+}
+
+/**
+ * After a failure, bring the next attempt forward — but never past the job's own next
+ * scheduled slot, and never beyond the retries it was given.
+ *
+ * Backoff rather than a fixed delay: a NAS rebooting is back in minutes, an unplugged drive
+ * is back whenever somebody notices. Hammering either every minute just fills the log.
+ */
+async function scheduleRetry(ctx: ModuleContext, job: Job): Promise<void> {
+  if (!ctx.db) return;
+  const failures = await recordOutcome(ctx.db, job.id, false);
+  const when = nextRetry(scheduleOf(job), job.maxRetries, failures, new Date());
+  if (!when) return;
+  await markRun(ctx.db, job.id, when.toISOString());
+  await ctx.audit?.(
+    "backup.run.retry",
+    `${job.name}: attempt ${failures + 1} of ${job.maxRetries + 1} at ${when.toISOString()}`,
+  );
 }
 
 /**
@@ -217,9 +283,17 @@ export async function reconcileRuns(ctx: ModuleContext): Promise<void> {
     if (!job) continue;
 
     if (status.state !== "done") {
+      // Cancelling is a choice, not a fault: it must not burn a retry or raise an alarm.
+      if (status.state === "cancelled") {
+        await ctx.audit?.("backup.run.cancelled", job.name);
+        continue;
+      }
+      await scheduleRetry(ctx, job);
       await alert(ctx, job, failureAlert(job, message ?? `The run ended as "${status.state}".`));
       continue;
     }
+
+    await recordOutcome(ctx.db, job.id, true);
 
     // Retention runs only after a SUCCESSFUL copy. Pruning old snapshots because a failed
     // run left the destination looking full is exactly how you lose the good ones.

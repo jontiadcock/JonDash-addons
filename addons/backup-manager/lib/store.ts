@@ -1,5 +1,6 @@
 import "server-only";
 import type { ModuleContext } from "@/lib/modules/types";
+import { nextRun, parseDays, type Schedule } from "./schedule";
 
 /** Every read and write in one place. `db.table()` resolves the real `mod_…` name. */
 type Db = NonNullable<ModuleContext["db"]>;
@@ -17,6 +18,16 @@ export type Job = {
   atMinute: number;
   enabled: number;
   nextRunAt: string | null;
+
+  /** 'interval' (every N hours) or 'daily' (at a time, on chosen days). */
+  scheduleKind: "interval" | "daily";
+  /** Daily only. CSV of 0-6, 0 = Sunday. Empty means every day. */
+  daysCsv: string;
+
+  /** 0 disables retrying; a failure then simply waits for the next scheduled slot. */
+  maxRetries: number;
+  /** Drives the backoff, cleared on any success. Also "how long has this been broken?". */
+  consecutiveFailures: number;
 
   /** Grandfather-father-son retention. Snapshot mode only, and only when `pruneEnabled`. */
   keepDaily: number;
@@ -76,20 +87,24 @@ export async function saveJob(db: Db, job: Job): Promise<void> {
     `INSERT INTO ${db.table("jobs")}
        (id, name, sourceRootId, sourceSubpath, destRootId, destSubpath, mode, excludeCsv,
         everyHours, atMinute, enabled, nextRunAt,
+        scheduleKind, daysCsv, maxRetries, consecutiveFailures,
         keepDaily, keepWeekly, keepMonthly, keepYearly, pruneEnabled,
         notifyEmail, notifyWebhook, staleAfterHours, lastNotifiedAt, createdAt)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(id) DO UPDATE SET
        name=excluded.name, sourceRootId=excluded.sourceRootId, sourceSubpath=excluded.sourceSubpath,
        destRootId=excluded.destRootId, destSubpath=excluded.destSubpath, mode=excluded.mode,
        excludeCsv=excluded.excludeCsv, everyHours=excluded.everyHours, atMinute=excluded.atMinute,
        enabled=excluded.enabled, nextRunAt=excluded.nextRunAt,
+       scheduleKind=excluded.scheduleKind, daysCsv=excluded.daysCsv,
+       maxRetries=excluded.maxRetries,
        keepDaily=excluded.keepDaily, keepWeekly=excluded.keepWeekly,
        keepMonthly=excluded.keepMonthly, keepYearly=excluded.keepYearly,
        pruneEnabled=excluded.pruneEnabled, notifyEmail=excluded.notifyEmail,
        notifyWebhook=excluded.notifyWebhook, staleAfterHours=excluded.staleAfterHours`,
     job.id, job.name, job.sourceRootId, job.sourceSubpath, job.destRootId, job.destSubpath,
     job.mode, job.excludeCsv, job.everyHours, job.atMinute, job.enabled, job.nextRunAt,
+    job.scheduleKind, job.daysCsv, job.maxRetries, job.consecutiveFailures,
     job.keepDaily, job.keepWeekly, job.keepMonthly, job.keepYearly, job.pruneEnabled,
     job.notifyEmail, job.notifyWebhook, job.staleAfterHours, job.lastNotifiedAt, job.createdAt,
   );
@@ -113,18 +128,28 @@ export async function dueJobs(db: Db, now = new Date()): Promise<Job[]> {
   );
 }
 
+/** A job's schedule in the shape `lib/schedule.ts` works with. */
+export function scheduleOf(job: Pick<Job, "scheduleKind" | "everyHours" | "atMinute" | "daysCsv">): Schedule {
+  return {
+    kind: job.scheduleKind === "daily" ? "daily" : "interval",
+    everyHours: job.everyHours,
+    atMinute: job.atMinute,
+    days: parseDays(job.daysCsv ?? ""),
+  };
+}
+
 /**
- * The next time this job should run: today at `atMinute` if that is still ahead, else
- * `everyHours` from that point. Computed rather than "now + interval" so a job set for
- * 02:00 stays at 02:00 instead of drifting later every night.
+ * The next time this job should run.
+ *
+ * The arithmetic lives in `lib/schedule.ts` — pure, and tested there rather than here,
+ * because "every weeknight at 2am" crossing a month end is exactly the kind of thing that
+ * looks right and silently isn't.
  */
-export function computeNextRun(job: Pick<Job, "everyHours" | "atMinute">, from = new Date()): string {
-  const next = new Date(from);
-  next.setSeconds(0, 0);
-  next.setHours(0, job.atMinute, 0, 0);
-  const stepMs = Math.max(1, job.everyHours) * 3_600_000;
-  while (next.getTime() <= from.getTime()) next.setTime(next.getTime() + stepMs);
-  return next.toISOString();
+export function computeNextRun(
+  job: Pick<Job, "scheduleKind" | "everyHours" | "atMinute" | "daysCsv">,
+  from = new Date(),
+): string {
+  return nextRun(scheduleOf(job), from).toISOString();
 }
 
 export async function markRun(db: Db, jobId: string, nextRunAt: string): Promise<void> {
@@ -198,8 +223,116 @@ export async function markNotified(db: Db, jobId: string): Promise<void> {
   );
 }
 
+/** A run ended. Track the streak, because it decides both retries and alert wording. */
+export async function recordOutcome(db: Db, jobId: string, ok: boolean): Promise<number> {
+  if (ok) {
+    await db.run(`UPDATE ${db.table("jobs")} SET consecutiveFailures = 0 WHERE id = ?`, jobId);
+    return 0;
+  }
+  await db.run(
+    `UPDATE ${db.table("jobs")} SET consecutiveFailures = consecutiveFailures + 1 WHERE id = ?`,
+    jobId,
+  );
+  const rows = await db.query<{ n: unknown }>(
+    `SELECT consecutiveFailures AS n FROM ${db.table("jobs")} WHERE id = ?`,
+    jobId,
+  );
+  return num(rows[0]?.n);
+}
+
+// ---------------------------------------------------------------- module-wide settings
+
+/**
+ * How many backups may copy at once.
+ *
+ * A property of the machine's disk, not of any one job: five jobs firing at 2am against one
+ * spinning disk take longer in total than running them one after another, and make
+ * everything else on the box unusable while they do. Default 1 — sequential — because that
+ * is the safe answer and nobody is waiting.
+ */
+export const DEFAULT_CONCURRENCY = 1;
+
+export async function getConcurrency(db: Db): Promise<number> {
+  const rows = await db.query<{ value: string }>(
+    `SELECT value FROM ${db.table("settings")} WHERE key = 'concurrency'`,
+  );
+  const raw = rows[0]?.value;
+  if (raw === undefined || String(raw).trim() === "") return DEFAULT_CONCURRENCY;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 1 ? Math.min(16, Math.trunc(n)) : DEFAULT_CONCURRENCY;
+}
+
+export async function setConcurrency(db: Db, n: number): Promise<number> {
+  const safe = Number.isFinite(n) && n >= 1 ? Math.min(16, Math.trunc(n)) : DEFAULT_CONCURRENCY;
+  await db.run(
+    `INSERT INTO ${db.table("settings")} (key, value) VALUES ('concurrency', ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    String(safe),
+  );
+  return safe;
+}
+
+/** Turn every job on or off in one go — for "we're moving the NAS this weekend". */
+export async function setAllEnabled(db: Db, enabled: boolean): Promise<void> {
+  await db.run(`UPDATE ${db.table("jobs")} SET enabled = ?`, enabled ? 1 : 0);
+}
+
 export async function recentRuns(db: Db, limit = 25): Promise<Run[]> {
   return db.query<Run>(`SELECT * FROM ${db.table("runs")} ORDER BY startedAt DESC LIMIT ?`, limit);
+}
+
+export async function getRun(db: Db, id: string): Promise<Run | null> {
+  const rows = await db.query<Run>(`SELECT * FROM ${db.table("runs")} WHERE id = ?`, id);
+  return rows[0] ?? null;
+}
+
+/** One job's own history, for its detail page. */
+export async function runsForJob(db: Db, jobId: string, limit = 50): Promise<Run[]> {
+  return db.query<Run>(
+    `SELECT * FROM ${db.table("runs")} WHERE jobId = ? ORDER BY startedAt DESC LIMIT ?`,
+    jobId,
+    limit,
+  );
+}
+
+/**
+ * Everything currently in flight, across all jobs.
+ *
+ * The dashboard widget asks this on every render, which is why the runs table carries an
+ * index on `state` — without it this is a full scan of every run ever recorded, on a query
+ * that runs whenever anybody looks at their dashboard.
+ */
+export async function runningRuns(db: Db): Promise<Run[]> {
+  return db.query<Run>(`SELECT * FROM ${db.table("runs")} WHERE state = 'running' ORDER BY startedAt`);
+}
+
+/** Rolled-up numbers for one job, so a summary doesn't need every row. */
+export type JobStats = {
+  total: number;
+  failures: number;
+  /** Mean duration of finished runs, in ms. Null when nothing has finished yet. */
+  averageMs: number | null;
+  lastSuccessAt: string | null;
+};
+
+export async function statsForJob(db: Db, jobId: string): Promise<JobStats> {
+  const rows = await db.query<Record<string, unknown>>(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN state <> 'done' AND finishedAt IS NOT NULL THEN 1 ELSE 0 END) AS failures,
+       AVG(CASE WHEN finishedAt IS NOT NULL
+                THEN (julianday(finishedAt) - julianday(startedAt)) * 86400000.0 END) AS averageMs
+     FROM ${db.table("runs")} WHERE jobId = ?`,
+    jobId,
+  );
+  const r = rows[0] ?? {};
+  const avg = r.averageMs == null ? null : num(r.averageMs);
+  return {
+    total: num(r.total),
+    failures: num(r.failures),
+    averageMs: avg,
+    lastSuccessAt: await lastSuccessAt(db, jobId),
+  };
 }
 
 export async function lastRunFor(db: Db, jobId: string): Promise<Run | null> {

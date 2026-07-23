@@ -40,7 +40,7 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "filesystem:read",
@@ -55,8 +55,8 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.0.1-beta.1",
-      "notes": "First release. Copies folders you choose to somewhere else on a schedule — either keeping the destination up to date, or making a new dated copy each time. Dated copies can be tidied automatically on a grandfather-father-son schedule: keep a week of daily copies, a month of weekly ones and a year of monthly ones. Tidying DELETES old copies, so it is off until you turn it on per backup, it never removes the most recent copy, it never touches anything of yours sitting alongside them, and you can preview exactly what would go first. Every run writes a log naming each file copied, skipped or failed on. It can email you or call a web address when a backup fails — and, if you ask it to, when nothing has succeeded for a while, which is the failure that otherwise goes unnoticed. JonDash's own secrets are never copied. Needs JonDash 1.5.2."
+      "tag": "backup-manager/v0.0.2-beta.1",
+      "notes": "A much fuller version. There's now a dashboard tile telling you at a glance whether your backups are healthy, and each backup gets its own page with its history, how long it typically takes, and the dated copies it has kept. A backup that's running now shows what it's copying as it goes, and you can stop it. You can look inside your approved folders to pick a sub-folder rather than typing the path, and ask any backup what it WOULD copy before it copies anything. Scheduling is no longer just 'every so many hours' — you can say 'at 2am on weekdays'. A failed backup can retry on its own, backing off rather than hammering a NAS that's rebooting. You can cap how many run at once so they don't fight over one disk, pause everything at once, and duplicate a backup instead of retyping it. Before starting, it checks the destination is actually there and writable, so an unplugged drive gives you a clear message instead of a copy that dies halfway. Needs JonDash 1.5.2."
     }
   ],
   "helpers": [

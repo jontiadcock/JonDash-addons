@@ -6,6 +6,7 @@ import {
   addRootAction,
   assessPathAction,
   deleteJobAction,
+  previewBackupAction,
   previewPruneAction,
   removeRootAction,
   runNowAction,
@@ -13,6 +14,11 @@ import {
   setLogRetentionAction,
   testLocationAction,
 } from "../actions";
+import FolderPicker from "./folder-picker";
+import { jobPath } from "../lib/constants";
+import { WEEKDAY_NAMES, describeSchedule, parseDays } from "../lib/schedule";
+import { cloneJobAction, setAllEnabledAction, setConcurrencyAction } from "../actions";
+import { getConcurrency } from "../lib/store";
 
 /**
  * Everything that changes a backup lives here, in Admin → Modules → Backup Manager. The
@@ -41,6 +47,18 @@ type PrunePreview = {
   error?: string;
 };
 
+type BackupPreview = {
+  job?: string;
+  destination?: string;
+  create?: number;
+  update?: number;
+  unchanged?: number;
+  bytes?: number;
+  sample?: string[];
+  skipped?: { path: string; reason: string }[];
+  error?: string;
+};
+
 const parse = <T,>(raw: unknown): T | null => {
   if (typeof raw !== "string" || !raw) return null;
   try {
@@ -61,9 +79,13 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
   const get = async (k: string) => (await ctx.store?.get(k)) ?? "";
   const assessment = parse<Assessment>(await get("lastAssess"));
   const preview = parse<PrunePreview>(await get("lastPrunePreview"));
+  const backupPreview = parse<BackupPreview>(await get("lastBackupPreview"));
   const lastRoot = String(await get("lastRoot"));
   const lastTest = String(await get("lastTest"));
   const lastLogRetention = String(await get("lastLogRetention"));
+  const lastJobSave = String(await get("lastJobSave"));
+  const lastConcurrency = String(await get("lastConcurrency"));
+  const concurrency = db ? await getConcurrency(db) : 1;
 
   const muted = { color: "var(--muted)" } as const;
 
@@ -174,11 +196,41 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
           <button className="btn btn-primary self-start" type="submit">Allow this folder</button>
           {lastRoot && <p className="text-sm">{lastRoot}</p>}
         </form>
+
+        {/* Saves typing a sub-folder path by hand, which is where the typos live. */}
+        <FolderPicker ctx={ctx} roots={roots} />
       </section>
 
       {/* --------------------------------------------------------------------- jobs */}
       <section className="flex flex-col gap-2">
         <h3 className="font-medium">Backups</h3>
+        {lastJobSave && <p className="text-sm">{lastJobSave}</p>}
+
+        {jobs.length > 0 && (
+          <div className="card flex flex-wrap items-end gap-3 p-3">
+            <form action={setConcurrencyAction} className="flex items-end gap-2">
+              <label className="text-sm">
+                Run at most this many at once
+                <input className="input mt-1 w-20" type="number" name="concurrency" min={1} max={16} defaultValue={concurrency} />
+              </label>
+              <button className="btn" type="submit">Save</button>
+            </form>
+            <form action={setAllEnabledAction}>
+              <input type="hidden" name="enabled" value="0" />
+              <button className="btn btn-ghost" type="submit">Pause all</button>
+            </form>
+            <form action={setAllEnabledAction}>
+              <input type="hidden" name="enabled" value="1" />
+              <button className="btn btn-ghost" type="submit">Resume all</button>
+            </form>
+            <p className="w-full text-xs" style={muted}>
+              Several backups running at once against one disk finish later than running them in
+              turn, and make the machine sluggish meanwhile. Raise this only if the destinations are
+              genuinely separate.
+            </p>
+            {lastConcurrency && <p className="w-full text-sm">{lastConcurrency}</p>}
+          </div>
+        )}
 
         {jobs.length === 0 ? (
           <p className="text-sm" style={muted}>None set up yet.</p>
@@ -194,12 +246,26 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
                     </span>
                     <span className="text-xs" style={muted}>
                       {j.mode === "snapshot" ? "A new dated copy each time" : "Keeps the destination up to date"}
-                      {" · "}every {j.everyHours}h at {formatTime(j.atMinute)}
+                      {" · "}{describeSchedule({
+                        kind: j.scheduleKind === "daily" ? "daily" : "interval",
+                        everyHours: j.everyHours,
+                        atMinute: j.atMinute,
+                        days: parseDays(j.daysCsv ?? ""),
+                      }, formatTime)}
                       {j.mode === "snapshot" && j.pruneEnabled && " · older copies tidied automatically"}
+                      {j.maxRetries > 0 && ` · retries ${j.maxRetries}×`}
                       {(j.notifyEmail || j.notifyWebhook) && " · alerts on"}
+                      {j.consecutiveFailures > 0 && (
+                        <span style={{ color: "var(--danger)" }}> · failing ({j.consecutiveFailures})</span>
+                      )}
                     </span>
                   </span>
                   <span className="flex flex-none gap-2">
+                    <a className="btn btn-ghost" href={jobPath(j.id)}>Details</a>
+                    <form action={previewBackupAction}>
+                      <input type="hidden" name="id" value={j.id} />
+                      <button className="btn btn-ghost" type="submit">What would it copy?</button>
+                    </form>
                     {j.mode === "snapshot" && (
                       <form action={previewPruneAction}>
                         <input type="hidden" name="id" value={j.id} />
@@ -210,6 +276,10 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
                       <input type="hidden" name="id" value={j.id} />
                       <button className="btn btn-ghost" type="submit">Run now</button>
                     </form>
+                    <form action={cloneJobAction}>
+                      <input type="hidden" name="id" value={j.id} />
+                      <button className="btn btn-ghost" type="submit">Duplicate</button>
+                    </form>
                     <form action={deleteJobAction}>
                       <input type="hidden" name="id" value={j.id} />
                       <button className="btn btn-danger" type="submit">Delete</button>
@@ -217,6 +287,7 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
                   </span>
                 </div>
 
+                {backupPreview?.job === j.name && <BackupOutcome preview={backupPreview} />}
                 {preview?.job === j.name && <PruneOutcome preview={preview} />}
 
                 <details>
@@ -267,6 +338,42 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
   );
 }
 
+/** What a backup would copy, before it copies anything. */
+function BackupOutcome({ preview }: { preview: BackupPreview }) {
+  if (preview.error) {
+    return <p className="text-sm" style={{ color: "var(--danger)" }}>{preview.error}</p>;
+  }
+  const create = preview.create ?? 0;
+  const update = preview.update ?? 0;
+  const skipped = preview.skipped ?? [];
+  return (
+    <div className="rounded p-2 text-sm" style={{ background: "var(--surface-2)" }}>
+      <p className="font-medium">
+        {create + update === 0
+          ? "Nothing to copy — the destination is already up to date."
+          : `Would copy ${create} new and ${update} changed file(s), ${Math.round((preview.bytes ?? 0) / 1024)} KB in total.`}
+      </p>
+      {(preview.unchanged ?? 0) > 0 && (
+        <p style={{ color: "var(--muted)" }}>{preview.unchanged} already identical, left alone.</p>
+      )}
+      {(preview.sample ?? []).length > 0 && (
+        <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+          For example: {(preview.sample ?? []).join(", ")}
+          {create + update > (preview.sample ?? []).length && " …"}
+        </p>
+      )}
+      {skipped.length > 0 && (
+        <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+          Stepped over: {skipped.map((s) => `${s.path} (${s.reason})`).join("; ")}
+        </p>
+      )}
+      <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+        Nothing has been copied — this is a dry run.
+      </p>
+    </div>
+  );
+}
+
 /** What retention would take, shown before anything is destroyed. */
 function PruneOutcome({ preview }: { preview: PrunePreview }) {
   if (preview.error) {
@@ -305,6 +412,7 @@ function PruneOutcome({ preview }: { preview: PrunePreview }) {
 /** One form, used for both adding and editing — so the two can never drift apart. */
 function JobForm({ job, roots }: { job?: Job; roots: { id: string; label: string }[] }) {
   const snapshot = job?.mode === "snapshot";
+  const selectedDays = parseDays(job?.daysCsv ?? "");
   return (
     <form action={saveJobAction} className="mt-2 flex flex-col gap-3">
       {job && <input type="hidden" name="id" value={job.id} />}
@@ -346,26 +454,65 @@ function JobForm({ job, roots }: { job?: Job; roots: { id: string; label: string
           </select>
         </label>
         <label className="text-sm">
-          Every (hours)
-          <input className="input mt-1" type="number" name="everyHours" min={1} max={720} defaultValue={job?.everyHours ?? 24} />
-        </label>
-        <label className="text-sm">
-          Starting at
-          <input className="input mt-1" type="number" name="atMinute" min={0} max={1439} defaultValue={job?.atMinute ?? 120} />
-          <span className="mt-1 block text-xs" style={{ color: "var(--muted)" }}>
-            minutes past midnight &mdash; {formatTime(job?.atMinute ?? 120)}
-          </span>
-        </label>
-        <label className="text-sm">
           Skip these (comma separated)
           <input className="input mt-1" name="excludeCsv" defaultValue={job?.excludeCsv} placeholder="node_modules, .git" />
         </label>
       </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="enabled" defaultChecked={job ? !!job.enabled : true} />
-        Run this on a schedule
-      </label>
+      {/* -- when ---------------------------------------------------------------- */}
+      <fieldset className="rounded p-3" style={{ background: "var(--surface-2)" }}>
+        <legend className="px-1 text-sm font-medium">When to run</legend>
+        <div className="flex flex-wrap gap-2">
+          <label className="text-sm">
+            Pattern
+            <select className="input mt-1" name="scheduleKind" defaultValue={job?.scheduleKind ?? "interval"}>
+              <option value="interval">Every so many hours</option>
+              <option value="daily">At a time of day</option>
+            </select>
+          </label>
+          <label className="text-sm">
+            Every (hours)
+            <input className="input mt-1 w-24" type="number" name="everyHours" min={1} max={720} defaultValue={job?.everyHours ?? 24} />
+          </label>
+          <label className="text-sm">
+            At
+            <input className="input mt-1 w-24" type="number" name="atMinute" min={0} max={1439} defaultValue={job?.atMinute ?? 120} />
+            <span className="mt-1 block text-xs" style={{ color: "var(--muted)" }}>
+              minutes past midnight &mdash; {formatTime(job?.atMinute ?? 120)}
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span className="text-sm">On these days</span>
+          {WEEKDAY_NAMES.map((name, i) => (
+            <label key={name} className="flex items-center gap-1 text-sm">
+              <input type="checkbox" name="days" value={i} defaultChecked={selectedDays.includes(i)} />
+              {name}
+            </label>
+          ))}
+        </div>
+        <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+          Days apply to <strong>at a time of day</strong>. Tick none for every day. &ldquo;Every so
+          many hours&rdquo; ignores them and counts from the time above, so it stays on the hour
+          rather than drifting later each run.
+        </p>
+      </fieldset>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="enabled" defaultChecked={job ? !!job.enabled : true} />
+          Run this on a schedule
+        </label>
+        <label className="text-sm">
+          Retry a failure this many times
+          <input className="input mt-1 w-20" type="number" name="maxRetries" min={0} max={10} defaultValue={job?.maxRetries ?? 0} />
+        </label>
+        <span className="text-xs" style={{ color: "var(--muted)" }}>
+          0 means wait for the next scheduled run. Retries back off — five minutes, then ten, up
+          to an hour — and never delay the job past its own next slot.
+        </span>
+      </div>
 
       {/* -- retention ---------------------------------------------------------- */}
       <fieldset className="rounded p-3" style={{ background: "var(--surface-2)" }}>

@@ -3,7 +3,18 @@ import { moduleAction } from "@/lib/modules/api";
 import { revalidatePath } from "next/cache";
 import filesystem from "@/helpers/filesystem/api";
 import { MODULE_ID, ADMIN_PATH, MODULE_PATH } from "./lib/constants";
-import { computeNextRun, deleteJob, getJob, policyOf, saveJob, type Job } from "./lib/store";
+import { formatDays, parseDays } from "./lib/schedule";
+import {
+  computeNextRun,
+  deleteJob,
+  getJob,
+  getRun,
+  policyOf,
+  saveJob,
+  setAllEnabled,
+  setConcurrency,
+  type Job,
+} from "./lib/store";
 import { runJob } from "./module";
 
 /**
@@ -91,6 +102,15 @@ export const saveJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
     enabled: bool(form, "enabled"),
     nextRunAt: null,
 
+    scheduleKind: str(form, "scheduleKind") === "daily" ? "daily" : "interval",
+    // Checkboxes named `days` — absent entirely when none are ticked, which correctly means
+    // "every day". Normalised through parseDays so nothing odd reaches the database.
+    daysCsv: formatDays(parseDays(form.getAll("days").map(String).join(","))),
+    maxRetries: Math.min(10, int(form, "maxRetries", 0)),
+    // Preserved: editing a job's settings must not reset how broken it currently is, or the
+    // backoff starts again from five minutes on every save.
+    consecutiveFailures: existing?.consecutiveFailures ?? 0,
+
     keepDaily: int(form, "keepDaily", 7),
     keepWeekly: int(form, "keepWeekly", 4),
     keepMonthly: int(form, "keepMonthly", 12),
@@ -113,6 +133,10 @@ export const saveJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
     "backup.job.save",
     `${job.name} (${job.mode}${job.pruneEnabled ? ", retention on" : ""})`,
   );
+  // Confirm in words. The form lives inside a <details>, and a server re-render resets that
+  // element's open state — so without this the section simply folds shut and you are left
+  // guessing whether anything happened.
+  await ctx.store?.set("lastJobSave", `Saved “${job.name}”. Next run ${job.enabled ? job.nextRunAt : "— paused"}.`);
   revalidatePath(ADMIN_PATH);
   revalidatePath(MODULE_PATH);
 });
@@ -168,6 +192,130 @@ export const viewLogAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
   const text = await filesystem(ctx).logText(str(form, "runId"));
   await ctx.store?.set("lastLog", text ?? "That log has been removed by the log retention policy.");
   revalidatePath(MODULE_PATH);
+});
+
+/**
+ * Stop a backup that is currently running.
+ *
+ * The helper checks the abort flag between files, so a huge file in progress still
+ * finishes rather than leaving a half-written one at the destination. The run then
+ * reconciles as `cancelled` on the next tick, like any other outcome — cancelling is not a
+ * failure and must not be reported as one.
+ */
+export const cancelRunAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const run = await getRun(ctx.db, str(form, "runId"));
+  if (!run?.helperRunId) return;
+  filesystem(ctx).cancel(run.helperRunId);
+  await ctx.audit?.("backup.run.cancel", run.jobId);
+  revalidatePath(MODULE_PATH);
+  revalidatePath(ADMIN_PATH);
+});
+
+/**
+ * A dry run of the BACKUP itself — what it would copy, having copied nothing.
+ *
+ * Distinct from the retention preview, which is about what would be deleted. This is the
+ * question people actually ask before trusting a new job: "is it going to pick up what I
+ * think it will?"
+ */
+export const previewBackupAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const job = await getJob(ctx.db, str(form, "id"));
+  if (!job) return;
+
+  const r = await filesystem(ctx).plan({
+    sourceRootId: job.sourceRootId,
+    sourceSubpath: job.sourceSubpath || undefined,
+    destRootId: job.destRootId,
+    destSubpath: job.destSubpath || undefined,
+    mode: job.mode,
+    exclude: job.excludeCsv ? job.excludeCsv.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
+  });
+
+  await ctx.store?.set(
+    "lastBackupPreview",
+    JSON.stringify(
+      r.ok
+        ? {
+            job: job.name,
+            destination: r.plan.destination,
+            create: r.plan.toCreate.length,
+            update: r.plan.toUpdate.length,
+            unchanged: r.plan.unchanged,
+            bytes: r.plan.totalBytes,
+            // A sample, not the lot: a drive-wide source would otherwise put a hundred
+            // thousand paths through the store and onto the page.
+            sample: [...r.plan.toCreate, ...r.plan.toUpdate].slice(0, 12),
+            skipped: r.plan.skipped.slice(0, 12),
+          }
+        : { job: job.name, error: r.reason },
+    ),
+  );
+  revalidatePath(ADMIN_PATH);
+});
+
+/**
+ * Move around inside an approved folder, for choosing a sub-folder without typing it.
+ *
+ * The browse position lives in the module's own store rather than the URL, because this
+ * renders inside the admin settings panel, which has no route of its own to hang state on.
+ * `browse` returns names and sizes only — never file contents — so nothing sensitive
+ * crosses into this module by looking.
+ */
+export const browseAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  const rootId = str(form, "rootId");
+  const subpath = str(form, "subpath");
+  // "" is a legitimate destination: it means the root itself.
+  await ctx.store?.set("browse", JSON.stringify({ rootId, subpath }));
+  revalidatePath(ADMIN_PATH);
+});
+
+/** Copy an existing job as a starting point, rather than retyping every field. */
+export const cloneJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const src = await getJob(ctx.db, str(form, "id"));
+  if (!src) return;
+
+  const copy: Job = {
+    ...src,
+    id: crypto.randomUUID(),
+    name: `${src.name} (copy)`,
+    // A clone starts paused and clean. Duplicating a job usually means changing something
+    // before it should run, and inheriting a failure streak would misreport the new one.
+    enabled: 0,
+    nextRunAt: null,
+    consecutiveFailures: 0,
+    lastNotifiedAt: null,
+    createdAt: new Date().toISOString(),
+  };
+  copy.nextRunAt = computeNextRun(copy);
+
+  await saveJob(ctx.db, copy);
+  await ctx.audit?.("backup.job.clone", `${src.name} → ${copy.name}`);
+  await ctx.store?.set("lastJobSave", `Copied “${src.name}”. The copy is paused until you turn it on.`);
+  revalidatePath(ADMIN_PATH);
+  revalidatePath(MODULE_PATH);
+});
+
+/** Stop or start everything at once — for "we're moving the NAS this weekend". */
+export const setAllEnabledAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const on = str(form, "enabled") === "1";
+  await setAllEnabled(ctx.db, on);
+  await ctx.audit?.("backup.jobs.bulk", on ? "all backups resumed" : "all backups paused");
+  await ctx.store?.set("lastJobSave", on ? "All backups resumed." : "All backups paused.");
+  revalidatePath(ADMIN_PATH);
+  revalidatePath(MODULE_PATH);
+});
+
+/** How many backups may copy at once. A property of the disk, not of any one job. */
+export const setConcurrencyAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  if (!ctx.db) return;
+  const n = await setConcurrency(ctx.db, int(form, "concurrency", 1));
+  await ctx.audit?.("backup.settings.concurrency", String(n));
+  await ctx.store?.set("lastConcurrency", `Saved — up to ${n} backup${n === 1 ? "" : "s"} at once.`);
+  revalidatePath(ADMIN_PATH);
 });
 
 /** How long RUN LOGS are kept. Distinct from GFS retention, which is about the backups. */
