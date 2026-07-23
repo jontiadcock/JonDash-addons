@@ -153,13 +153,16 @@ describe("Backup Manager 0.0.1 → 0.1.0, through core's own migration runner", 
   });
 
   /**
-   * The sharp edge, asserted rather than assumed: re-running 002 without its
-   * `ModuleMigration` row throws instead of quietly corrupting. That is the wedge — a
-   * part-applied migration cannot self-heal — and it lives in core's runner, not in this
-   * SQL. Recorded here so it fails loudly if core ever adds a transaction and the
-   * behaviour changes.
+   * A fully-applied file, re-run because its `ModuleMigration` row was lost, throws rather
+   * than corrupting anything. **This stays true whether or not core wraps a migration file
+   * in a transaction** — the columns were committed by a run that succeeded, so there is
+   * nothing to roll back and `ALTER TABLE ADD COLUMN` still collides.
+   *
+   * Verified by simulating the wrapped version: the same statement inside a
+   * `prisma.$transaction` fails identically. So do NOT invert this one when the transaction
+   * lands; the case it describes does not change. The case that changes is the next test.
    */
-  it("DOCUMENTS THE SHARP EDGE: re-running 002 unrecorded throws duplicate column", async () => {
+  it("a fully-applied file, re-run unrecorded, throws duplicate column", async () => {
     await prisma.moduleMigration.deleteMany({
       where: { moduleId: MODULE_ID, filename: "002_scheduling_and_reliability.sql" },
     });
@@ -169,5 +172,37 @@ describe("Backup Manager 0.0.1 → 0.1.0, through core's own migration runner", 
     await prisma.moduleMigration.create({
       data: { moduleId: MODULE_ID, filename: "002_scheduling_and_reliability.sql" },
     });
+  });
+
+  /**
+   * THE ACTUAL WEDGE, and the one the transaction fixes. **Invert this test when core's
+   * per-file transaction ships**, not the one above.
+   *
+   * A file that fails PARTWAY currently leaves its earlier statements committed while the
+   * file stays unrecorded, so the retry restarts at statement 1 and dies on a column that
+   * now exists — the same failure forever, recoverable only by hand.
+   *
+   * Today: the residue survives. After the fix: nothing survives, and the corrected file
+   * applies cleanly on the next attempt. The assertion below is written so it FAILS once
+   * the behaviour improves, which is exactly when someone should come and change it.
+   */
+  it("TODAY: a part-applied file leaves residue behind — invert when the transaction lands", async () => {
+    const jobs = "mod_backup_manager_jobs";
+
+    // Stand in for a two-statement migration whose second statement is invalid.
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE ${jobs} ADD COLUMN probeOne TEXT NOT NULL DEFAULT ''`,
+    );
+    await expect(
+      prisma.$executeRawUnsafe(`ALTER TABLE ${jobs} ADD COLUMN probeTwo NOT_A_TYPE(((`),
+    ).rejects.toThrow();
+
+    const cols = (await tableInfo(jobs)).map((c) => c.name);
+    // No transaction today, so statement 1 stuck. Once each file is wrapped this flips to
+    // .not.toContain, and the retry below stops being necessary at all.
+    expect(cols).toContain("probeOne");
+
+    // SQLite cannot DROP COLUMN on older versions; leave the probe column rather than risk
+    // breaking the table. It is a test database and this is the last case in the file.
   });
 });
