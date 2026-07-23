@@ -48,6 +48,21 @@
       "path": "helpers/scheduler",
       "tag": "scheduler/v0.0.2-beta.1",
       "notes": "Same runtime as 0.0.1-beta.1, with minAppVersion corrected to the 1.5.0 pre-release. Proven end to end: a declared job ran at server start with nobody signed in, and was skipped while its module was disabled."
+    },
+    {
+      "id": "filesystem",
+      "name": "Files and folders",
+      "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.5.1-beta.1",
+      "provides": [
+        { "id": "filesystem:read", "label": "Look at files and folders in the locations you allow" },
+        { "id": "filesystem:write", "label": "Create and change files in the locations you allow" },
+        { "id": "filesystem:delete", "label": "Delete files in the locations you allow" }
+      ],
+      "path": "helpers/filesystem",
+      "tag": "filesystem/v0.0.1-beta.1",
+      "notes": "First release. Copies and mirrors folders within locations an administrator approves, and nothing else — it exposes no way to read a file's contents. sync and snapshot modes only; deletion is not yet built. The first helper to name its own capabilities."
     }
   ]
 }
