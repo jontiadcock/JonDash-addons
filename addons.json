@@ -21,7 +21,7 @@
       ],
       "path": "addons/health-monitor",
       "tag": "health-monitor/v0.0.5",
-      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting has been removed - it never controlled how often anything was actually checked."
+      "notes": "Monitoring now starts with the server instead of when someone first opens the dashboard, so a restart overnight no longer leaves your services unwatched until morning. The advanced \"how often to look for due checks\" setting is gone — it never controlled how often anything was checked."
     },
     {
       "id": "template",
@@ -34,7 +34,7 @@
       ],
       "path": "addons/template",
       "tag": "template/v0.0.6",
-      "notes": "The template depends on nothing: no helpers and no background work, so copying it gives you a module that installs on its own. Adds a done toggle (showing a follow-up migration and a permission the code actually uses), and a much fuller guide - including a paste-in AI prompt that covers building, testing and verifying a module end to end."
+      "notes": "The template depends on nothing: no helpers and no background work, so copying it gives you a module that installs on its own. Adds a done toggle — showing a follow-up migration and a permission the code actually uses — and a fuller guide, including a paste-in AI prompt for building a module."
     },
     {
       "id": "backup-manager",
