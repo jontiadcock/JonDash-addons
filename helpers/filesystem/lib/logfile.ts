@@ -86,6 +86,12 @@ export type LogSummary = {
   skipped: number;
   errors: number;
   error?: string | null;
+  /**
+   * What this run was. A prune copies nothing and deletes things, so a footer reading
+   * "Copied 0 file(s) / Skipped 4" is actively misleading about an operation that just
+   * destroyed four backups. Different work, different words.
+   */
+  kind?: "copy" | "prune";
 };
 
 /** An open log for one run. Writes are appended; nothing is held in memory but a buffer. */
@@ -166,6 +172,16 @@ export class RunLog {
     this.push(`${stamp()}  SKIPPED  ${relPath} — ${reason}`);
   }
 
+  /**
+   * Something DESTROYED, and why. Kept distinct from `skipped` deliberately: a line reading
+   * "SKIPPED — removed by retention policy" describes the opposite of what happened, and
+   * this is the one log anybody reads after wondering where a backup went.
+   */
+  removed(relPath: string, reason: string): void {
+    if (this.closed) return;
+    this.push(`${stamp()}  REMOVED  ${relPath} — ${reason}`);
+  }
+
   /** A file that could not be read or written. Always recorded. */
   failed(relPath: string, reason: string): void {
     if (this.closed) return;
@@ -178,8 +194,12 @@ export class RunLog {
     this.push("-".repeat(78));
     this.push(`Finished      ${stamp()}`);
     this.push(`Result        ${summary.state}`);
-    this.push(`Copied        ${summary.filesCopied} file(s), ${summary.bytesCopied} bytes`);
-    this.push(`Skipped       ${summary.skipped} (protected or excluded)`);
+    if (summary.kind === "prune") {
+      this.push(`Removed       ${summary.skipped} backup(s)`);
+    } else {
+      this.push(`Copied        ${summary.filesCopied} file(s), ${summary.bytesCopied} bytes`);
+      this.push(`Skipped       ${summary.skipped} (protected or excluded)`);
+    }
     this.push(`Errors        ${summary.errors}`);
     if (summary.error) this.push(`Detail        ${summary.error}`);
     await this.flush();

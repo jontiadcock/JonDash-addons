@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { dataDir, secretsPath } from "@/lib/config";
 
 /**
  * The secret registry — what a backup must never carry off this machine.
@@ -50,18 +51,6 @@ export function identityOf(st: { dev: number | bigint; ino: number | bigint }): 
 }
 
 /**
- * Mirrors `dataDir()` in the core app's `lib/config.ts`, which is not exported.
- *
- * Duplicating a rule invites drift, so this is deliberately the ONLY duplicated line and
- * it is called out here: if core ever changes how the data directory is located, this
- * must change with it. Asked of the core session: export `dataDir()`/`secretsPath()` so
- * this can go away.
- */
-function dataDir(): string {
-  return process.env.JONDASH_DATA_DIR || path.join(process.cwd(), ".data");
-}
-
-/**
  * Where Prisma's SQLite file actually is, from `DATABASE_URL`.
  *
  * A relative `file:./dev.db` is resolved against the `prisma/` directory, which is how
@@ -81,7 +70,7 @@ function candidatePaths(installDir: string): { path: string; reason: string }[] 
   const data = dataDir();
   const out: { path: string; reason: string }[] = [
     { path: data, reason: "JonDash's data folder (holds the master encryption key)" },
-    { path: path.join(data, "secrets.json"), reason: "JonDash's master encryption key" },
+    { path: secretsPath(), reason: "JonDash's master encryption key" },
     { path: path.join(data, "tls"), reason: "JonDash's HTTPS private keys" },
     { path: path.join(data, "network.json"), reason: "JonDash's network configuration" },
     { path: path.join(installDir, ".env"), reason: "JonDash's environment file" },
@@ -153,7 +142,7 @@ export async function protectedContent(installDir = process.cwd()): Promise<Prot
   const envKey = process.env.ENCRYPTION_KEY;
   if (envKey && /^[0-9a-fA-F]{64}$/.test(envKey)) literals.push(envKey.toLowerCase());
   try {
-    const text = await fs.readFile(path.join(dataDir(), "secrets.json"), "utf8");
+    const text = await fs.readFile(secretsPath(), "utf8");
     const parsed = JSON.parse(text) as { encryptionKey?: string };
     if (parsed?.encryptionKey && /^[0-9a-f]{64}$/.test(parsed.encryptionKey)) {
       literals.push(parsed.encryptionKey.toLowerCase());

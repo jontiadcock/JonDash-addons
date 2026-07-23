@@ -1,6 +1,33 @@
 import type { HelperDefinition } from "@/lib/helpers/types";
+import { prisma } from "@/lib/db";
+import { helperTableName } from "@/lib/helpers/migrate";
 import { listRootPaths } from "./lib/roots";
 import { DEFAULT_RETENTION, pruneLogs } from "./lib/logfile";
+
+/**
+ * What consent screens are allowed to know about this helper's configuration.
+ *
+ * Core cannot read `hlp_filesystem_*` — that separation is deliberate — so it asks, and
+ * this decides what to hand over. **Only the approved folder paths, and nothing else.** Not
+ * run history, not who approved what, not the log directory. The single question a consent
+ * screen is answering is "which folders would this let a module touch?", so that is the
+ * only thing that travels.
+ *
+ * Core bounds this at two seconds and swallows anything thrown, because a helper must never
+ * be able to take a consent screen down while describing itself. This is one indexed read,
+ * nowhere near that, but it returns `{}` on failure rather than relying on core's net —
+ * falling back to generic wording is strictly better than a screen that renders nothing.
+ */
+async function readConfig(): Promise<Record<string, unknown>> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ id: string; path: string; label: string }[]>(
+      `SELECT id, path, label FROM ${helperTableName("filesystem", "roots")} ORDER BY label`,
+    );
+    return { roots: rows };
+  } catch {
+    return {};
+  }
+}
 
 /**
  * A run still marked `running` when the server boots can only mean one thing: the process
@@ -59,28 +86,27 @@ const helper: HelperDefinition = {
   name: "Files and folders",
   description:
     "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-  version: "0.0.2-beta.1",
-  // Unchanged at 0.0.2. This is what the helper needs to RUN, and its runtime requirements
-  // haven't moved — helper-named capabilities arrived in 1.5.1 and nothing since is needed.
-  // (Delivering an UPDATE to an existing install is a separate matter, waiting on the
-  // helper update mechanism the core session is building.) The pre-release, not a bare
-  // "1.5.1": semver ranks a pre-release below its release, so "1.5.1" would be refused on
-  // every 1.5.1 beta — the builds beta-channel users actually run.
-  minAppVersion: "1.5.1-beta.1",
+  version: "0.0.3-beta.1",
+  // Raised for 0.0.3: `ctx.can()` and `HelperDefinition.readConfig` arrived in 1.5.2, and
+  // this release uses both. Declaring 1.5.1 would install on a build where enforcement
+  // silently does nothing, which is the quiet weakening this release exists to remove.
+  //
+  // The PRE-RELEASE, not a bare "1.5.2": semver ranks a pre-release below its release, so
+  // "1.5.2" would be refused on every 1.5.2 beta — the builds beta-channel users run.
+  minAppVersion: "1.5.2-beta.1",
 
   /**
    * Three lines rather than one, deliberately — "delete" is far too important to be folded
    * into "write".
    *
-   * Note, corrected after live testing: core renders one consent line per permission the
-   * MODULE declared, not one per capability this helper provides. A module asking only for
-   * `filesystem:read` shows the admin a single line. These `describe` functions supply the
-   * wording; they do not decide what is listed.
+   * Which lines get LISTED is core's decision, not these functions'. The pre-install browse
+   * screen rolls up every capability this helper provides; the post-install module page
+   * lists only what the module itself declared. `describe` supplies the wording for both.
    *
-   * `describe` receives the helper's config, which core does not yet populate — it calls
-   * `helperCapabilityLabels()` with no argument — so `where()` currently always says "the
-   * folders you allow". Harmless and honest; it will start naming real folders for free if
-   * core ever passes config through.
+   * Since 1.5.2 core populates `config` from `readConfig` above, so these name the real
+   * approved folders rather than saying "the folders you allow". They still fall back to
+   * that wording when nothing is approved yet — which is both true and the state an admin
+   * is usually in when first reading a consent screen.
    */
   provides: [
     {
@@ -98,6 +124,8 @@ const helper: HelperDefinition = {
   ],
 
   migrations: "./migrations",
+
+  readConfig,
 
   onBoot: reconcileInterruptedRuns,
 };
