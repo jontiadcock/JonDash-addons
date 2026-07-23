@@ -5,7 +5,7 @@ keeps dated copies if you want them, tidies old ones away, and tells you when a 
 healthy.
 
 - **Module id:** `backup-manager`
-- **Version:** `0.1.0` on stable, `0.1.1-beta.2` on beta
+- **Version:** `0.1.1` on both channels
 - **Minimum JonDash version:** `1.5.2-beta.1` — the **pre-release**, deliberately. Semver ranks
   `1.5.2-beta.1` *below* `1.5.2`, so a bare `"1.5.2"` would be refused on every 1.5.2 beta, which is
   exactly what beta-channel users run. 1.5.2 is the release that added `ctx.can()` enforcement, which

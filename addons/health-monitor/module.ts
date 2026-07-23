@@ -24,11 +24,11 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.5-beta.1",
+  version: "0.0.5",
   // The `scheduler` helper and `schedules` arrived in 1.5.0. Named as the PRE-RELEASE:
   // semver ranks `1.5.0-beta.4` below `1.5.0`, so a bare "1.5.0" would be refused on
   // every 1.5.0 beta — the builds beta-channel users are actually running.
-  minAppVersion: "1.5.0-beta.1",
+  minAppVersion: "1.5.0",
 
   // network:outbound — contact the targets and notification endpoints you configure.
   // crypto:use       — encrypt channel credentials (webhook URLs, bot tokens) at rest.

@@ -24,6 +24,29 @@ Each add-on has its **own semver**, independent of other add-ons and of JonDash:
 The version is recorded in the add-on's `MODULE.md`, its `module.ts` (`version`), and its `addons.json`
 entry on the channel branch it lives on.
 
+### Keeping beta ahead of stable — the step that closes a promotion
+
+> **After promoting `X-beta.N` to `X` on `main`, advance the beta manifest past it.** A promotion is
+> not finished until both channels have moved.
+>
+> **Why it matters, and why nothing tells you:** semver ranks a pre-release *below* its release, so
+> `0.0.5-beta.1 < 0.0.5`. Leave the beta manifest pointing at the pre-release that became the release
+> and every beta user is running something **older than stable, with no way forward** — their channel
+> only offers the version they already have. Nothing errors. JonDash used to surface it as a
+> downgrade offer (`v0.0.5 → v0.0.5-beta.1`); since it stopped offering older versions as updates, the
+> symptom is **silence** — beta users simply read "up to date" while sitting behind stable.
+>
+> Two ways to advance, both fine:
+> - **Match stable** — republish the beta entry at the release version, pointing at the same tag. Use
+>   this when nothing is in flight; the two channels agree until the next pre-release opens. This is
+>   the normal resting state, not a smell.
+> - **Open the next pre-release** — `X.Y.(Z+1)-beta.1` — when there is genuinely work in flight.
+>
+> Never leave beta on the superseded pre-release. Found 2026-07-24 by the core session with **four of
+> five entries** stale; `node scripts/check-manifest.mjs` now diffs the two manifests and **fails** if
+> any beta entry sorts below its stable counterpart, because a manifest diff is the only thing that
+> catches this.
+
 ### Fixing a broken beta — increment `N`, never the version
 
 > **A beta that needs fixing becomes `X.Y.Z-beta.2`, not `X.Y.(Z+1)-beta.1`.** Owner's rule,

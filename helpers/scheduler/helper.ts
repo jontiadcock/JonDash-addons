@@ -17,10 +17,10 @@ const helper: HelperDefinition = {
   id: "scheduler",
   name: "Scheduler",
   description: "Runs modules' declared background work on time, starting when the server starts.",
-  version: "0.0.2-beta.1",
+  version: "0.0.2",
   // `-beta.1`, not a bare "1.5.0": semver ranks a pre-release below its release, so a bare
   // "1.5.0" excludes every 1.5.0 beta — the builds this helper's users are actually running.
-  minAppVersion: "1.5.0-beta.1",
+  minAppVersion: "1.5.0",
   provides: [], // nothing to consent to — it grants a module no new capability
   migrations: "./migrations",
   async onBoot(ctx) {
