@@ -26,16 +26,22 @@ import type { ModuleDefinition } from "@/lib/modules/types";
  * the module fail verification and become uninstallable, which is exactly what happened to
  * `0.1.1-beta.1`. It is a maintainer's test of core's behaviour, not part of the artifact.
  *
- * Run it by copying it into a JonDash checkout that has this module installed, since it
- * needs core's own vitest config for the `@` alias, the `server-only` stub and a throwaway
- * DATABASE_URL:
+ * Run it by copying it into a JonDash checkout (>= 1.5.4-beta.1) that has this module
+ * installed, since it needs core's own vitest wiring — the `@` alias, the `server-only`
+ * stub and a throwaway migrated DATABASE_URL:
  *   cp tests/backup-manager-upgrade.test.ts <jondash>/tests/
  *   cd <jondash> && npx vitest run tests/backup-manager-upgrade.test.ts
+ *
+ * The final case (rollback of a part-applied migration) needs the per-file transaction that
+ * landed in **1.5.4-beta.1** (BUG-32). It fails against any earlier build, by design — that
+ * is what proved the fix was needed.
  */
 
 const MODULE_ID = "backup-manager";
 const MIG_DIR = path.join(process.cwd(), "modules", MODULE_ID, "migrations");
 const PATH_002 = path.join(MIG_DIR, "002_scheduling_and_reliability.sql");
+// A throwaway migration used only by the rollback test. Sorts after 002, so it runs last.
+const PATH_003 = path.join(MIG_DIR, "003_rollback_probe.sql");
 
 const def = { id: MODULE_ID, migrations: "./migrations" } as ModuleDefinition;
 
@@ -70,8 +76,10 @@ beforeAll(async () => {
 });
 
 // Restore 002 whatever happens, or a failed run leaves the module missing a migration file.
+// Remove the throwaway 003 the rollback test writes, so the module folder is left as it shipped.
 afterAll(() => {
   if (sql002) fs.writeFileSync(PATH_002, sql002, "utf8");
+  fs.rmSync(PATH_003, { force: true });
 });
 
 describe("Backup Manager 0.0.1 → 0.1.0, through core's own migration runner", () => {
@@ -165,13 +173,10 @@ describe("Backup Manager 0.0.1 → 0.1.0, through core's own migration runner", 
 
   /**
    * A fully-applied file, re-run because its `ModuleMigration` row was lost, throws rather
-   * than corrupting anything. **This stays true whether or not core wraps a migration file
-   * in a transaction** — the columns were committed by a run that succeeded, so there is
-   * nothing to roll back and `ALTER TABLE ADD COLUMN` still collides.
-   *
-   * Verified by simulating the wrapped version: the same statement inside a
-   * `prisma.$transaction` fails identically. So do NOT invert this one when the transaction
-   * lands; the case it describes does not change. The case that changes is the next test.
+   * than corrupting anything. **This stays true with or without the transaction** — the
+   * columns were committed by a run that succeeded, so there is nothing to roll back and
+   * `ALTER TABLE ADD COLUMN` still collides. Left as-is when the transaction landed; the
+   * case it describes did not change. The one that changed is the next test.
    */
   it("a fully-applied file, re-run unrecorded, throws duplicate column", async () => {
     await prisma.moduleMigration.deleteMany({
@@ -186,34 +191,60 @@ describe("Backup Manager 0.0.1 → 0.1.0, through core's own migration runner", 
   });
 
   /**
-   * THE ACTUAL WEDGE, and the one the transaction fixes. **Invert this test when core's
-   * per-file transaction ships**, not the one above.
+   * THE WEDGE, and the case core's per-file transaction fixes (BUG-32, JonDash 1.5.4-beta.1).
    *
-   * A file that fails PARTWAY currently leaves its earlier statements committed while the
-   * file stays unrecorded, so the retry restarts at statement 1 and dies on a column that
-   * now exists — the same failure forever, recoverable only by hand.
+   * Before: a file that failed part-way left its earlier statements committed while the file
+   * stayed unrecorded, so the retry restarted at statement 1 and died on a column that now
+   * existed — the same failure forever, recoverable only by hand.
    *
-   * Today: the residue survives. After the fix: nothing survives, and the corrected file
-   * applies cleanly on the next attempt. The assertion below is written so it FAILS once
-   * the behaviour improves, which is exactly when someone should come and change it.
+   * After: the whole file plus its "applied" record run in one transaction, so a mid-file
+   * failure rolls back everything. Nothing is left behind and nothing is recorded, so a
+   * corrected file applies cleanly on the next attempt.
+   *
+   * **This drives the REAL `runModuleMigrations`**, not a hand-rolled `$transaction` — the
+   * point is to prove CORE's behaviour, not to re-implement it and test the copy. A throwaway
+   * `003` is written into the migrations dir with a good statement then a bad one; `afterAll`
+   * removes it.
    */
-  it("TODAY: a part-applied file leaves residue behind — invert when the transaction lands", async () => {
+  it("rolls a part-applied file back, so a corrected retry succeeds (needs 1.5.4-beta.1)", async () => {
     const jobs = "mod_backup_manager_jobs";
 
-    // Stand in for a two-statement migration whose second statement is invalid.
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE ${jobs} ADD COLUMN probeOne TEXT NOT NULL DEFAULT ''`,
+    // A two-statement migration whose SECOND statement is invalid. Statement 1 would add a
+    // column; if it survives the failure, there is no transaction.
+    fs.writeFileSync(
+      PATH_003,
+      `ALTER TABLE ${jobs} ADD COLUMN probeOne TEXT NOT NULL DEFAULT '';\n` +
+        `ALTER TABLE ${jobs} ADD COLUMN probeTwo NOT_A_TYPE(((;\n`,
+      "utf8",
     );
-    await expect(
-      prisma.$executeRawUnsafe(`ALTER TABLE ${jobs} ADD COLUMN probeTwo NOT_A_TYPE(((`),
-    ).rejects.toThrow();
 
-    const cols = (await tableInfo(jobs)).map((c) => c.name);
-    // No transaction today, so statement 1 stuck. Once each file is wrapped this flips to
-    // .not.toContain, and the retry below stops being necessary at all.
-    expect(cols).toContain("probeOne");
+    await expect(runModuleMigrations(def)).rejects.toThrow();
 
-    // SQLite cannot DROP COLUMN on older versions; leave the probe column rather than risk
-    // breaking the table. It is a test database and this is the last case in the file.
+    // INVERTED (was .toContain before the fix): statement 1 must have rolled back with the
+    // rest of the file, so probeOne does NOT exist.
+    const afterFail = (await tableInfo(jobs)).map((c) => c.name);
+    expect(afterFail).not.toContain("probeOne");
+    expect(afterFail).not.toContain("probeTwo");
+
+    // And the file must NOT be recorded as applied — the record is written inside the same
+    // transaction, so it rolled back too.
+    const applied = await prisma.moduleMigration.findMany({ where: { moduleId: MODULE_ID } });
+    expect(applied.map((m) => m.filename)).not.toContain("003_rollback_probe.sql");
+
+    // The payoff: a corrected 003 now applies cleanly, where before the retry was wedged
+    // forever on "duplicate column probeOne".
+    fs.writeFileSync(
+      PATH_003,
+      `ALTER TABLE ${jobs} ADD COLUMN probeOne TEXT NOT NULL DEFAULT '';\n` +
+        `ALTER TABLE ${jobs} ADD COLUMN probeTwo TEXT NOT NULL DEFAULT '';\n`,
+      "utf8",
+    );
+    await runModuleMigrations(def); // must not throw
+
+    const afterFix = (await tableInfo(jobs)).map((c) => c.name);
+    expect(afterFix).toContain("probeOne");
+    expect(afterFix).toContain("probeTwo");
+    const applied2 = await prisma.moduleMigration.findMany({ where: { moduleId: MODULE_ID } });
+    expect(applied2.map((m) => m.filename)).toContain("003_rollback_probe.sql");
   });
 });
