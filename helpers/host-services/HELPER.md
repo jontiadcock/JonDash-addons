@@ -245,19 +245,23 @@ plainly at the moment of adding.
 | Creating a grant needs | an interactive desktop session | an interactive desktop session |
 | Using one needs | nothing — works logged out | nothing |
 
-## The one claim nobody has tested — do not present grants as tamper-proof
+## Tamper resistance — TESTED 2026-07-25, and it holds
 
-A grant's security descriptor is written to let the account JonDash runs as **read and execute** the
-task and nothing more, so a standard user should not be able to *edit* it — to repoint `Plex-restart` at
-some other command, for instance.
+A grant's security descriptor lets the account JonDash runs as **read and execute** the task and nothing
+more. This was the load-bearing claim: if a standard user could edit a task that runs as SYSTEM, the
+model would collapse from a narrow permanent capability into arbitrary SYSTEM execution.
 
-**That is coded, not proven.** Neither this session nor core has tested it, and it is the load-bearing
-claim: if a standard user can edit a task that runs as SYSTEM, the whole model collapses into a
-privilege escalation rather than a narrow permanent capability.
+Measured, from a non-elevated process, against a real grant:
 
-So until someone verifies it, describe a grant as *a narrow permanent capability* and never as
-*tamper-proof*. What IS verified: creating one needs a human at a UAC prompt, declining creates nothing,
-and the fixed command cannot take arguments.
+| Attempt | Result |
+| --- | --- |
+| Repoint the task at `calc.exe` | `ERROR: Access is denied.` |
+| Disable it | `ERROR: Access is denied.` |
+| Delete it | `ERROR: Access is denied.` |
+
+The command it runs was unchanged afterwards. **Everything in the model is now verified:** creating a
+grant needs a human at a UAC prompt, declining creates nothing, the fixed command cannot take arguments,
+and the grant cannot be altered by the account that uses it.
 
 **Implementation note for whoever builds the grant manager:** a Scheduled Task created by an
 administrator is not runnable by a standard user by default. Its security descriptor has to permit the
