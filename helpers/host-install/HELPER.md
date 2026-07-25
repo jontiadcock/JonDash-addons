@@ -121,9 +121,25 @@ no audit entry excuses; the helper's tables survive removal, so reinstalling res
 remove it deliberately.
 
 **Owner wants an offer at that moment** — *"would you like to remove Docker too?"* — which `onUninstall`
-cannot do: it is headless, runs after the admin has confirmed, and is bounded at 5s. Asked of core
-(2026-07-25): let a helper contribute a question to the uninstall confirmation. Until then the Docker
-module carries a **Remove Docker** button in its own settings.
+cannot do, because it is headless: it can act, but it cannot ask.
+
+*It could not wait, either — until it turned out it can.* `uninstallMayPrompt: true` shipped in
+JonDash 1.7.1-beta.5 and raises the budget to the elevation timeout, and the hook already runs inside
+the uninstall the admin just clicked. The timing objection was designed around a constraint that had
+already been lifted; **check the current contract before building around a limit.**
+
+What is genuinely missing is only the *asking*. Core has confirmed the shape but not scheduled it:
+
+```ts
+uninstallQuestions?: () => Promise<{ id: string; label: string; detail?: string; default: boolean }[]>
+onUninstall?: (ctx, answers: Record<string, boolean>) => Promise<void>
+```
+
+Max 10 questions, and `label`/`detail` render as **text, never markup**. When it lands, this helper
+returns one question per package it installed, defaulting to **no**, naming the package and saying that
+containers and volumes go with it. Until then the Docker module carries a **Remove Docker** button in
+its own settings — a worse place, since the moment someone thinks about removing Docker is the moment
+they remove the module.
 
 ## Package ids — the only variable that reaches an elevated process
 

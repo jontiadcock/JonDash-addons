@@ -13,13 +13,15 @@ import { readGrants, revokeEverything } from "./lib/grant";
  * an install that never approved a service returns in milliseconds and never prompts. Only a
  * machine with live grants pays for the slow path.
  *
- * **The slow path cannot fit the 5s budget, and that is not something this code can fix.**
- * Revoking a grant needs elevation, and elevation waits on a human answering a UAC prompt —
- * core's own timeout for that is ten minutes. So when grants exist this hook will normally be
- * cut off mid-prompt, the files will be removed anyway, and the grants will survive. Reported
- * to core rather than papered over; what is done here is to make that outcome *loud* instead
- * of silent, because an orphaned grant nobody knows about is the failure this hook exists to
- * prevent.
+ * **The slow path is allowed to wait, via `uninstallMayPrompt`.** Revoking needs elevation and
+ * elevation waits on a human, so the 5s default could never cover it. Setting that flag raises
+ * the budget to the elevation timeout, and the hook already runs *inside* the uninstall the
+ * admin just clicked — they are at the screen, so the prompt has obvious provenance.
+ *
+ * The failure path still has to be loud, because an orphaned grant nobody knows about is
+ * exactly what this hook exists to prevent: a declined or timed-out revocation writes an
+ * INCOMPLETE entry naming the tasks and both ways to remove them, since once this returns
+ * there is no JonDash screen left that knows they exist.
  */
 async function revokeGrantsOnUninstall(ctx: Parameters<NonNullable<HelperDefinition["onUninstall"]>>[0]): Promise<void> {
   const existing = await readGrants();
@@ -129,6 +131,13 @@ const helper: HelperDefinition = {
   migrations: "./migrations",
 
   readConfig,
+
+  /**
+   * Revoking a grant raises a UAC prompt, so this hook needs to outlive the 5s default. It is
+   * for waiting on a person, not for slow code — the empty case still returns in about 190ms
+   * because reading grants needs no elevation.
+   */
+  uninstallMayPrompt: true,
 
   onUninstall: revokeGrantsOnUninstall,
 };

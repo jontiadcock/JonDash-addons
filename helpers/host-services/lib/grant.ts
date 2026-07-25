@@ -79,6 +79,12 @@ function toOutcome(reason: GrantFailure, message: string): GrantOutcome {
       // softened: "we would not do this because it could not be logged" is the useful
       // sentence, and hiding it would undo the fix.
       return { status: "failed", detail: message };
+    // Package reasons, added when core grew an install API. They cannot occur on this
+    // helper's calls — it never names a package — but they are listed rather than defaulted,
+    // because the whole value of an exhaustive switch is that the next addition breaks the
+    // build instead of quietly becoming "failed". That is what caught these two.
+    case "package-not-found":
+    case "no-package-manager":
     case "invalid-request":
     case "failed":
       return { status: "failed", detail: message };
