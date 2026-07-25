@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { ModuleWidgetProps } from "@/lib/modules/types";
 import systemMetrics, { type Snapshot } from "@/helpers/system-metrics/api";
-import { bytes, pct, uptime, levelFor, TONE, type Level } from "../lib/format";
+import { bytes, pct, rate, uptime, levelFor, TONE, type Level } from "../lib/format";
+import { collectFor } from "../lib/groups";
 
 /**
  * The dashboard tile — "is my box OK" at a glance.
@@ -24,10 +25,26 @@ function verdict(m: Snapshot): { text: string; level: Level } {
     const disk = m.disks.find((d) => d.usedPct === fullest);
     return { text: `${disk?.mount ?? "A disk"} is nearly full — ${pct(fullest)}`, level: "bad" };
   }
+  // Swap in heavy use means real memory pressure even when free memory looks fine.
+  if (m.swap && m.swap.totalBytes > 0 && m.swap.usedPct >= 50) {
+    return { text: `Swapping — ${pct(m.swap.usedPct)} of swap in use`, level: "warn" };
+  }
+  if (m.battery && m.battery.status === "discharging" && (m.battery.percent ?? 100) <= 20) {
+    return { text: `On battery — ${m.battery.percent}% left`, level: "warn" };
+  }
   if (fullest >= 75 || m.memory.usedPct >= 75) {
     return { text: "Getting busy", level: "warn" };
   }
   return { text: "All healthy", level: "ok" };
+}
+
+/** Total throughput across interfaces, so the tile shows one number rather than a list. */
+function totalNet(m: Snapshot): { rx: number; tx: number } | null {
+  if (!m.networkIo || m.networkIo.length === 0) return null;
+  return m.networkIo.reduce(
+    (acc, n) => ({ rx: acc.rx + n.rxBytesPerSec, tx: acc.tx + n.txBytesPerSec }),
+    { rx: 0, tx: 0 },
+  );
 }
 
 /** A slim usage bar that follows the app theme. */
@@ -56,7 +73,9 @@ function Bar({ usedPct }: { usedPct: number }) {
 }
 
 export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
-  const m = await systemMetrics(ctx).read();
+  // Only gather what the admin left switched on — a metric turned off is never sampled.
+  const settings = await ctx.settings.all();
+  const m = await systemMetrics(ctx).read({ collect: collectFor(settings) });
 
   if (!m) {
     return (
@@ -71,6 +90,7 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
 
   const v = verdict(m);
   const showLoad = m.cpu.load1 !== null;
+  const net = totalNet(m);
 
   return (
     <div className="card p-4">
@@ -102,6 +122,14 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
           </div>
           <Bar usedPct={m.memory.usedPct} />
         </div>
+        {m.swap && m.swap.totalBytes > 0 && (
+          <div className="flex items-center justify-between gap-3">
+            <dt>Swap</dt>
+            <dd>
+              {bytes(m.swap.usedBytes)} / {bytes(m.swap.totalBytes)} · {pct(m.swap.usedPct)}
+            </dd>
+          </div>
+        )}
         {m.disks.slice(0, 3).map((d) => (
           <div key={d.mount} className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-3">
@@ -111,6 +139,22 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
             <Bar usedPct={d.usedPct} />
           </div>
         ))}
+        {net && (
+          <div className="flex items-center justify-between gap-3">
+            <dt>Network</dt>
+            <dd>
+              ↓ {rate(net.rx)} · ↑ {rate(net.tx)}
+            </dd>
+          </div>
+        )}
+        {m.battery && (
+          <div className="flex items-center justify-between gap-3">
+            <dt>Battery</dt>
+            <dd>
+              {m.battery.percent !== null ? `${m.battery.percent}%` : "—"} · {m.battery.status}
+            </dd>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3">
           <dt>Uptime</dt>
           <dd>{uptime(m.host.uptimeSec)}</dd>

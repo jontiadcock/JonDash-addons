@@ -1,6 +1,18 @@
 import "server-only";
 import type { DeclaredPermission, ModuleContext } from "@/lib/modules/types";
-import { snapshot, type DiskUsage, type Snapshot } from "./lib/collect";
+import {
+  snapshot,
+  ALL_GROUPS,
+  type Battery,
+  type CollectOptions,
+  type DiskIo,
+  type DiskUsage,
+  type MetricGroup,
+  type NetworkInterface,
+  type NetworkIo,
+  type Snapshot,
+  type Swap,
+} from "./lib/collect";
 
 /**
  * The ONLY surface a consuming module may import — `@/helpers/system-metrics/api`. The
@@ -8,23 +20,38 @@ import { snapshot, type DiskUsage, type Snapshot } from "./lib/collect";
  * `helpers: ["system-metrics"]`, and refuses any deeper path, so the internals below are
  * free to change without breaking a consumer.
  *
- * There is exactly one call, and it is read-only. It returns *numbers gathered from the
- * host* — never a path's contents, never a handle to the machine. That is what keeps the
- * consent line ("see CPU, memory, disks…") honest and stops this becoming a way to read
+ * There is one call, and it is read-only. It returns *numbers gathered from the host* —
+ * never a path's contents, never a handle to the machine. That is what keeps the consent
+ * line ("see CPU, memory, disks…") honest and stops this becoming a way to read
  * `.data/secrets.json`.
  */
 
-// Re-exported so a module gets the shape from the api entry it's allowed to import, never
-// from `./lib/collect` (which the verifier would refuse).
-export type { Snapshot, DiskUsage };
+// Re-exported so a module gets every type from the entry point it is allowed to import,
+// never from `./lib/collect` (which the verifier would refuse).
+export type {
+  Battery,
+  CollectOptions,
+  DiskIo,
+  DiskUsage,
+  MetricGroup,
+  NetworkInterface,
+  NetworkIo,
+  Snapshot,
+  Swap,
+};
+export { ALL_GROUPS };
 
 export type SystemMetricsApi = {
   /**
    * A fresh reading of the host, or `null` if the calling module did not declare
    * `system-metrics:read`. On a supported host `null` means only that — the reads
    * themselves don't fail. Safe to poll; the helper caches nothing.
+   *
+   * Pass `collect` to gather only the groups you will actually show. A group left out is
+   * never sampled, which is the difference between a metric being hidden and a metric not
+   * being taken at all. Omit the argument for everything.
    */
-  read(): Promise<Snapshot | null>;
+  read(opts?: CollectOptions): Promise<Snapshot | null>;
 };
 
 /**
@@ -38,9 +65,9 @@ function granted(ctx: ModuleContext, permission: DeclaredPermission): boolean {
 }
 
 const api = (ctx: ModuleContext): SystemMetricsApi => ({
-  async read() {
+  async read(opts) {
     if (!granted(ctx, "system-metrics:read")) return null;
-    return snapshot();
+    return snapshot(opts);
   },
 });
 

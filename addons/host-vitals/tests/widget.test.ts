@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ModuleContext } from "@/lib/modules/types";
 import HostVitalsWidget from "../ui/widget";
+import { collectFor } from "../lib/groups";
 
 /**
  * The dashboard tile must draw its own card — the dashboard supplies a grid cell and nothing
@@ -11,20 +12,24 @@ import HostVitalsWidget from "../ui/widget";
  * `can: () => true` exercises the genuine read path against this host.
  */
 
-function ctx(granted: boolean): ModuleContext {
-  const grants = granted ? (["system-metrics:read"] as const) : ([] as const);
+function ctx(granted: boolean, settings: Record<string, unknown> = {}): ModuleContext {
+  const grants: string[] = granted ? ["system-metrics:read"] : [];
   return {
     moduleId: "host-vitals",
     user: null,
-    grants: [...grants],
-    can: (p) => grants.includes(p as (typeof grants)[number]),
-    settings: { get: async () => undefined, set: async () => {}, all: async () => ({}) },
+    grants,
+    can: (p: string) => grants.includes(p),
+    settings: {
+      get: async (k: string) => settings[k],
+      set: async () => {},
+      all: async () => settings,
+    },
     store: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
   } as unknown as ModuleContext;
 }
 
-async function render(granted: boolean): Promise<string> {
-  const el = await HostVitalsWidget({ ctx: ctx(granted) });
+async function render(granted: boolean, settings: Record<string, unknown> = {}): Promise<string> {
+  const el = await HostVitalsWidget({ ctx: ctx(granted, settings) });
   return el ? renderToStaticMarkup(el) : "";
 }
 
@@ -41,7 +46,63 @@ describe("host vitals tile", () => {
     expect(html).toMatch(/class="card p-4"/);
     expect(html).toContain("Host vitals");
     expect(html).toContain('href="/m/host-vitals"');
-    // The verdict line is always one of these three.
-    expect(html).toMatch(/All healthy|Getting busy|nearly full|Memory is tight/);
+    // The verdict line is always one of these.
+    expect(html).toMatch(/All healthy|Getting busy|nearly full|Memory is tight|Swapping|On battery/);
+  });
+
+  it("always shows the vitals that have no switch", async () => {
+    const html = await render(true, {});
+    expect(html).toContain("CPU");
+    expect(html).toContain("Memory");
+    expect(html).toContain("Uptime");
+  });
+
+  it("uses GB/TB, never GiB/TiB", async () => {
+    const html = await render(true);
+    expect(html).toMatch(/\d\s(GB|TB|MB|KB)\b/);
+    expect(html).not.toMatch(/GiB|TiB|MiB/);
+  });
+});
+
+describe("per-metric switches", () => {
+  /**
+   * The promise is that switching a vital off means it is not GATHERED, not merely hidden.
+   * The widget builds the helper's `collect` list from the settings, so the check that
+   * matters is that the disabled group never appears in that list.
+   */
+  it("leaves a disabled group out of the collect list entirely", async () => {
+    const groups = collectFor({ showNetwork: false, showNetworkIo: false, showSwap: false });
+    expect(groups).not.toContain("network");
+    expect(groups).not.toContain("networkIo");
+    expect(groups).not.toContain("swap");
+  });
+
+  it("includes a group that is switched on", async () => {
+    const groups = collectFor({ showNetwork: true, showDiskIo: true });
+    expect(groups).toContain("network");
+    expect(groups).toContain("diskIo");
+  });
+
+  it("always collects cpu, memory and disks — they have no switch", async () => {
+    for (const values of [{}, { showSwap: false, showNetwork: false, showTemps: false }]) {
+      const groups = collectFor(values);
+      expect(groups).toContain("cpu");
+      expect(groups).toContain("memory");
+      expect(groups).toContain("disks");
+    }
+  });
+
+  it("falls back to each switch's default when nothing has been saved", async () => {
+    const groups = collectFor({});
+    // Defaults: swap/network/networkIo/temps on; cpuCores/diskIo/fans/battery off.
+    expect(groups).toContain("swap");
+    expect(groups).toContain("temps");
+    expect(groups).not.toContain("cpuCores");
+    expect(groups).not.toContain("fans");
+  });
+
+  it("treats a stored string 'true' as on, since settings round-trip as text", async () => {
+    expect(collectFor({ showFans: "true" })).toContain("fans");
+    expect(collectFor({ showFans: "false" })).not.toContain("fans");
   });
 });
