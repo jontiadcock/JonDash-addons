@@ -88,7 +88,8 @@ export default async function ServiceControlSettings({ ctx }: ModuleSettingsPane
         <h3 className="font-medium">Approved services</h3>
         <p className="text-sm" style={{ color: "var(--muted)" }}>
           This list is the complete set of services any module can ever touch. Adding one asks Windows
-          for permission once — after that, controlling it needs no prompt.
+          for permission once — after that, starting and stopping it needs no prompt. Removing one asks
+          again, because withdrawing the permission is itself an administrator action.
         </p>
 
         {entries.length === 0 ? (
@@ -127,7 +128,14 @@ export default async function ServiceControlSettings({ ctx }: ModuleSettingsPane
                   )}
                   <form action={removeEntryAction}>
                     <input type="hidden" name="id" value={e.id} />
-                    <button type="submit" className="btn btn-sm">
+                    {/* Says so up front: deleting the underlying task is an admin operation, so
+                        this raises a prompt too. An admin who is not expecting one assumes
+                        something has gone wrong. */}
+                    <button
+                      type="submit"
+                      className="btn btn-sm"
+                      title={e.grantState === "none" ? "Remove" : "Removes it and its permission — Windows will ask you to confirm"}
+                    >
                       Remove
                     </button>
                   </form>

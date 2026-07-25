@@ -279,6 +279,25 @@ should exist, and neither should be removed on the grounds that the other is the
 `service-control` module"*) in the task's **Description** field. It costs nothing, and it is what turns
 the Task Scheduler view from a list of names into an actual audit trail.
 
+## When a prompt appears, and when it does not
+
+Measured on a real machine (2026-07-25), not inferred:
+
+| Action | Prompt? |
+| --- | --- |
+| Add a service to the allowlist | **Yes** — once, covering start, stop and restart together |
+| Start / stop / restart it afterwards | **No** — this is the entire point of granting once |
+| **Remove** a service from the allowlist | **Yes** — deleting a SYSTEM-level task is itself an admin operation |
+| Read a service's state | No — querying needs no privilege at all |
+
+**The removal prompt is easy to forget and worth stating plainly**, because an admin who clicks "Remove"
+and is not expecting a UAC dialog will assume something is wrong. It is also correct: revoking a standing
+privilege should be at least as protected as granting one, or anything running as that user could quietly
+strip an admin's grants.
+
+So a full add-then-remove cycle costs **two** prompts, not one. The first live end-to-end test raised
+exactly two, with none in between — grant, stop, start, revoke.
+
 ## Adding a service is ONE prompt, not three
 
 Core supports batching several grants into one elevation. **Use it:** adding an entry creates its
