@@ -1,7 +1,7 @@
 # Helpers
 
-**Live as of JonDash 1.5.0.** Two helpers are published on both channels: `scheduler` (needs JonDash
-1.5.0) and `filesystem` (needs 1.5.2).
+**Live as of JonDash 1.5.0.** Published: `scheduler` (needs JonDash 1.5.0) and `filesystem` (needs
+1.5.2) on both channels, and `system-metrics` (needs 1.5.2) on beta.
 
 A **helper** is first-party shared capability that modules can depend on. Where a module is written by
 anyone and is deliberately fenced in, a helper is written by the JonDash project and is trusted to do
@@ -50,6 +50,7 @@ that need it.
 | ------ | ---------------------- | --------------------- | ---- |
 | `scheduler` | Periodic work that runs from server start, declared rather than started | none — adds nothing to a consent screen | [scheduler/HELPER.md](scheduler/HELPER.md) |
 | `filesystem` | Copying and archiving folders to another location, within folders an admin approved | `filesystem:read`, `filesystem:write`, `filesystem:delete` | [filesystem/HELPER.md](filesystem/HELPER.md) |
+| `system-metrics` | Reading how the server itself is doing — CPU, memory, disk usage, uptime, temperatures | `system-metrics:read` | [system-metrics/HELPER.md](system-metrics/HELPER.md) |
 
 `filesystem` was built the way the rules above ask for: its API was driven by what its first real
 consumer (`backup-manager`) genuinely needed, decided *before* the API was designed — otherwise the

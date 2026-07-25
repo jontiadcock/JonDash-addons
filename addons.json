@@ -57,6 +57,22 @@
       "path": "addons/backup-manager",
       "tag": "backup-manager/v0.1.1",
       "notes": "Fixes the dashboard tile, which drew no card of its own — so instead of matching the other tiles it appeared as loose text on the dashboard background, with nothing naming which module it belonged to. It now looks like the rest, with a title and a link into the module."
+    },
+    {
+      "id": "host-vitals",
+      "name": "Host vitals",
+      "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
+      "version": "0.0.1",
+      "minAppVersion": "1.5.2-beta.1",
+      "permissions": [
+        "system-metrics:read"
+      ],
+      "helpers": [
+        "system-metrics"
+      ],
+      "path": "addons/host-vitals",
+      "tag": "host-vitals/v0.0.1",
+      "notes": "First release. A dashboard tile that says at a glance whether the server is healthy — leading with the problem, like a disk nearly full or tight memory, rather than a count — plus a page with every disk, load average and temperatures. Read-only. Needs JonDash 1.5.2."
     }
   ],
   "helpers": [
@@ -94,6 +110,22 @@
       "path": "helpers/filesystem",
       "tag": "filesystem/v0.0.4",
       "notes": "A documentation fix only — the helper itself is unchanged. Its claim that every copy removed by retention reaches the audit trail holds on JonDash 1.5.3 and later, and never did before it. It now says so, and what still holds on older versions: the log records every removal either way."
+    },
+    {
+      "id": "system-metrics",
+      "name": "System metrics",
+      "description": "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
+      "version": "0.0.1",
+      "minAppVersion": "1.5.2-beta.1",
+      "provides": [
+        {
+          "id": "system-metrics:read",
+          "label": "See this server's CPU, memory, disk usage, uptime and temperature"
+        }
+      ],
+      "path": "helpers/system-metrics",
+      "tag": "system-metrics/v0.0.1",
+      "notes": "First release. Lets a module show how the server itself is doing — CPU load, memory, how full each disk is, uptime, and temperatures where the hardware reports them. Read-only: it can see these numbers and change nothing. The first module to use it is Host vitals."
     }
   ]
 }
