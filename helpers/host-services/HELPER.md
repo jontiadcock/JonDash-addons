@@ -194,7 +194,47 @@ plainly at the moment of adding.
 **Implementation note for whoever builds the grant manager:** a Scheduled Task created by an
 administrator is not runnable by a standard user by default. Its security descriptor has to permit the
 account JonDash runs as to *read and execute* it — and nothing more. Getting that wrong either breaks
-the feature or widens it.
+the feature or widens it. (Core confirmed 2026-07-25 that it does this, namespaces tasks under
+`JonDash\`, refuses anything outside that folder, and stores the absolute path to `sc.exe` so an app
+update or move cannot break existing grants.)
+
+## Naming an entry, and why the names are readable
+
+Core's grant manager fixes the *grammar* — `--service <name> --verb start|stop|restart`, with no syntax
+for "run this command" or "read the action from a file". This helper owns *policy*: which services, and
+which verbs on each.
+
+**Task names are readable, not opaque.** An entry named `Plex` produces `JonDash\Plex-restart`. The
+tempting alternative — an opaque id like `svc_a7f3-restart`, immune to any name-derived trickery — was
+rejected, because **the whole case for granting once rests on the admin being able to open Task
+Scheduler and read exactly what JonDash may do unprompted.** An opaque id forfeits the property that
+justifies the design. Safety here comes from a strict charset, not from hiding meaning.
+
+| Rule | |
+| --- | --- |
+| Charset | `[A-Za-z0-9._-]` only, ≤ 64 chars. Everything else is replaced, not escaped. |
+| Collisions | resolved with a numeric suffix (`Plex-2`), never by silently reusing a task. |
+| One task per verb | a grant covers one service and one verb; three verbs is three tasks. |
+| The display label never appears in a task name | so relabelling an entry never touches the OS, and a label with emoji or a `\` cannot reach the task path. |
+
+The charset matters beyond tidiness: `\` is the Task Scheduler folder separator, so an unsanitised
+name is a path-escape attempt. Core refuses anything outside `JonDash\` as a backstop — both checks
+should exist, and neither should be removed on the grounds that the other is there.
+
+**Ask of core:** put the human label and the origin (*"added by <admin> on <date> for the
+`service-control` module"*) in the task's **Description** field. It costs nothing, and it is what turns
+the Task Scheduler view from a list of names into an actual audit trail.
+
+## Adding a service is ONE prompt, not three
+
+Core supports batching several grants into one elevation. **Use it:** adding an entry creates its
+start, stop and restart grants behind a single UAC prompt.
+
+Three prompts to add one service would train the admin to click through them, which is precisely the
+habituation `../ELEVATION.md` warns about — and the second and third prompts carry no new information,
+since the decision the admin actually made was *"may JonDash control this service"*. Batching by
+**arguments** is safe; `--create-from <file>` remains forbidden, because a file is a mutable
+instruction source and that is the hole, not the batching.
 
 ## Version history
 
