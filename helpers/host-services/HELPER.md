@@ -12,6 +12,28 @@ not on any channel, because two things are still missing:
 **What already works without any privilege:** reading the state of allowlisted services. Querying a
 service needs no elevation, so the dashboard is useful on a machine where no grant has ever been made.
 
+### What has actually been exercised, and what has not
+
+Recorded because "it compiles" and "it works" are different claims, and the gap is where privileged
+code goes wrong.
+
+| Module | How it was tested |
+| --- | --- |
+| `lib/names.ts` | 14 unit tests, including the `\` path-escape and collision suffixing |
+| `lib/risk.ts` | 8 unit tests |
+| `lib/services.ts` | **Run against real Windows services**, cross-checked against `sc.exe` output — not just against its own parser |
+| `lib/allowlist.ts` | 23-check harness on a real SQLite database, migration applied by **core's own `runHelperMigrations`** |
+| `lib/requests.ts` | Same harness — queue, decline, expiry, cross-module isolation, suggestion cooldown |
+| `api.ts` | 20-check harness: every permission gate, the identical-refusal probing defence, and assertions that the surface is exactly five calls and exposes no `addEntry`/`setUnattended`/`execute` |
+| `lib/grant.ts` | **Only the refusal path.** `capability()` correctly reports `grant-manager-missing`, and adding a controllable entry refuses and writes no row |
+
+**Not yet exercised, and honestly blocked:**
+
+- `createGrants`, `removeGrants`, `runGrant` on success — all need the OPS-18 binary.
+- `requests.execute()` on success — needs a real grant to run.
+- **The consent screen has never been seen.** That needs the `service-control` consumer, because the
+  install path and the consent roll-up only happen through a consuming module.
+
 **Elevation is granted once per service, not per action.** Adding a service to the allowlist creates a
 fixed OS-level grant — a Scheduled Task on Windows, a sudoers/polkit rule on Linux — and that is the
 only time a UAC prompt appears. Afterwards, starting and stopping that service needs no prompt, and the
