@@ -28,10 +28,13 @@ const helper: HelperDefinition = {
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
   version: "0.0.1",
-  // `ctx.can()` and `readConfig` both arrived in 1.5.2. The PRE-RELEASE, not a bare
-  // "1.5.2": semver ranks a pre-release below its release, so "1.5.2" would be refused on
-  // every 1.5.2 beta — exactly the builds beta-channel users run.
-  minAppVersion: "1.5.2-beta.1",
+  // Raised from 1.5.2-beta.1: this release imports `@/lib/elevation`, which arrived in
+  // 1.7.1-beta.1. Declaring anything lower would install on a build where that module does
+  // not exist and fail at import time rather than refusing cleanly.
+  //
+  // The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
+  // "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
+  minAppVersion: "1.7.1-beta.1",
 
   /**
    * Two lines, and the split is for honesty rather than scoping — a consuming module

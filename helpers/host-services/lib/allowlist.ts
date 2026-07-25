@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
 import { randomUUID } from "node:crypto";
 import { allocateBase, VERBS } from "./names";
-import { createGrants, removeGrants, type GrantOutcome } from "./grant";
+import { createGrants, removeGrants, resolveTaskBase, type GrantOutcome } from "./grant";
 import { assessRisk, type Risk } from "./risk";
 
 /**
@@ -109,27 +109,46 @@ export async function addEntry(input: {
     return { ok: false, reason: "duplicate" };
   }
 
+  // Cheap local check first: if nothing survives sanitising there is no name to be had, and
+  // that answer needs no subprocess.
+  if (!allocateBase(serviceName, [])) return { ok: false, reason: "unusable-name" };
+
+  /**
+   * ASK THE BINARY WHAT IT WILL CALL THIS, THEN CHECK COLLISIONS ON *ITS* ANSWER.
+   *
+   * Order matters and getting it wrong is not theoretical — it was measured. Our sanitiser
+   * and the binary's disagree: we turn a space into `-`, it deletes the character. So
+   * "My Service" and "MyService" are two distinct names to us and **the same task name to
+   * Windows**. Checking collisions on our own answer would pass, and two allowlist entries
+   * would then point at ONE Scheduled Task — removing either would silently revoke the
+   * other, which is precisely what the suffixing in names.ts exists to prevent.
+   *
+   * So the binary is the authority on the name, and we only add the disambiguating suffix.
+   * `-` survives its sanitiser (verified), so a suffixed name stays stable through it.
+   */
+  const canonical = (await resolveTaskBase(serviceName)) ?? allocateBase(serviceName, [])!;
   const taskBase = allocateBase(
-    serviceName,
+    canonical,
     existing.map((e) => e.taskBase),
   );
-  if (!taskBase) {
-    // Either nothing survived sanitising, or 98 suffixes were taken. Both are refusals
-    // rather than something to work around with a generated name — see names.ts.
-    return { ok: false, reason: sanitisedNothing(serviceName) ? "unusable-name" : "no-free-name" };
-  }
+  if (!taskBase) return { ok: false, reason: "no-free-name" };
 
   const verbs = input.canControl === false ? [] : VERBS;
+
   if (verbs.length > 0) {
-    const outcome = await createGrants(serviceName, taskBase, verbs);
+    const outcome = await createGrants(serviceName, taskBase, verbs, {
+      label: input.addedBy ?? undefined,
+      userId: input.addedBy ?? null,
+    });
     if (outcome.status !== "ok") return { ok: false, reason: "grant-refused", outcome };
   }
+  const finalBase = taskBase;
 
   const entry: Entry = {
     id: randomUUID(),
     serviceName,
     label: (input.label ?? serviceName).trim() || serviceName,
-    taskBase,
+    taskBase: finalBase,
     canControl: input.canControl !== false,
     unattended: input.unattended === true,
     grantState: verbs.length > 0 ? "granted" : "none",
@@ -154,10 +173,6 @@ export async function addEntry(input: {
   return { ok: true, entry, risk: assessRisk(serviceName) };
 }
 
-function sanitisedNothing(serviceName: string): boolean {
-  return allocateBase(serviceName, []) === null;
-}
-
 /**
  * Remove an entry AND its grants, in one action.
  *
@@ -170,7 +185,7 @@ export async function removeEntry(id: string): Promise<{ ok: boolean; outcome?: 
   if (!entry) return { ok: true }; // idempotent: already gone is success
 
   if (entry.grantState !== "none") {
-    const outcome = await removeGrants(entry.taskBase, VERBS);
+    const outcome = await removeGrants(entry.taskBase);
     if (outcome.status !== "ok") return { ok: false, outcome };
   }
 

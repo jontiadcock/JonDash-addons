@@ -1,32 +1,32 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { platform } from "node:os";
-import { isSafeBase, taskNameFor, type Verb } from "./names";
+import {
+  createGrant,
+  grantSupport,
+  listGrants,
+  previewGrantName,
+  removeGrant,
+  type GrantFailure,
+} from "@/lib/elevation";
+import { taskNameFor, type Verb } from "./names";
 
 /**
- * The bridge to core's grant manager (OPS-18).
+ * The bridge to core's grant manager (OPS-18, shipped in JonDash 1.7.1-beta.1).
  *
- * A grant is a fixed OS-level permission: a Scheduled Task on Windows with "run with
- * highest privileges", a sudoers/polkit rule on Linux. Creating one prompts for elevation
- * ONCE. Using one never prompts, survives restarts of JonDash and of the machine, and works
- * with nobody logged in — which is what makes overnight automation possible at all.
+ * **Everything privileged goes through `@/lib/elevation`, never the binary directly.** That
+ * is HELPERS-DESIGN rule 7, and the reason is auditing: core resolves the path, maps exit
+ * codes and logs every call — including the declined and failed ones. A helper that spawns
+ * `jondash-grant.exe` itself works perfectly and appears nowhere in the log, which is the
+ * worst combination available.
  *
- * The rule the whole design rests on, from ../ELEVATION.md:
+ * A grant is a Scheduled Task under `\JonDash\` running one fixed command with highest
+ * privileges. Creating one prompts for elevation ONCE and the grant then persists, so
+ * unattended automation works and a restart of JonDash or the machine changes nothing.
  *
- *   A granted action must be entirely self-contained. It must never read what to do from
- *   anywhere.
- *
- * The task stores the absolute path to `sc.exe` and a fixed service and verb. `schtasks
- * /run` accepts only a task name and cannot pass arguments, so what can happen without a
- * prompt is fixed at the instant the admin approved it, and enforced by Windows rather than
- * by this code. A task that read its action from a file would be a local privilege
- * escalation for every process on the machine.
- *
- * NOTE: the grant manager binary does not exist yet — core has accepted it as OPS-18 but
- * not shipped it. Everything here is written to that contract and reports
- * `grant-manager-missing` until it lands, which is why `capability()` exists and why no
- * call in this file silently degrades to something weaker.
+ * The rule the design rests on, from ../ELEVATION.md: **a granted action must be entirely
+ * self-contained and must never read what to do from anywhere.** The task stores a fixed
+ * service and verb, and `schtasks /run` cannot pass arguments, so what can happen without a
+ * prompt is fixed at the instant the admin approved it — enforced by Windows, not by us.
  */
 
 /** Why elevation is impossible here. Named separately so callers can switch on it. */
@@ -35,10 +35,10 @@ export type ElevationReason = "no-interactive-session" | "grant-manager-missing"
 export type ElevationSupport = { ok: true; platform: "windows" | "linux" } | { ok: false; reason: ElevationReason };
 
 /**
- * `cancelled-at-uac` and `failed` are separate on purpose, and so is `unavailable`. They
- * mean different things to a caller: "not now" invites a retry, "it broke" invites a look
- * at the detail, and "there is no grant" needs the admin to create one. Collapsing them
- * into a boolean is how a module ends up retrying a decision the admin already made.
+ * `cancelled-at-uac`, `unavailable` and `failed` stay separate on purpose. They mean
+ * different things to a caller: "not now" invites a retry, "there is no grant" needs an
+ * admin to create one, and "it broke" needs the detail. Collapsing them into a boolean is
+ * how a module ends up retrying a decision a person already made.
  */
 export type GrantOutcome =
   | { status: "ok" }
@@ -46,85 +46,77 @@ export type GrantOutcome =
   | { status: "unavailable"; reason: ElevationReason }
   | { status: "failed"; detail: string };
 
-/** Windows returns this when the user dismisses the UAC prompt. */
-const ERROR_CANCELLED = 1223;
-
-const TIMEOUT_MS = 120_000; // a UAC prompt waits on a human
-
-/**
- * Where the binary lives: shipped inside the release, versioned with the app, resolved
- * relative to the install root rather than hardcoded. A grant it creates must never
- * reference this binary — the task points at `sc.exe` — or an app update would break every
- * existing grant.
- */
-export function grantManagerPath(): string {
-  const name = platform() === "win32" ? "jondash-grant.exe" : "jondash-grant";
-  return join(process.cwd(), "bin", name);
+/** Core's failure vocabulary is richer than ours; this is the only place that translates. */
+function toOutcome(reason: GrantFailure, message: string): GrantOutcome {
+  switch (reason) {
+    case "declined":
+      return { status: "cancelled-at-uac" };
+    case "not-installed":
+      return { status: "unavailable", reason: "grant-manager-missing" };
+    case "no-interactive-desktop":
+      return { status: "unavailable", reason: "no-interactive-session" };
+    case "unsupported-platform":
+      return { status: "unavailable", reason: "unsupported-platform" };
+    default:
+      return { status: "failed", detail: message };
+  }
 }
 
 /**
  * Can this installation create grants?
  *
- * Needs no capability to call: a module must be able to explain itself on a headless box
- * without having been granted anything.
+ * Needs no capability — a module must be able to explain itself on a headless box without
+ * having been granted anything.
  *
- * Note the asymmetry, which is easy to get backwards — CREATING a grant needs an
- * interactive desktop because that is where UAC prompts; USING one does not. A headless
- * install can therefore run grants made earlier but cannot make new ones.
+ * Note the asymmetry, which is easy to get backwards: CREATING a grant needs an interactive
+ * desktop because that is where UAC prompts; USING one does not. A headless install can run
+ * grants made earlier but cannot make new ones.
  */
 export function capability(): ElevationSupport {
-  const p = platform();
-  if (p !== "win32" && p !== "linux") return { ok: false, reason: "unsupported-platform" };
-  if (!existsSync(grantManagerPath())) return { ok: false, reason: "grant-manager-missing" };
-  if (!hasInteractiveSession()) return { ok: false, reason: "no-interactive-session" };
-  return { ok: true, platform: p === "win32" ? "windows" : "linux" };
+  const s = grantSupport();
+  if (s.available) return { ok: true, platform: "windows" };
+  const mapped = toOutcome(s.reason, s.message);
+  return { ok: false, reason: mapped.status === "unavailable" ? mapped.reason : "grant-manager-missing" };
 }
 
 /**
- * Best-effort detection of a desktop that could show a prompt.
+ * What the binary will ACTUALLY call this task.
  *
- * Deliberately best-effort: Session 0 isolation cannot be detected reliably from Node, so
- * the authority is the grant manager itself, which refuses and says why. This exists to
- * give a useful answer BEFORE prompting rather than to be the safety check.
+ * We sanitise names ourselves (`names.ts`) and so does the binary. Two sanitisers are two
+ * copies of a contract, and core flagged that exact risk about its own exit codes — so the
+ * binary is treated as the authority and its answer is what gets stored. If they ever
+ * disagree, the stored name still matches the real task and `schtasks /run` keeps working;
+ * without this, a silent divergence would make every action fail with "task not found".
  */
-function hasInteractiveSession(): boolean {
-  if (platform() === "linux") return Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
-  // A Windows service runs in Session 0 with no desktop. SESSIONNAME is set for interactive
-  // logons ("Console", "RDP-Tcp#0") and absent under most service hosts.
-  return Boolean(process.env.SESSIONNAME);
-}
-
-function run(args: string[]): Promise<{ code: number; out: string }> {
-  return new Promise((resolve) => {
-    execFile(grantManagerPath(), args, { timeout: TIMEOUT_MS, windowsHide: false }, (err, stdout, stderr) => {
-      const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
-      const code = err && typeof (err as { code?: unknown }).code === "number" ? (err as { code: number }).code : err ? 1 : 0;
-      resolve({ code, out });
-    });
-  });
+export async function resolveTaskBase(desired: string): Promise<string | null> {
+  const r = await previewGrantName(desired);
+  return r.ok ? r.value : null;
 }
 
 /**
  * Create the grants for one allowlist entry — all its verbs behind a SINGLE elevation.
  *
- * Batching by arguments is safe and batching by file is not: `--create-from <file>` would
- * reintroduce the mutable instruction source the whole design excludes. Three separate
- * prompts to add one service would also train the admin to click through them, which is the
- * habituation this model exists to avoid; prompts two and three carry no new information,
- * because the decision actually being made is "may JonDash control this service".
+ * Batching by arguments is safe; batching by file is not, because a file is a mutable
+ * instruction source. Three prompts to add one service would also train the admin to click
+ * through them — the habituation ELEVATION.md warns about — and prompts two and three carry
+ * no new information, since the decision being made is "may JonDash control this service".
  */
-export async function createGrants(serviceName: string, taskBase: string, verbs: Verb[]): Promise<GrantOutcome> {
-  const support = capability();
-  if (!support.ok) return { status: "unavailable", reason: support.reason };
-  if (!isSafeBase(taskBase)) return { status: "failed", detail: "unsafe task name" };
-
-  const args = ["--create", "--service", serviceName, "--base", taskBase];
-  for (const v of verbs) args.push("--verb", v);
-
-  const { code, out } = await run(args);
-  if (code === 0) return { status: "ok" };
-  if (code === ERROR_CANCELLED) return { status: "cancelled-at-uac" };
-  return { status: "failed", detail: out || `grant manager exited ${code}` };
+export async function createGrants(
+  serviceName: string,
+  taskBase: string,
+  verbs: Verb[],
+  by?: { label?: string; userId?: string | null },
+): Promise<GrantOutcome> {
+  const r = await createGrant({
+    service: serviceName,
+    verbs,
+    id: taskBase,
+    // Recorded in the task's Description, so Task Scheduler itself reads as an audit trail
+    // rather than a list of names.
+    by: by?.label,
+    userId: by?.userId ?? null,
+  });
+  return r.ok ? { status: "ok" } : toOutcome(r.reason, r.message);
 }
 
 /**
@@ -132,70 +124,55 @@ export async function createGrants(serviceName: string, taskBase: string, verbs:
  *
  * Removing an allowlist entry and removing its grants are ONE action, never two — a list
  * entry that disappears while the OS grant survives is exactly the orphan nobody audits.
- * `--remove` is idempotent, so a retry after a partial failure is safe.
  */
-export async function removeGrants(taskBase: string, verbs: Verb[]): Promise<GrantOutcome> {
-  const support = capability();
-  if (!support.ok) return { status: "unavailable", reason: support.reason };
+export async function removeGrants(taskBase: string, userId?: string | null): Promise<GrantOutcome> {
+  const r = await removeGrant({ id: taskBase, userId: userId ?? null });
+  return r.ok ? { status: "ok" } : toOutcome(r.reason, r.message);
+}
 
-  const args = ["--remove", "--base", taskBase];
-  for (const v of verbs) args.push("--verb", v);
-
-  const { code, out } = await run(args);
-  if (code === 0) return { status: "ok" };
-  if (code === ERROR_CANCELLED) return { status: "cancelled-at-uac" };
-  return { status: "failed", detail: out || `grant manager exited ${code}` };
+/**
+ * What Windows actually has granted, read from the OS rather than from our own rows.
+ *
+ * Worth surfacing to an admin: it cannot drift from reality, so an orphan left by a failed
+ * uninstall shows up here even though nothing in our tables mentions it.
+ */
+export async function readGrants(): Promise<{ name: string; command: string; enabled: boolean }[]> {
+  const r = await listGrants();
+  return r.ok ? r.value.map((g) => ({ name: g.name, command: g.command, enabled: g.enabled })) : [];
 }
 
 /**
  * Run an already-granted action. **This does not elevate and does not prompt** — it asks
- * the OS to run a task that was authorised earlier, which is the entire point of the model.
+ * the OS to run a task authorised earlier, which is the whole point of the model.
+ *
+ * Spawned here rather than through `@/lib/elevation`, because core's module has no call for
+ * it: it creates, removes and lists grants but never triggers one. That is not a rule being
+ * bent — `schtasks /run` is unprivileged and would fail without an existing grant — but it
+ * does mean the moment a service actually restarts is absent from core's elevation log, so
+ * the helper audits it instead. Raised with core.
  *
  * `schtasks /run` takes only a task name; there is no way to pass an argument, and that is
  * what makes the grant's scope enforceable by Windows rather than by convention.
  */
 export async function runGrant(taskBase: string, verb: Verb): Promise<GrantOutcome> {
-  if (!isSafeBase(taskBase)) return { status: "failed", detail: "unsafe task name" };
+  if (platform() !== "win32") return { status: "unavailable", reason: "unsupported-platform" };
 
-  if (platform() === "win32") {
-    return new Promise((resolve) => {
-      execFile(
-        "schtasks.exe",
-        ["/run", "/tn", taskNameFor(taskBase, verb)],
-        { timeout: 30_000, windowsHide: true },
-        (err, stdout, stderr) => {
-          const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
-          if (!err) return resolve({ status: "ok" });
-          // The task not existing means the grant was never made, or was removed outside
-          // JonDash — reported as unavailable rather than failed, because the fix is to
-          // re-grant it, not to retry the action.
-          if (/cannot find|does not exist|ERROR: The system cannot find/i.test(out)) {
-            return resolve({ status: "unavailable", reason: "grant-manager-missing" });
-          }
-          resolve({ status: "failed", detail: out || "schtasks failed" });
-        },
-      );
-    });
-  }
-
-  if (platform() === "linux") {
-    return new Promise((resolve) => {
-      execFile(
-        "sudo",
-        ["-n", "systemctl", verb, taskBase],
-        { timeout: 30_000 },
-        (err, stdout, stderr) => {
-          const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
-          if (!err) return resolve({ status: "ok" });
-          // `sudo -n` never prompts. A password demand here means the sudoers rule is gone.
-          if (/password is required|a terminal is required/i.test(out)) {
-            return resolve({ status: "unavailable", reason: "grant-manager-missing" });
-          }
-          resolve({ status: "failed", detail: out || "systemctl failed" });
-        },
-      );
-    });
-  }
-
-  return { status: "unavailable", reason: "unsupported-platform" };
+  return new Promise((resolve) => {
+    execFile(
+      "schtasks.exe",
+      ["/run", "/tn", taskNameFor(taskBase, verb)],
+      { timeout: 30_000, windowsHide: true },
+      (err, stdout, stderr) => {
+        const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
+        if (!err) return resolve({ status: "ok" });
+        // The task not existing means the grant was never made, or was removed outside
+        // JonDash. Reported as unavailable rather than failed, because the fix is to
+        // re-grant it, not to retry the action.
+        if (/cannot find|does not exist|ERROR: The system cannot find/i.test(out)) {
+          return resolve({ status: "unavailable", reason: "grant-manager-missing" });
+        }
+        resolve({ status: "failed", detail: out || "schtasks failed" });
+      },
+    );
+  });
 }
