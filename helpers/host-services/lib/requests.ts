@@ -112,6 +112,15 @@ export async function requestStatus(moduleId: string, requestId: string): Promis
   }
 }
 
+/** Open suggestions, for the settings screen's prefilled-form flow. */
+export async function openSuggestions(): Promise<
+  { id: string; moduleId: string; serviceName: string; reason: string; createdAt: string }[]
+> {
+  return prisma.$queryRawUnsafe(
+    `SELECT id, moduleId, serviceName, reason, createdAt FROM ${T.suggestions()} WHERE state = 'open' ORDER BY createdAt`,
+  );
+}
+
 /** Requests awaiting an administrator. The settings screen's queue. */
 export async function pendingRequests(): Promise<ReqRow[]> {
   return prisma.$queryRawUnsafe<ReqRow[]>(

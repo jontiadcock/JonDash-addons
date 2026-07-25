@@ -55,7 +55,25 @@ applies here.
 
 ## The boundary that makes this safe
 
-> **A module can name a service. It can never add one.**
+> **A module acting on its own can name a service. Only an administrator can add one.**
+
+**This wording was corrected on 2026-07-25.** The original said *"a module can never add one"*, which was
+not a stricter guarantee — it was an unimplementable one. A helper has no UI of its own and core has no
+generic editor for helper configuration, so with no mutator anywhere the allowlist could never be
+populated at all. The real boundary in this app is not module-versus-helper; it is **whether an
+authenticated administrator is behind the call**, which is the shape `filesystem` already uses for
+approved roots.
+
+So the mutators live under `admin.*` and refuse unless `ctx.user.role === "ADMIN"`. That is stricter than
+`filesystem`, which records the user without requiring one — proportionate here, because adding an entry
+creates a *standing OS privilege* rather than approving a folder.
+
+**Be honest about what that check is worth:** `ctx.user` is forgeable exactly as `ctx.can` is, since a
+module can spread its context and hand back a doctored one. It catches accidents and honest modules,
+which is nearly all of them. **What catches the rest is UAC** — creating an entry creates an OS grant,
+which raises a real elevation prompt a human must approve at the machine. A module that fakes an admin
+context still cannot obtain a standing privilege silently. The software check is the first layer; the
+operating system is the one that cannot be talked out of it.
 
 The allowlist lives in this helper's own tables, is edited only by an administrator on JonDash's own
 settings screen, and is the complete set of services any module can ever touch. A module asking about
@@ -184,7 +202,7 @@ that keeps asking becomes visibly annoying, which is the correct outcome.
 
 | Guarantee | How it holds |
 | --------- | ------------ |
-| **A module can never add to the allowlist.** | `suggest` writes a suggestion row; nothing promotes it but an admin edit — and only that edit creates the OS grant. |
+| **A module acting on its own can never add to the allowlist.** | `suggest` writes a suggestion row; nothing promotes it but an admin edit through `admin.add`, which refuses without `ctx.user.role === "ADMIN"` — and only that edit creates the OS grant, behind a UAC prompt that cannot be forged. |
 | **A module can never name a service outside it.** | `request` resolves the id against the allowlist first and refuses otherwise. |
 | **A grant covers one service and three verbs, fixed when it was made.** | The OS grant is self-contained and takes no arguments — `schtasks /run` cannot pass any. |
 | **No standing process.** | Nothing runs between actions; the grant is a definition, not a daemon, and is visible in Task Scheduler. |
