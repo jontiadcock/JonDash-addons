@@ -23,13 +23,13 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.2-beta.1",
+  version: "0.0.2-beta.2",
   // Matches the helper's floor, and for the same reason: on 1.7.1-beta.1 an elevated action
   // could proceed without being recorded, so the audit guarantee this module relies on was
   // not actually there. The PRE-RELEASE, not a bare "1.7.1" — semver ranks a pre-release
   // below its release, so "1.7.1" would be refused on every 1.7.1 beta, the builds beta
   // users run.
-  minAppVersion: "1.7.1-beta.7",
+  minAppVersion: "1.7.1-beta.9",
 
   /**
    * Both helper capabilities. They render red on the consent screen — core assumes the worst
@@ -37,21 +37,15 @@ const serviceControl: ModuleDefinition = {
    * services on the machine JonDash runs on.
    */
   /**
-   * Three, and the third is the one that matters.
-   *
-   * `:configure` says this module decides what goes on the allowlist. It exists because the
-   * power did: until `0.0.1-beta.4` this module could add entries while its consent screen
-   * mentioned only controlling them, which is a privilege-escalation path rather than an
-   * oversight. Declaring it does not make that power smaller — it makes it visible, so an
-   * admin agrees to it knowingly instead of discovering it later.
-   *
-   * It is temporary. When JonDash can host a helper's own settings page, the editor moves
-   * there and this line is deleted.
+   * Two, and `host-services:configure` is **gone** — it existed for one release because this
+   * module hosted the allowlist editor, which let it choose what went on the list it was only
+   * meant to use. JonDash 1.7.1 gave helpers their own settings page, so the editor moved to
+   * Admin → Helpers and the capability was deleted rather than left disclosed.
    */
-  permissions: ["host-services:read", "host-services:control", "host-services:configure"],
+  permissions: ["host-services:read", "host-services:control"],
 
   /** Pinned to the version that introduced the API this module calls. */
-  helpers: [{ id: "host-services", minVersion: "0.0.2-beta.1" }],
+  helpers: [{ id: "host-services", minVersion: "0.0.2-beta.2" }],
 
   /** Which services exist on the host, and the power to stop them, is admin information. */
   adminOnly: true,

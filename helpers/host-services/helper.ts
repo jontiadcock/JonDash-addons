@@ -1,6 +1,31 @@
 import type { HelperDefinition } from "@/lib/helpers/types";
-import { listServiceLabels, readConfig } from "./lib/allowlist";
+import { addEntry, listServiceLabels, readConfig, removeEntry, setUnattended } from "./lib/allowlist";
+import { decline, execute } from "./lib/requests";
 import { readGrants, revokeEverything } from "./lib/grant";
+import SettingsPanel from "./ui/settings-panel";
+
+/** Wording for a refused add. Separate so the panel gets a sentence, not a code. */
+function explainAdd(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok: true }>): string {
+  switch (r.reason) {
+    case "duplicate":
+      return "That service is already on the list.";
+    case "unusable-name":
+      return "That name has no characters that can be used.";
+    case "name-clash":
+      // Names the entry in the way, because "pick another name" is useless advice when the
+      // service name is not yours to choose.
+      return `Windows would give this the same permission name as "${r.detail}". Remove that entry first if this is the one you want.`;
+    case "grant-refused": {
+      const o = r.outcome;
+      if (o.status === "cancelled-at-uac") return "You dismissed the Windows permission prompt.";
+      if (o.status === "timed-out") return "The permission prompt was not answered in time.";
+      if (o.status === "unavailable") return "This installation cannot grant that permission.";
+      // Narrowed via the discriminant rather than reaching for `.detail` on the union — `ok`
+      // has no such field, and TypeScript is right to say so.
+      return o.status === "failed" ? o.detail : "The permission could not be granted.";
+    }
+  }
+}
 
 /**
  * Last chance to take back what this helper gave the operating system.
@@ -103,7 +128,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.2-beta.1",
+  version: "0.0.2-beta.2",
   /**
    * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
    *
@@ -118,7 +143,13 @@ const helper: HelperDefinition = {
    * The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
    * "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
    */
-  minAppVersion: "1.7.1-beta.7",
+  // 1.7.1-beta.**9**, the first build with `SettingsPanel` / `onSettingsSubmit` — checked
+  // tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this
+  // release does not work without them.
+  //
+  // The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
+  // "1.7.1" would refuse every 1.7.1 beta — including beta.9, which has the feature.
+  minAppVersion: "1.7.1-beta.9",
 
   /**
    * Two lines, and the split is for honesty rather than scoping — a consuming module
@@ -141,34 +172,95 @@ const helper: HelperDefinition = {
       permission: "host-services:control",
       describe: (config) => `Start, stop and restart ${which(config)}`,
     },
-    /**
-     * **The capability that had to exist, because the power already did.**
+    /*
+     * There is no third capability, and there must not be one again.
      *
-     * Up to `0.0.1-beta.4` a module could add allowlist entries through `admin.add` while its
-     * consent screen said only that it could *control the services you listed*. That was a
-     * privilege-escalation path: a module could display "Add Plex" and submit `sshd`, and the
-     * UAC prompt names `jondash-grant.exe` rather than the service, so nothing on screen
-     * caught it.
+     * `host-services:configure` existed briefly (0.0.1 stable) because the allowlist editor
+     * had nowhere to live but a consuming module's settings panel, which meant the module
+     * supplied the service name being approved — it could display "Add Plex" and submit
+     * `sshd`. Declaring the power made the consent screen honest without making the
+     * arrangement right: the thing being bounded could still edit its own boundary.
      *
-     * Removing the power made the allowlist uneditable, since a helper has no UI of its own.
-     * So it is back, and **disclosed** — an admin now sees, in red, that this module can
-     * decide what goes on the list. That is a real thing to consent to, and consenting to it
-     * knowingly is categorically different from it happening behind a line about restarting.
-     *
-     * **This is still the wrong home.** Editing belongs on the helper's own settings page,
-     * where JonDash renders the form and no module is in the path — then this capability is
-     * deleted rather than merely honest. Asked of core 2026-07-26.
+     * JonDash 1.7.1 gave helpers their own settings page, so the editor moved to
+     * `ui/settings-panel.tsx` and the capability was deleted. **Rule 8 of HELPERS-DESIGN
+     * now states it generally: a helper's module-facing API must contain no mutators for
+     * admin-owned configuration — read and request, never add, remove or approve.**
      */
-    {
-      permission: "host-services:configure",
-      describe: () =>
-        "Choose which services JonDash may control — this module can add and remove them, and anything it adds it can then start and stop",
-    },
   ],
 
   migrations: "./migrations",
 
   readConfig,
+
+  SettingsPanel,
+
+  /**
+   * Everything that changes the allowlist, in one place, reachable only through core.
+   *
+   * Core has already asserted same-origin and `modules.manage` before this runs, and builds
+   * `ctx.user` from the resolved session — so unlike the old module-supplied context, it is
+   * not something a caller can fabricate. There is deliberately no permission check of our
+   * own here: adding one would suggest this is reachable by some other route, and it is not.
+   *
+   * Throwing is safe — core catches, audits and shows it — but a refusal the admin can act on
+   * is better returned than thrown.
+   */
+  onSettingsSubmit: async (ctx, payload) => {
+    const op = String(payload.op ?? "");
+    const userId = ctx.user.id;
+
+    switch (op) {
+      case "add": {
+        const serviceName = String(payload.serviceName ?? "").trim();
+        if (!serviceName) return { ok: false, error: "Name a service." };
+        const r = await addEntry({
+          serviceName,
+          label: String(payload.label ?? "").trim() || undefined,
+          canControl: payload.readOnly !== true,
+          addedBy: userId,
+        });
+        if (!r.ok) return { ok: false, error: explainAdd(r) };
+        // The risk warning rides back on success, because "you have just allowed something
+        // that can lock you out" is only useful at the moment it becomes true.
+        return { ok: true, message: `Added ${r.entry.serviceName}.${r.risk.level === "none" ? "" : ` ${r.risk.message}`}` };
+      }
+
+      case "remove": {
+        const r = await removeEntry(String(payload.id ?? ""));
+        return r.ok ? { ok: true, message: "Removed." } : { ok: false, error: "Could not withdraw the permission." };
+      }
+
+      case "unattended": {
+        const on = payload.value === true;
+        await setUnattended(String(payload.id ?? ""), on);
+        return {
+          ok: true,
+          message: on
+            ? "That service can now be controlled without asking you first."
+            : "That service will ask for your approval each time.",
+        };
+      }
+
+      case "approve": {
+        const outcome = await execute(String(payload.id ?? ""), userId);
+        if (outcome.status === "approved") {
+          return outcome.ok ? { ok: true, message: "Done." } : { ok: false, error: `It ran but failed: ${outcome.detail}` };
+        }
+        if (outcome.status === "cancelled-at-uac") {
+          return { ok: false, error: "You dismissed the Windows permission prompt, so nothing happened." };
+        }
+        return { ok: false, error: outcome.status === "failed" ? outcome.detail : "That request is no longer waiting." };
+      }
+
+      case "decline": {
+        await decline(String(payload.id ?? ""), userId);
+        return { ok: true, message: "Declined." };
+      }
+
+      default:
+        return { ok: false, error: "Unknown action." };
+    }
+  },
 
   /**
    * Revoking a grant raises a UAC prompt, so this hook needs to outlive the 5s default. It is

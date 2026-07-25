@@ -78,19 +78,18 @@
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.2-beta.1",
-      "minAppVersion": "1.7.1-beta.7",
+      "version": "0.0.2-beta.2",
+      "minAppVersion": "1.7.1-beta.9",
       "permissions": [
         "host-services:read",
-        "host-services:control",
-        "host-services:configure"
+        "host-services:control"
       ],
       "helpers": [
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.2-beta.1",
-      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "service-control/v0.0.2-beta.2",
+      "notes": "Asks for one permission fewer. Choosing which services JonDash may control now happens under Admin → Helpers, so this module no longer needs — or has — the power to change that list. Same features otherwise. Windows only."
     },
     {
       "id": "docker-manager",
@@ -170,8 +169,8 @@
       "id": "host-services",
       "name": "Host services",
       "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-      "version": "0.0.2-beta.1",
-      "minAppVersion": "1.7.1-beta.7",
+      "version": "0.0.2-beta.2",
+      "minAppVersion": "1.7.1-beta.9",
       "provides": [
         {
           "id": "host-services:read",
@@ -180,15 +179,11 @@
         {
           "id": "host-services:control",
           "label": "Start, stop and restart the services you list"
-        },
-        {
-          "id": "host-services:configure",
-          "label": "Choose which services JonDash may control — this module can add and remove them, and anything it adds it can then start and stop"
         }
       ],
       "path": "helpers/host-services",
-      "tag": "host-services/v0.0.2-beta.1",
-      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "host-services/v0.0.2-beta.2",
+      "notes": "SECURITY — choosing which services JonDash may control moves to Admin → Helpers, where JonDash itself shows the form. No module can change that list any more, so the extra permission the last release asked for is gone. Needs JonDash 1.7.1."
     },
     {
       "id": "docker",
