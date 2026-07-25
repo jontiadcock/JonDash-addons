@@ -3,6 +3,7 @@ import {
   grantSupport,
   listGrants,
   previewGrantName,
+  removeAllGrants,
   removeGrant,
   runGrant as coreRunGrant,
   type GrantFailure,
@@ -149,6 +150,18 @@ export async function createGrants(
  */
 export async function removeGrants(taskBase: string, userId?: string | null): Promise<GrantOutcome> {
   const r = await removeGrant({ id: taskBase, userId: userId ?? null });
+  return r.ok ? { status: "ok" } : toOutcome(r.reason, r.message);
+}
+
+/**
+ * Revoke every grant this helper ever created. Used only when the helper itself is being
+ * removed — there is no route to this from a module.
+ *
+ * Reads from Windows rather than from our tables, so a grant left by a failed removal is
+ * caught too. Needs elevation, and therefore a human at a prompt.
+ */
+export async function revokeEverything(): Promise<GrantOutcome> {
+  const r = await removeAllGrants({ userId: null });
   return r.ok ? { status: "ok" } : toOutcome(r.reason, r.message);
 }
 
