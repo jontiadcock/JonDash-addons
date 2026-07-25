@@ -17,24 +17,37 @@ import { listServiceLabels, readConfig } from "./lib/allowlist";
  *
  * See HELPER.md, and ../ELEVATION.md for the model this is an application of.
  *
- * **This helper is inert until core ships the grant manager (OPS-18).** Reading service
- * state works today and needs no privilege; creating grants reports
- * `grant-manager-missing` and refuses. That is deliberate — nothing here degrades to a
- * weaker form of privilege when the intended one is unavailable.
+ * **Working end to end since JonDash 1.7.1-beta.2** (OPS-18). Proven on a real machine: one
+ * approval when a service is added, then start and stop with no further prompt, verified by
+ * reading the service's actual state either side. Removing an entry prompts again, because
+ * withdrawing a standing privilege is itself an administrator action.
+ *
+ * **What is NOT proven, and must not be claimed:** whether the task's security descriptor
+ * stops a standard user *editing* a grant. It is coded that way and neither session has
+ * tested it. Until someone does, a grant is a narrow permanent capability — not a
+ * tamper-proof one.
  */
 const helper: HelperDefinition = {
   id: "host-services",
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.1-beta.1",
-  // Raised from 1.5.2-beta.1: this release imports `@/lib/elevation`, which arrived in
-  // 1.7.1-beta.1. Declaring anything lower would install on a build where that module does
-  // not exist and fail at import time rather than refusing cleanly.
-  //
-  // The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
-  // "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
-  minAppVersion: "1.7.1-beta.1",
+  version: "0.0.1-beta.2",
+  /**
+   * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
+   *
+   * beta.1 shipped `@/lib/elevation`, so the imports resolve there — but on beta.1 an
+   * elevated action could still proceed when its audit entry failed to write. This helper
+   * tells administrators that every elevated action is recorded, and on beta.1 that sentence
+   * is not true. Declaring the lower floor would install against a build where the promise
+   * quietly does not hold, which is worse than refusing to install at all.
+   *
+   * beta.2 also adds `runGrant`, so the moment a service actually restarts is logged.
+   *
+   * The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
+   * "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
+   */
+  minAppVersion: "1.7.1-beta.2",
 
   /**
    * Two lines, and the split is for honesty rather than scoping — a consuming module

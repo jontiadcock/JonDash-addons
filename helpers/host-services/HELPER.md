@@ -245,6 +245,20 @@ plainly at the moment of adding.
 | Creating a grant needs | an interactive desktop session | an interactive desktop session |
 | Using one needs | nothing — works logged out | nothing |
 
+## The one claim nobody has tested — do not present grants as tamper-proof
+
+A grant's security descriptor is written to let the account JonDash runs as **read and execute** the
+task and nothing more, so a standard user should not be able to *edit* it — to repoint `Plex-restart` at
+some other command, for instance.
+
+**That is coded, not proven.** Neither this session nor core has tested it, and it is the load-bearing
+claim: if a standard user can edit a task that runs as SYSTEM, the whole model collapses into a
+privilege escalation rather than a narrow permanent capability.
+
+So until someone verifies it, describe a grant as *a narrow permanent capability* and never as
+*tamper-proof*. What IS verified: creating one needs a human at a UAC prompt, declining creates nothing,
+and the fixed command cannot take arguments.
+
 **Implementation note for whoever builds the grant manager:** a Scheduled Task created by an
 administrator is not runnable by a standard user by default. Its security descriptor has to permit the
 account JonDash runs as to *read and execute* it — and nothing more. Getting that wrong either breaks

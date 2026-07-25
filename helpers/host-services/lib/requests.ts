@@ -149,7 +149,9 @@ export async function execute(requestId: string, decidedBy: string | null): Prom
     return { status: "failed", at: now, detail: "the service is no longer controllable" };
   }
 
-  const outcome = await runGrant(entry.taskBase, r.action as Verb);
+  // The approving admin is passed through so core's audit entry names who asked, rather than
+  // recording the action as unattributed.
+  const outcome = await runGrant(entry.taskBase, r.action as Verb, decidedBy);
 
   if (outcome.status === "ok") {
     await settle(requestId, "approved", decidedBy, true, `${r.action} ${entry.serviceName}`);
@@ -158,6 +160,12 @@ export async function execute(requestId: string, decidedBy: string | null): Prom
   if (outcome.status === "cancelled-at-uac") {
     await settle(requestId, "cancelled-at-uac", decidedBy, false, "");
     return { status: "cancelled-at-uac", at: now };
+  }
+  if (outcome.status === "timed-out") {
+    // Nobody answered, which is not the same as saying no. Left as a failure with wording
+    // that invites a retry, rather than the terminal `cancelled-at-uac`.
+    await settle(requestId, "failed", decidedBy, false, "nobody answered the permission prompt");
+    return { status: "failed", at: now, detail: "nobody answered the permission prompt" };
   }
   const detail = outcome.status === "unavailable" ? `no grant: ${outcome.reason}` : outcome.detail;
   await settle(requestId, "failed", decidedBy, false, detail);

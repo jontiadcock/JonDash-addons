@@ -330,8 +330,11 @@ function explain(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok: true }>)
       return "that service is already on the list";
     case "unusable-name":
       return "that name has no characters that can be used";
-    case "no-free-name":
-      return "too many services with similar names";
+    case "name-clash":
+      // Names the other service, because "pick a different name" is useless advice when the
+      // service name is not yours to choose — knowing which entry is in the way is what lets
+      // the admin decide which of the two they actually want.
+      return `Windows would give this the same permission name as "${r.detail}", and two services cannot share one. Remove that entry first if this is the one you want.`;
     case "grant-refused":
       return describeOutcome(r.outcome);
   }

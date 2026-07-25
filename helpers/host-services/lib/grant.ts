@@ -1,14 +1,13 @@
-import { execFile } from "node:child_process";
-import { platform } from "node:os";
 import {
   createGrant,
   grantSupport,
   listGrants,
   previewGrantName,
   removeGrant,
+  runGrant as coreRunGrant,
   type GrantFailure,
 } from "@/lib/elevation";
-import { taskNameFor, type Verb } from "./names";
+import type { Verb } from "./names";
 
 /**
  * The bridge to core's grant manager (OPS-18, shipped in JonDash 1.7.1-beta.1).
@@ -32,6 +31,13 @@ import { taskNameFor, type Verb } from "./names";
 /** Why elevation is impossible here. Named separately so callers can switch on it. */
 export type ElevationReason = "no-interactive-session" | "grant-manager-missing" | "unsupported-platform";
 
+/**
+ * A prompt nobody answered. Distinct from `cancelled-at-uac` because they mean opposite
+ * things: declining is a decision, timing out is an absence of one. Retrying after a
+ * time-out is reasonable; retrying after a decline is nagging.
+ */
+export type TimedOut = { status: "timed-out" };
+
 export type ElevationSupport = { ok: true; platform: "windows" | "linux" } | { ok: false; reason: ElevationReason };
 
 /**
@@ -43,21 +49,37 @@ export type ElevationSupport = { ok: true; platform: "windows" | "linux" } | { o
 export type GrantOutcome =
   | { status: "ok" }
   | { status: "cancelled-at-uac" }
+  | { status: "timed-out" }
   | { status: "unavailable"; reason: ElevationReason }
   | { status: "failed"; detail: string };
 
-/** Core's failure vocabulary is richer than ours; this is the only place that translates. */
+/**
+ * Core's failure vocabulary is richer than ours; this is the only place that translates.
+ *
+ * Every case is written out rather than leaning on `default`, so adding a reason in core
+ * surfaces here as a compile error instead of being silently folded into "failed" — which is
+ * exactly how `timed-out` would have stayed invisible. A ten-minute wait reported as a
+ * failure was the mystery behind one unexplained result in the first integration run.
+ */
 function toOutcome(reason: GrantFailure, message: string): GrantOutcome {
   switch (reason) {
     case "declined":
       return { status: "cancelled-at-uac" };
+    case "timed-out":
+      return { status: "timed-out" };
     case "not-installed":
       return { status: "unavailable", reason: "grant-manager-missing" };
     case "no-interactive-desktop":
       return { status: "unavailable", reason: "no-interactive-session" };
     case "unsupported-platform":
       return { status: "unavailable", reason: "unsupported-platform" };
-    default:
+    case "not-audited":
+      // Core now refuses to grant what it cannot record. Reported verbatim rather than
+      // softened: "we would not do this because it could not be logged" is the useful
+      // sentence, and hiding it would undo the fix.
+      return { status: "failed", detail: message };
+    case "invalid-request":
+    case "failed":
       return { status: "failed", detail: message };
   }
 }
@@ -145,34 +167,17 @@ export async function readGrants(): Promise<{ name: string; command: string; ena
  * Run an already-granted action. **This does not elevate and does not prompt** — it asks
  * the OS to run a task authorised earlier, which is the whole point of the model.
  *
- * Spawned here rather than through `@/lib/elevation`, because core's module has no call for
- * it: it creates, removes and lists grants but never triggers one. That is not a rule being
- * bent — `schtasks /run` is unprivileged and would fail without an existing grant — but it
- * does mean the moment a service actually restarts is absent from core's elevation log, so
- * the helper audits it instead. Raised with core.
+ * Now goes through core (1.7.1-beta.2) rather than spawning `schtasks /run` ourselves.
+ * Spawning it directly was never an escalation — running a task cannot create a capability,
+ * and without an existing grant it simply fails — but it put *the moment a service actually
+ * restarts* outside the audit log built to record privileged actions. Granting was logged and
+ * using was not, which is the wrong half.
  *
- * `schtasks /run` takes only a task name; there is no way to pass an argument, and that is
- * what makes the grant's scope enforceable by Windows rather than by convention.
+ * **Returns when the task has been STARTED, not when the service has finished changing
+ * state.** A stop can take seconds. Callers that need the real outcome must poll the service;
+ * treating this as "the service is now stopped" would be a lie.
  */
-export async function runGrant(taskBase: string, verb: Verb): Promise<GrantOutcome> {
-  if (platform() !== "win32") return { status: "unavailable", reason: "unsupported-platform" };
-
-  return new Promise((resolve) => {
-    execFile(
-      "schtasks.exe",
-      ["/run", "/tn", taskNameFor(taskBase, verb)],
-      { timeout: 30_000, windowsHide: true },
-      (err, stdout, stderr) => {
-        const out = `${stdout ?? ""}${stderr ?? ""}`.trim();
-        if (!err) return resolve({ status: "ok" });
-        // The task not existing means the grant was never made, or was removed outside
-        // JonDash. Reported as unavailable rather than failed, because the fix is to
-        // re-grant it, not to retry the action.
-        if (/cannot find|does not exist|ERROR: The system cannot find/i.test(out)) {
-          return resolve({ status: "unavailable", reason: "grant-manager-missing" });
-        }
-        resolve({ status: "failed", detail: out || "schtasks failed" });
-      },
-    );
-  });
+export async function runGrant(taskBase: string, verb: Verb, userId?: string | null): Promise<GrantOutcome> {
+  const r = await coreRunGrant({ name: `${taskBase}-${verb}`, userId: userId ?? null });
+  return r.ok ? { status: "ok" } : toOutcome(r.reason, r.message);
 }

@@ -82,7 +82,7 @@ export async function findEntry(id: string): Promise<Entry | null> {
 
 export type AddResult =
   | { ok: true; entry: Entry; risk: Risk }
-  | { ok: false; reason: "duplicate" | "unusable-name" | "no-free-name"; detail?: string }
+  | { ok: false; reason: "duplicate" | "unusable-name" | "name-clash"; detail?: string }
   | { ok: false; reason: "grant-refused"; outcome: GrantOutcome };
 
 /**
@@ -114,24 +114,26 @@ export async function addEntry(input: {
   if (!allocateBase(serviceName, [])) return { ok: false, reason: "unusable-name" };
 
   /**
-   * ASK THE BINARY WHAT IT WILL CALL THIS, THEN CHECK COLLISIONS ON *ITS* ANSWER.
+   * THE BINARY DECIDES THE NAME, AND A CLASH IS REFUSED RATHER THAN SUFFIXED.
    *
-   * Order matters and getting it wrong is not theoretical — it was measured. Our sanitiser
-   * and the binary's disagree: we turn a space into `-`, it deletes the character. So
-   * "My Service" and "MyService" are two distinct names to us and **the same task name to
-   * Windows**. Checking collisions on our own answer would pass, and two allowlist entries
-   * would then point at ONE Scheduled Task — removing either would silently revoke the
-   * other, which is precisely what the suffixing in names.ts exists to prevent.
+   * Our sanitiser and the binary's disagree — we turn a space into `-`, it deletes the
+   * character — so "My Service" and "MyService" are two names to us and **one task name to
+   * Windows**. Checking collisions on our own answer let two entries point at a single
+   * Scheduled Task, where removing either silently revoked the other. Measured, not imagined.
    *
-   * So the binary is the authority on the name, and we only add the disambiguating suffix.
-   * `-` survives its sanitiser (verified), so a suffixed name stays stable through it.
+   * The first fix was to suffix the binary's answer. Core then found the deeper problem and
+   * changed its own behaviour: a suffixed grant has **ambiguous removal**, which is what
+   * caused the accumulation in the first place. So suffixing is gone. Two different services
+   * that reduce to the same task name are now refused, with wording that tells the admin
+   * what to do — the same call core made, for the same reason.
+   *
+   * Refusing is worse UX than a silent suffix and better behaviour: the alternative is a
+   * permission whose removal cannot be reasoned about.
    */
   const canonical = (await resolveTaskBase(serviceName)) ?? allocateBase(serviceName, [])!;
-  const taskBase = allocateBase(
-    canonical,
-    existing.map((e) => e.taskBase),
-  );
-  if (!taskBase) return { ok: false, reason: "no-free-name" };
+  const clash = existing.find((e) => e.taskBase.toLowerCase() === canonical.toLowerCase());
+  if (clash) return { ok: false, reason: "name-clash", detail: clash.serviceName };
+  const taskBase = canonical;
 
   const verbs = input.canControl === false ? [] : VERBS;
 
