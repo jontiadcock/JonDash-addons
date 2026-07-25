@@ -64,7 +64,40 @@ A helper is built with or just before its first consumer.
 
 ### AM — Add-on modules
 
-#### AM-01 · Docker manager — "Hyper-V, but for Docker" — ⏳ Planned
+#### AM-07 · Virtualization manager — ⏳ Planned (owner direction, 2026-07-26)
+
+**`docker-manager` becomes `virtualization-manager`:** one UI over whatever runs isolated workloads on
+this host — Docker today, then Hyper-V, WSL, and possibly Podman or Proxmox.
+
+**Broad MODULE, narrow HELPERS. This is the whole design decision.** A consumer discloses *every*
+capability of *every* helper it declares, so a single `virtualization` helper covering both would make
+a module that only lists containers say **"can control virtual machines"** on its consent screen —
+permanently, for every future consumer. Stopping a container and stopping a VM are not the same power
+and must not share a line. Same reasoning that split `host-install` from `host-services`, and the same
+reasoning behind the 2026-07-26 security fix.
+
+They also share almost no code: Docker is HTTP over a local socket, Hyper-V is WMI/PowerShell, Proxmox
+is REST with credentials over a network. The common part is the name.
+
+- **Helpers:** `AH-01 docker` (built) · `AH-06 hyper-v` · `AH-07 wsl` — each with its own capabilities.
+- **The module declares only what it uses**, so an admin can grant Docker without granting Hyper-V.
+- **Rename while it is cheap.** `docker-manager` is `0.0.1-beta.1` with no users; a module id is a
+  stable identifier and renaming later orphans its data.
+- **Get Docker right first** (owner, 2026-07-26). The rename and the second engine come after the
+  Docker feature set is settled — a second engine built on a shaky first one inherits the shakiness.
+
+#### AM-08 · Installing Docker felt clunky — ⏳ Planned (owner, 2026-07-26)
+
+First real install worked, but the flow is rough. **Not yet diagnosed** — capture what was actually
+awkward before redesigning, rather than guessing. Known candidates: `installPackage` blocks for minutes
+with no progress (core deliberately has no progress stream, so the module must poll `isInstalled` and
+does not yet); Docker Desktop needs WSL2 and a restart, which the module mentions but does not check
+for or sequence; and after a successful install the engine is not running, so the page still says
+"Docker isn't running" with no obvious next step.
+
+- **Needs:** nothing new from core — this is module-side sequencing and honesty about long operations.
+
+#### AM-01 · Docker manager — "Hyper-V, but for Docker" — 🔨 Built 2026-07-26 (`0.0.1-beta.1`)
 Owner request, 2026-07-25, and the lead idea: **an easy, visual way to run Docker**, the way Hyper-V
 Manager is to VMs. A grid of containers, each a tile showing name, image, state and health, live
 CPU/memory, with start / stop / restart, and tail-the-logs in a panel. A dashboard widget summarises
