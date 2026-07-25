@@ -40,9 +40,9 @@ screen via `provides` (shipped in JonDash 1.5.2).
 Ordered by a mix of value, reuse and the owner's stated enthusiasm (2026-07-25). **Not yet confirmed.**
 A helper is built with or just before its first consumer.
 
-1. 🔨 **AH-02 `system-metrics` helper** → **AM-02 Host vitals** — **built 2026-07-25**, publishing to
-   beta. Taken first as the quickest read-only pair, and used to prove the two-phase build process
-   below.
+1. ✅ **AH-02 `system-metrics` helper** → **AM-02 Host vitals** — **shipped 2026-07-25.** `0.0.1` on
+   stable; `0.0.2-beta.1` on beta adds eight more readings with per-metric switches. Taken first as
+   the quickest read-only pair, and used to prove the two-phase build process below.
 2. ⏳ **AH-01 `docker` helper** → **AM-01 Docker manager** — the flagship; owner-led. The helper
    unlocks more than one module, so it earns its cost among the remaining work.
 3. ⏳ **AM-04 Dynamic DNS** — no helper, small, a homelab staple. A quick win slottable anywhere.

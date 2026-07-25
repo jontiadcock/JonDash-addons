@@ -4,10 +4,21 @@
  * already gathered. Kept separate so it can be unit-tested without a database.
  */
 
-/** Bytes → the largest sensible binary unit, one decimal. */
+/**
+ * Bytes → a human size, e.g. "31.8 GB", "1.8 TB".
+ *
+ * **Binary maths (÷1024), decimal-style labels (GB/TB).** That is deliberately what Windows
+ * Explorer and `df -h` do, so JonDash agrees with the tools someone would check it against.
+ * It does mean a drive sold as "2 TB" reads as 1.8 TB here — but it reads that way in
+ * Explorer too, and agreeing with the machine beats agreeing with the packaging.
+ *
+ * (Strictly, 1024-based units are KiB/MiB/GiB. Memory really is binary — 32 GB of RAM is
+ * exactly 32 GiB — so for memory these labels are precisely right; for disks they follow the
+ * same convention every OS file manager uses.)
+ */
 export function bytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "—";
-  const units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
   let v = n;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) {
@@ -15,6 +26,24 @@ export function bytes(n: number): string {
     i++;
   }
   return `${v.toFixed(v >= 100 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/** Bytes per second → "12.3 MB/s". Same unit convention as `bytes`. */
+export function rate(bytesPerSec: number): string {
+  if (!Number.isFinite(bytesPerSec) || bytesPerSec < 0) return "—";
+  return `${bytes(bytesPerSec)}/s`;
+}
+
+/** Fan/clock style integers with a unit, or an em dash when absent. */
+export function withUnit(n: number | null | undefined, unit: string): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  return `${Math.round(n)} ${unit}`;
+}
+
+/** MHz → "3.4 GHz" once it passes a thousand, else "800 MHz". */
+export function clock(mhz: number | null | undefined): string {
+  if (mhz === null || mhz === undefined || !Number.isFinite(mhz) || mhz <= 0) return "—";
+  return mhz >= 1000 ? `${(mhz / 1000).toFixed(1)} GHz` : `${Math.round(mhz)} MHz`;
 }
 
 /** A whole-number percentage for display. */
