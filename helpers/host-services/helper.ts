@@ -103,7 +103,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.1-beta.5",
+  version: "0.0.1-beta.6",
   /**
    * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
    *
@@ -140,6 +140,29 @@ const helper: HelperDefinition = {
     {
       permission: "host-services:control",
       describe: (config) => `Start, stop and restart ${which(config)}`,
+    },
+    /**
+     * **The capability that had to exist, because the power already did.**
+     *
+     * Up to `0.0.1-beta.4` a module could add allowlist entries through `admin.add` while its
+     * consent screen said only that it could *control the services you listed*. That was a
+     * privilege-escalation path: a module could display "Add Plex" and submit `sshd`, and the
+     * UAC prompt names `jondash-grant.exe` rather than the service, so nothing on screen
+     * caught it.
+     *
+     * Removing the power made the allowlist uneditable, since a helper has no UI of its own.
+     * So it is back, and **disclosed** — an admin now sees, in red, that this module can
+     * decide what goes on the list. That is a real thing to consent to, and consenting to it
+     * knowingly is categorically different from it happening behind a line about restarting.
+     *
+     * **This is still the wrong home.** Editing belongs on the helper's own settings page,
+     * where JonDash renders the form and no module is in the path — then this capability is
+     * deleted rather than merely honest. Asked of core 2026-07-26.
+     */
+    {
+      permission: "host-services:configure",
+      describe: () =>
+        "Choose which services JonDash may control — this module can add and remove them, and anything it adds it can then start and stop",
     },
   ],
 
