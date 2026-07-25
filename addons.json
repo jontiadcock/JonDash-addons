@@ -62,7 +62,7 @@
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.2",
+      "version": "0.0.3-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "system-metrics:read"
@@ -71,8 +71,8 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.2",
-      "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery. Each can be switched off, and one you switch off is not collected at all rather than just hidden. Sizes now read GB and TB. Several of the new readings are Linux-only."
+      "tag": "host-vitals/v0.0.3-beta.1",
+      "notes": "The usage bars now follow the interface style you picked. They kept rounded corners under Terminal, Brutalist and Paper, which are square-cornered on purpose, so a rounded bar sat inside a hard-edged card. Appearance only — every reading behaves exactly as before."
     },
     {
       "id": "service-control",
