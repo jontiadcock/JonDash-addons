@@ -2,8 +2,29 @@
 # Nothing here needs installing; keep dependency/build cruft out.
 node_modules/
 
-# Disposable JonDash installs used to test modules against a real app.
-# This repo is PUBLIC — a whole copy of the app (and its database) must never land here.
+# ---------------------------------------------------------------------------
+# READ BEFORE EDITING ANYTHING BELOW THIS LINE.
+#
+# WORKING/ holds everything that isn't source: disposable JonDash installs used
+# to test modules (WORKING/testbed/), notes, scratch. It is ~8 GB, and each
+# testbed is a whole copy of the app PLUS its database — prisma/dev.db,
+# .data/secrets.json, session tokens, the lot.
+#
+# This repo is PUBLIC. These entries are not tidiness; they are the only thing
+# between that data and a public push. Weakening one, or putting a working
+# folder somewhere not listed here, publishes it.
+#
+# Verify rather than assume, whenever this file changes:
+#
+#     git check-ignore -v WORKING/testbed/s154/prisma/dev.db
+#     git add -A --dry-run            # must list nothing under WORKING/
+#
+# Both cases are listed because NTFS is case-insensitive but CI is not.
+# .testbed/ stays as a backstop against the older habit.
+# ---------------------------------------------------------------------------
+/WORKING/
+/working/
+/scratch/
 .testbed/
 .vite/
 .next/

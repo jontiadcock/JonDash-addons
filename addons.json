@@ -73,6 +73,27 @@
       "path": "addons/host-vitals",
       "tag": "host-vitals/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery. Each can be switched off, and one you switch off is not collected at all rather than just hidden. Sizes now read GB and TB. Several of the new readings are Linux-only."
+    },
+    {
+      "id": "docker-manager",
+      "name": "Docker manager",
+      "description": "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
+      "version": "0.0.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "permissions": [
+        "docker:read",
+        "docker:logs",
+        "docker:manage",
+        "host-install:read",
+        "host-install:manage"
+      ],
+      "helpers": [
+        "docker",
+        "host-install"
+      ],
+      "path": "addons/docker-manager",
+      "tag": "docker-manager/v0.0.1",
+      "notes": "First stable release. Lists your containers with live state and start, stop, pause and restart, and a dashboard tile showing what is running. If Docker isn't installed it tells you how, or offers to install it for you. It cannot run commands inside a container."
     }
   ],
   "helpers": [
@@ -126,6 +147,50 @@
       "path": "helpers/system-metrics",
       "tag": "system-metrics/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery, and lets a module gather only what it will show. Nothing was removed, so anything built against the previous version keeps working. Most new readings are Linux-only."
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "description": "Lets a module see the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes.",
+      "version": "0.0.1",
+      "minAppVersion": "1.5.2-beta.1",
+      "provides": [
+        {
+          "id": "docker:read",
+          "label": "See the containers on this server — their names, images, state and resource use"
+        },
+        {
+          "id": "docker:logs",
+          "label": "Read container logs, which often contain passwords, keys and personal data"
+        },
+        {
+          "id": "docker:manage",
+          "label": "Start, stop, pause and restart containers on this server"
+        }
+      ],
+      "path": "helpers/docker",
+      "tag": "docker/v0.0.1",
+      "notes": "First stable release. Talks to Docker over its local socket and exposes only container operations — never the socket itself, because anything that reaches it can take over the machine. There is no way to run a command inside a container, and there never will be."
+    },
+    {
+      "id": "host-install",
+      "name": "Install software",
+      "description": "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
+      "version": "0.0.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "provides": [
+        {
+          "id": "host-install:read",
+          "label": "See whether a piece of software is installed on this server"
+        },
+        {
+          "id": "host-install:manage",
+          "label": "Install and remove software on this server — you approve each one, and see its name before it runs"
+        }
+      ],
+      "path": "helpers/host-install",
+      "tag": "host-install/v0.0.1",
+      "notes": "First stable release. A module can only ask; you approve it in JonDash where the package name is shown in full, and Windows asks again before anything runs. It will only ever offer to remove software JonDash installed itself. Windows only."
     }
   ]
 }
