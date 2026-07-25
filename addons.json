@@ -78,7 +78,7 @@
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.1-beta.6",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.7.1-beta.7",
       "permissions": [
         "host-services:read",
@@ -89,8 +89,8 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.1-beta.6",
-      "notes": "Now asks permission to choose which services JonDash may control — a power it always had but never declared. You will see that as a third line when you enable it. Same features: see your approved services, and start, stop or restart them. Windows only."
+      "tag": "service-control/v0.0.2-beta.1",
+      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     },
     {
       "id": "docker-manager",
@@ -170,7 +170,7 @@
       "id": "host-services",
       "name": "Host services",
       "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-      "version": "0.0.1-beta.6",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.7.1-beta.7",
       "provides": [
         {
@@ -187,8 +187,8 @@
         }
       ],
       "path": "helpers/host-services",
-      "tag": "host-services/v0.0.1-beta.6",
-      "notes": "SECURITY FIX — a module could decide which services JonDash may control while only asking permission to control them. That power now has its own line on the consent screen, so you agree to it knowingly. Windows only for now."
+      "tag": "host-services/v0.0.2-beta.1",
+      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     },
     {
       "id": "docker",
