@@ -27,7 +27,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.1",
+  version: "0.0.1-beta.1",
   // Raised from 1.5.2-beta.1: this release imports `@/lib/elevation`, which arrived in
   // 1.7.1-beta.1. Declaring anything lower would install on a build where that module does
   // not exist and fail at import time rather than refusing cleanly.

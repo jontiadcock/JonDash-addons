@@ -73,6 +73,23 @@
       "path": "addons/host-vitals",
       "tag": "host-vitals/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery. Each can be switched off, and one you switch off is not collected at all rather than just hidden. Sizes now read GB and TB. Several of the new readings are Linux-only."
+    },
+    {
+      "id": "service-control",
+      "name": "Service control",
+      "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.1-beta.1",
+      "permissions": [
+        "host-services:read",
+        "host-services:control"
+      ],
+      "helpers": [
+        "host-services"
+      ],
+      "path": "addons/service-control",
+      "tag": "service-control/v0.0.1-beta.1",
+      "notes": "First release. A dashboard tile and a page for the services you approve, with start, stop and restart. The approved-services list is edited in this module's settings for now — it belongs to the helper and moves there once JonDash can host helper settings. Windows only."
     }
   ],
   "helpers": [
@@ -126,6 +143,26 @@
       "path": "helpers/system-metrics",
       "tag": "system-metrics/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery, and lets a module gather only what it will show. Nothing was removed, so anything built against the previous version keeps working. Most new readings are Linux-only."
+    },
+    {
+      "id": "host-services",
+      "name": "Host services",
+      "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.1-beta.1",
+      "provides": [
+        {
+          "id": "host-services:read",
+          "label": "See whether the services you list are running"
+        },
+        {
+          "id": "host-services:control",
+          "label": "Start, stop and restart the services you list"
+        }
+      ],
+      "path": "helpers/host-services",
+      "tag": "host-services/v0.0.1-beta.1",
+      "notes": "First release. Approving a service asks Windows for permission once; after that a module can start and stop it with no prompt. Removing it asks again. Needs JonDash 1.7.1-beta.1, which ships the component that requests the permission. Windows only for now."
     }
   ]
 }
