@@ -94,6 +94,24 @@
       "path": "addons/docker-manager",
       "tag": "docker-manager/v0.0.1",
       "notes": "First stable release. Lists your containers with live state and start, stop, pause and restart, and a dashboard tile showing what is running. If Docker isn't installed it tells you how, or offers to install it for you. It cannot run commands inside a container."
+    },
+    {
+      "id": "service-control",
+      "name": "Service control",
+      "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
+      "version": "0.0.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "permissions": [
+        "host-services:read",
+        "host-services:control",
+        "host-services:configure"
+      ],
+      "helpers": [
+        "host-services"
+      ],
+      "path": "addons/service-control",
+      "tag": "service-control/v0.0.1",
+      "notes": "First stable release. Approve a service once, then start, stop and restart it from your dashboard with no further prompts. Read the three permissions before you enable it — the third lets this module decide which services JonDash may control. Windows only."
     }
   ],
   "helpers": [
@@ -191,6 +209,30 @@
       "path": "helpers/host-install",
       "tag": "host-install/v0.0.1",
       "notes": "First stable release. A module can only ask; you approve it in JonDash where the package name is shown in full, and Windows asks again before anything runs. It will only ever offer to remove software JonDash installed itself. Windows only."
+    },
+    {
+      "id": "host-services",
+      "name": "Host services",
+      "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
+      "version": "0.0.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "provides": [
+        {
+          "id": "host-services:read",
+          "label": "See whether the services you list are running"
+        },
+        {
+          "id": "host-services:control",
+          "label": "Start, stop and restart the services you list"
+        },
+        {
+          "id": "host-services:configure",
+          "label": "Choose which services JonDash may control — this module can add and remove them, and anything it adds it can then start and stop"
+        }
+      ],
+      "path": "helpers/host-services",
+      "tag": "host-services/v0.0.1",
+      "notes": "First stable release. Approving a service asks Windows for permission once; after that a module can start and stop it with no prompt. Removing it asks again. Uninstalling asks whether to withdraw the permissions it holds. Windows only for now."
     }
   ]
 }
