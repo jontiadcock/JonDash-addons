@@ -29,7 +29,7 @@ const helper: HelperDefinition = {
   name: "Install software",
   description:
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-  version: "0.0.1-beta.1",
+  version: "0.0.2-beta.1",
   // The package API (installPackage / uninstallPackage / packageState) arrived in
   // 1.7.1-beta.7. The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its
   // release, so "1.7.1" would be refused on every 1.7.1 beta — the builds beta users run.

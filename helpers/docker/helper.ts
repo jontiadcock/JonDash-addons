@@ -21,7 +21,7 @@ const helper: HelperDefinition = {
   name: "Docker",
   description:
     "Lets a module see the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes.",
-  version: "0.0.1-beta.2",
+  version: "0.0.2-beta.1",
   // `ctx.can()` arrived in 1.5.2 and every capability check here depends on it. The
   // PRE-RELEASE, not a bare "1.5.2": semver ranks a pre-release below its release, so "1.5.2"
   // would be refused on every 1.5.2 beta — the builds beta users run.

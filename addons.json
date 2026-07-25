@@ -95,7 +95,7 @@
       "id": "docker-manager",
       "name": "Docker manager",
       "description": "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
-      "version": "0.0.1-beta.2",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.7.1-beta.7",
       "permissions": [
         "docker:read",
@@ -109,8 +109,8 @@
         "host-install"
       ],
       "path": "addons/docker-manager",
-      "tag": "docker-manager/v0.0.1-beta.2",
-      "notes": "Stopping and restarting no longer report a timeout when they actually worked — Docker waits ten seconds before forcing a container to exit, and JonDash was giving up after eight. Lists containers with live state and start, stop, pause and restart."
+      "tag": "docker-manager/v0.0.2-beta.1",
+      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     }
   ],
   "helpers": [
@@ -189,7 +189,7 @@
       "id": "docker",
       "name": "Docker",
       "description": "Lets a module see the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes.",
-      "version": "0.0.1-beta.2",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         {
@@ -206,14 +206,14 @@
         }
       ],
       "path": "helpers/docker",
-      "tag": "docker/v0.0.1-beta.2",
-      "notes": "Fixes stopping and restarting reporting \"the engine did not respond in time\" when it had in fact worked. Docker waits ten seconds for a container to exit before forcing it, and JonDash was giving up after eight. It now waits, and says it is still working rather than that it failed."
+      "tag": "docker/v0.0.2-beta.1",
+      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     },
     {
       "id": "host-install",
       "name": "Install software",
       "description": "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.2-beta.1",
       "minAppVersion": "1.7.1-beta.7",
       "provides": [
         {
@@ -226,8 +226,8 @@
         }
       ],
       "path": "helpers/host-install",
-      "tag": "host-install/v0.0.1-beta.1",
-      "notes": "FIRST BUILD, no install has ever been performed with it. A module can only ask; you approve it in JonDash where the package name is shown in full, and Windows asks again. It will only ever offer to remove software JonDash installed. Windows only."
+      "tag": "host-install/v0.0.2-beta.1",
+      "notes": "Same as the 0.0.1 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     }
   ]
 }
