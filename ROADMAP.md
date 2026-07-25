@@ -86,6 +86,49 @@ is REST with credentials over a network. The common part is the name.
 - **Get Docker right first** (owner, 2026-07-26). The rename and the second engine come after the
   Docker feature set is settled — a second engine built on a shaky first one inherits the shakiness.
 
+#### AM-09 · App catalogue — deploy containers from templates — ⏳ Planned (owner, 2026-07-26)
+
+Owner's goal, stated plainly: ***"make people want to use it because it is better than Docker
+Desktop."*** Docker Desktop gives you a list; the draw is a curated set of things you can actually
+**deploy in one click** — Plex, Pi-hole, Home Assistant, Immich — the way CasaOS and Umbrel do.
+
+**This is a much bigger security step than everything shipped so far, and it must not be slipped in as
+a convenience.** Every capability to date is *lifecycle on things that already exist*: the helper has
+no `create`, no image pull, no volume or network operations, deliberately. Deploying an app means
+creating containers — and **a container created with the wrong flags is root on the host**
+(`--privileged`, `-v /:/host`, `--pid=host`, docker socket mounted through). A one-click catalogue is
+therefore a route to arbitrary host compromise unless the template is the boundary.
+
+Design direction, to be settled before any code:
+
+- **Templates are data with a fixed shape, never a compose file or a command.** The module supplies a
+  template id and the user's choices (ports, a data folder); the helper builds the create request. If
+  a template could name arbitrary mounts or flags, the template *is* the exploit.
+- **A refused list that cannot be overridden:** privileged, host PID/network/IPC namespaces, mounting
+  `/` or the docker socket, and `cap_add` beyond a tiny allowlist.
+- **Its own capability** — `docker:deploy`, red, separate from `docker:manage`. A module that only
+  restarts containers must never disclose the power to create them.
+- **Where templates come from is the real question.** A remote catalogue means someone else's JSON
+  decides what runs as root on the owner's machine. First-party and versioned in this repo is the only
+  version that starts safe; a third-party catalogue is a separate decision with a separate consent.
+
+**Links to vendor pages are the cheap half and can ship first** — no new capability, no risk, and it
+answers "what can I run?" while the deploy path is designed properly.
+
+#### AM-10 · Start Docker when the machine starts — ⏳ Planned (owner asked, 2026-07-26)
+
+**It does not do this today, and cannot.** The module runs when a page is rendered; nothing in it runs
+at boot, and it has no way to start the engine before JonDash itself is up.
+
+What is realistic: Docker Desktop has its own *"Start Docker Desktop when you log in"* setting, and
+that is the correct answer for most people — the module should **detect whether it is set and offer to
+turn it on**, rather than inventing a competing mechanism. The engine's Windows service
+(`com.docker.service`) can also be allowlisted through `host-services`, which is already shipped, so
+"start the engine" becomes a button that reuses proven machinery.
+
+- **Needs:** `AH-04 host-services` (shipped) for the service, plus a way to read/set the Desktop
+  autostart preference — likely a registry read, which needs no new capability.
+
 #### AM-08 · Installing Docker felt clunky — ⏳ Planned (owner, 2026-07-26)
 
 First real install worked, but the flow is rough. **Not yet diagnosed** — capture what was actually
