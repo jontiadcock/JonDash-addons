@@ -23,12 +23,11 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.2-beta.2",
-  // Matches the helper's floor, and for the same reason: on 1.7.1-beta.1 an elevated action
-  // could proceed without being recorded, so the audit guarantee this module relies on was
-  // not actually there. The PRE-RELEASE, not a bare "1.7.1" — semver ranks a pre-release
-  // below its release, so "1.7.1" would be refused on every 1.7.1 beta, the builds beta
-  // users run.
+  version: "0.0.3-beta.1",
+  // Matches the helper's floor: beta.9 is the first build with helper settings pages, which
+  // is where the allowlist editor now lives. The PRE-RELEASE, not a bare "1.7.1" — semver
+  // ranks a pre-release below its release, so "1.7.1" would refuse every 1.7.1 beta,
+  // including beta.9, which has the feature.
   minAppVersion: "1.7.1-beta.9",
 
   /**
@@ -45,7 +44,7 @@ const serviceControl: ModuleDefinition = {
   permissions: ["host-services:read", "host-services:control"],
 
   /** Pinned to the version that introduced the API this module calls. */
-  helpers: [{ id: "host-services", minVersion: "0.0.2-beta.2" }],
+  helpers: [{ id: "host-services", minVersion: "0.0.3-beta.1" }],
 
   /** Which services exist on the host, and the power to stop them, is admin information. */
   adminOnly: true,

@@ -128,27 +128,19 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.2-beta.2",
+  version: "0.0.3-beta.1",
   /**
-   * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
+   * 1.7.1-beta.**9**, the first build carrying `SettingsPanel` / `onSettingsSubmit` — checked
+   * tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this
+   * release cannot work without them.
    *
-   * beta.1 shipped `@/lib/elevation`, so the imports resolve there — but on beta.1 an
-   * elevated action could still proceed when its audit entry failed to write. This helper
-   * tells administrators that every elevated action is recorded, and on beta.1 that sentence
-   * is not true. Declaring the lower floor would install against a build where the promise
-   * quietly does not hold, which is worse than refusing to install at all.
-   *
-   * beta.2 also adds `runGrant`, so the moment a service actually restarts is logged.
+   * It also clears every earlier floor this helper has needed: `@/lib/elevation` (beta.1),
+   * audit-before-acting so an elevated action cannot happen unrecorded (beta.2), `runGrant`
+   * so the restart itself is logged (beta.2), and `uninstallQuestions` (beta.7).
    *
    * The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
-   * "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
+   * "1.7.1" would refuse every 1.7.1 beta — including beta.9, which has the feature.
    */
-  // 1.7.1-beta.**9**, the first build with `SettingsPanel` / `onSettingsSubmit` — checked
-  // tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this
-  // release does not work without them.
-  //
-  // The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
-  // "1.7.1" would refuse every 1.7.1 beta — including beta.9, which has the feature.
   minAppVersion: "1.7.1-beta.9",
 
   /**
