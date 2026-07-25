@@ -43,11 +43,15 @@ A helper is built with or just before its first consumer.
 1. ✅ **AH-02 `system-metrics` helper** → **AM-02 Host vitals** — **shipped 2026-07-25.** `0.0.1` on
    stable; `0.0.2-beta.1` on beta adds eight more readings with per-metric switches. Taken first as
    the quickest read-only pair, and used to prove the two-phase build process below.
-2. ⏳ **AH-01 `docker` helper** → **AM-01 Docker manager** — the flagship; owner-led. The helper
-   unlocks more than one module, so it earns its cost among the remaining work.
-3. ⏳ **AM-04 Dynamic DNS** — no helper, small, a homelab staple. A quick win slottable anywhere.
-4. ⏳ **AM-05 health-monitor: speed-test check** — enhancement to a shipped module, no helper. Small.
-5. ⏳ **AH-03 `wireguard` helper** → **AM-03 VPN access manager** — highest value, heaviest, and the
+2. ⏳ **AH-01 `docker` helper** → **AM-01 Docker manager** — the flagship; owner-led. Spec written.
+   **Blocked on a testing decision**, not on design: there is no Docker engine on the development
+   machine, so the connected-engine path can't be exercised the way `system-metrics` was.
+3. ⏳ **AH-04 `host-services`** → a service control module — spec written, **blocked on the core
+   elevate shim**. See `helpers/ELEVATION.md` for the model both this and AH-05 use.
+4. ⏳ **AM-04 Dynamic DNS** — no helper, small, a homelab staple. A quick win slottable anywhere.
+5. ⏳ **AM-05 health-monitor: speed-test check** — enhancement to a shipped module, no helper. Small.
+6. ⏳ **AH-05 `host-install`** — same elevation model as AH-04, so it follows it.
+7. ⏳ **AH-03 `wireguard` helper** → **AM-03 VPN access manager** — highest value, heaviest, and the
    most dangerous consent. Its Tailscale slice needs no helper and could come earlier if wanted.
 
 ---
@@ -146,6 +150,35 @@ taken microseconds apart. Stateless — no tables, no migrations, no `onBoot`, n
 > `HELPER.md` and the authoring docs alone**, with the helper's source treated as off-limits. Every
 > point where the docs came up short was fixed in the docs rather than worked around. The process is
 > worth repeating for `AH-01 docker`.
+
+#### AH-04 · `host-services` helper — ⏳ Spec written, BLOCKED on core
+Start / stop / restart **services the administrator explicitly listed**, so a module can be a control
+panel for its own machine. Two capabilities: `host-services:read` and `host-services:control` — where
+"control" means *may raise a request*, not *may act*, and the label says so.
+
+Built on **just-in-time elevation** (`helpers/ELEVATION.md`): a module requests, the admin approves in
+JonDash, the OS shows its own UAC/polkit prompt, the action runs once and privilege ends. **No standing
+privileged agent** — the owner rejected that, rightly: a root daemon that exists so a button can restart
+Plex is a poor trade.
+
+The allowlist is the boundary and it is the `filesystem` helper's proven shape — admin-owned config, not
+a caller's argument. A module may *suggest* an addition (one open suggestion at a time, 7-day cooldown
+after a decline); nothing promotes a suggestion but an admin edit.
+
+- **Blocked on:** the core elevate shim — a small, ideally signed binary shipped with JonDash. Sent to
+  the core session 2026-07-25.
+- **Hard boundary:** needs an interactive desktop session. As a Windows Service (Session 0), in a
+  container, or headless, it reports why and refuses — never degrades to standing privilege.
+
+#### AH-05 · `host-install` helper — ⏳ Planned, after AH-04
+Install a package from an allowlisted package manager (`winget`, `apt`) at the admin's approval. Same
+elevation model, plus one rule: the module supplies a **package name only** — never arguments, never a
+command string. A package name is a value; a shell string is a program.
+
+Judged against the right bar — *is this worse than the admin typing the command themselves?* — it is
+close to equivalent, given the exact command is shown verbatim, approval is per-action and never
+remembered, and physical presence is required. The residual risk is honest and must be documented where
+someone will read it: approve `install nginx` and you get whatever that publisher ships today.
 
 #### AH-03 · `wireguard` helper — ⏳ Planned
 Manages WireGuard peers against the host's config/daemon: `listPeers`, `status`, `addPeer(name)` →
