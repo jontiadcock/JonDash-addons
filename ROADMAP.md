@@ -156,19 +156,25 @@ Start / stop / restart **services the administrator explicitly listed**, so a mo
 panel for its own machine. Two capabilities: `host-services:read` and `host-services:control` — where
 "control" means *may raise a request*, not *may act*, and the label says so.
 
-Built on **just-in-time elevation** (`helpers/ELEVATION.md`): a module requests, the admin approves in
-JonDash, the OS shows its own UAC/polkit prompt, the action runs once and privilege ends. **No standing
-privileged agent** — the owner rejected that, rightly: a root daemon that exists so a button can restart
-Plex is a poor trade.
+**Elevation is granted once per service, not per action** (`helpers/ELEVATION.md`). Adding a service
+creates a fixed OS-level grant — a Scheduled Task on Windows, a sudoers/polkit rule on Linux — and that
+is the only UAC prompt. It survives restarts of JonDash and of the machine, and works with nobody
+logged in, which is what makes overnight automation possible at all.
+
+Safe because the grant is **self-contained and unparameterised**: `schtasks /run` cannot pass arguments
+(verified), so what can happen without a prompt is fixed at the moment the admin approved it and
+enforced by Windows rather than by our code. **No standing privileged agent** — the owner rejected that,
+rightly: a root daemon existing so a button can restart Plex is a poor trade.
 
 The allowlist is the boundary and it is the `filesystem` helper's proven shape — admin-owned config, not
 a caller's argument. A module may *suggest* an addition (one open suggestion at a time, 7-day cooldown
 after a decline); nothing promotes a suggestion but an admin edit.
 
-- **Blocked on:** the core elevate shim — a small, ideally signed binary shipped with JonDash. Sent to
-  the core session 2026-07-25.
-- **Hard boundary:** needs an interactive desktop session. As a Windows Service (Session 0), in a
-  container, or headless, it reports why and refuses — never degrades to standing privilege.
+- **Blocked on:** the core **grant manager** — a small, ideally signed binary that creates and removes
+  one OS grant, itself elevated once via UAC. Sent to the core session 2026-07-25.
+- **Boundary:** *creating* a grant needs an interactive desktop session, so as a Windows Service
+  (Session 0), in a container or headless, adding an entry refuses and says why. *Using* an existing
+  grant works anywhere, logged out included.
 
 #### AH-05 · `host-install` helper — ⏳ Planned, after AH-04
 Install a package from an allowlisted package manager (`winget`, `apt`) at the admin's approval. Same

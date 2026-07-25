@@ -1,7 +1,12 @@
 # Host services helper
 
-**Status: SPEC — not built.** Awaiting the owner's approval, and the **elevate shim from core** (see
+**Status: SPEC — not built.** Awaiting the owner's approval, and the **grant manager from core** (see
 `../ELEVATION.md`), without which no action can run.
+
+**Elevation is granted once per service, not per action.** Adding a service to the allowlist creates a
+fixed OS-level grant — a Scheduled Task on Windows, a sudoers/polkit rule on Linux — and that is the
+only time a UAC prompt appears. Afterwards, starting and stopping that service needs no prompt, and the
+grant survives restarts of JonDash and of the machine.
 
 Lets a module start, stop and restart **services the administrator has explicitly listed** — a Windows
 service, a systemd unit — so a JonDash module can be a control panel for the machine it runs on.
@@ -9,7 +14,7 @@ service, a systemd unit — so a JonDash module can be a control panel for the m
 - **Helper id:** `host-services`
 - **First consumer:** `service-control` — a tile per allowlisted service with its state and a
   start/stop/restart button.
-- **Requires:** JonDash **1.5.2-beta.1** (for `ctx.can()`), **plus** the core elevate shim.
+- **Requires:** JonDash **1.5.2-beta.1** (for `ctx.can()`), **plus** the core grant manager.
 - **Grants:** two capabilities, both red on the consent screen.
 
 Read **`../ELEVATION.md` first.** This helper is an application of that model, and every rule there
@@ -29,19 +34,30 @@ That is deliberately the same shape as the `filesystem` helper's approved roots,
 the dangerous surface is *configuration the admin owns*, not an argument the caller supplies. It is
 also what lets the consent line say "the services you allow" and mean it literally.
 
-**Nothing in the allowlist is elevated by being there.** Every action still goes through approval and
-UAC, every time.
+**Being on the list is what grants the privilege** — that is the whole security decision, and it is why
+adding an entry is the moment that prompts. What the grant covers is fixed at that instant: three
+actions, one named service, baked into the OS's own definition and unable to accept arguments later.
+
+Each entry then chooses whether a module still needs an admin click per action:
+
+- **Ask me each time** (default) — the module requests, the admin approves in JonDash, it runs.
+- **Allow without asking** — the module acts directly. This is what makes real automation possible: a
+  health check that restarts a hung service at 3am cannot wait for a human.
+
+The second is a deliberate choice per service, not a global switch, and the settings screen should say
+what it means in those words.
 
 ## Capabilities
 
 | Capability | Shown to the admin as |
 | ---------- | --------------------- |
 | `host-services:read` | "See whether the services you listed are running" |
-| `host-services:control` | "Ask to start, stop and restart the services you listed — each needs your approval at this computer" |
+| `host-services:control` | "Start, stop and restart the services you listed" |
 
-**`control` does not mean "can control".** It means "may raise a request". The label says so, because
-a capability that reads as unattended power when it is actually a request queue would be a lie the
-admin discovers later.
+**The label deliberately does not promise "each one needs your approval",** because that is a
+per-service setting the admin controls, not a property of the capability. A consent line that claims a
+safeguard the admin can later switch off is worse than one that states the power plainly. What bounds
+this capability is the allowlist, and the label says "the services you listed" for that reason.
 
 ## How a consumer uses it
 
@@ -84,7 +100,7 @@ type HostServicesApi = {
 
 type ElevationSupport =
   | { ok: true; platform: "windows" | "linux" }
-  | { ok: false; reason: "no-interactive-session" | "shim-missing" | "unsupported-platform" };
+  | { ok: false; reason: "no-interactive-session" | "grant-manager-missing" | "unsupported-platform" };
 
 type Service = {
   id: string;            // JonDash's id for the allowlist entry
@@ -132,10 +148,10 @@ that keeps asking becomes visibly annoying, which is the correct outcome.
 
 | Guarantee | How it holds |
 | --------- | ------------ |
-| **A module can never add to the allowlist.** | `suggest` writes a suggestion row; nothing promotes it but an admin edit. |
+| **A module can never add to the allowlist.** | `suggest` writes a suggestion row; nothing promotes it but an admin edit — and only that edit creates the OS grant. |
 | **A module can never name a service outside it.** | `request` resolves the id against the allowlist first and refuses otherwise. |
-| **Nothing runs without two approvals** — in JonDash, then at UAC. | The shim is only launched after the admin approves, and UAC is the OS's own gate. |
-| **No standing privilege.** | Nothing is elevated between actions; the shim runs once and exits. |
+| **A grant covers one service and three verbs, fixed when it was made.** | The OS grant is self-contained and takes no arguments — `schtasks /run` cannot pass any. |
+| **No standing process.** | Nothing runs between actions; the grant is a definition, not a daemon, and is visible in Task Scheduler. |
 | **Service names are validated before use.** | Matched against the allowlist entry, never composed from module input. |
 | **Every action is audited** — who approved, what ran, the result. | `ctx.audit` at approval and at completion. |
 | **A declined UAC prompt is reported, not retried.** | `cancelled-at-uac` is a terminal outcome. |
@@ -147,11 +163,14 @@ that keeps asking becomes visibly annoying, which is the correct outcome.
   unit file. Those are a different capability with a different argument.
 - **No discovery of services outside the allowlist.** A module cannot enumerate what exists on the
   machine; that is both a scoping and a privacy decision.
-- **No unattended action, ever.** There is no "approve automatically", no scheduled elevation, and no
-  remembered approval. If that is ever wanted it is a different helper with a much harder argument to
-  make.
-- **No fallback when elevation is impossible.** On a service/container/headless install, `capability()`
-  reports why and `request()` refuses. It must never degrade to standing privilege.
+- **No unattended action unless the admin chose it, per service.** "Allow without asking" is opt-in on
+  one entry at a time — never global, never a default, and never something a module can set.
+- **No fallback when a grant cannot be created.** Creating one needs an interactive desktop session;
+  on a Service/container/headless install `capability()` reports why and adding an entry refuses.
+  (Grants made earlier keep working there — a Scheduled Task runs with nobody logged in, which is what
+  makes overnight automation possible.)
+- **No removing a service without removing its grant.** They are the same action; a list entry that
+  disappears while the OS grant survives is exactly the kind of orphan nobody audits.
 
 ## Choosing what to allowlist — a warning worth showing
 
@@ -165,13 +184,20 @@ plainly at the moment of adding.
 
 | | Windows | Linux |
 | - | ------- | ----- |
-| Mechanism | Service Control Manager | systemd |
-| Elevation | UAC via the shim | polkit (`pkexec`) via the shim |
-| Works | in a desktop session | in a desktop session |
-| Does **not** work | as a Service (Session 0), in a container | headless / over plain SSH |
+| Mechanism | Service Control Manager (`sc.exe`) | systemd (`systemctl`) |
+| The grant | a Scheduled Task per service+verb, "run with highest privileges" | a sudoers rule (`NOPASSWD`) or polkit policy per service |
+| Prompt to create it | UAC, once | polkit / `sudo`, once |
+| Prompt to use it | **none** | **none** |
+| Creating a grant needs | an interactive desktop session | an interactive desktop session |
+| Using one needs | nothing — works logged out | nothing |
+
+**Implementation note for whoever builds the grant manager:** a Scheduled Task created by an
+administrator is not runnable by a standard user by default. Its security descriptor has to permit the
+account JonDash runs as to *read and execute* it — and nothing more. Getting that wrong either breaks
+the feature or widens it.
 
 ## Version history
 
 | Version | Notes |
 | ------- | ----- |
-| — | Spec only; nothing published. Blocked on the core elevate shim. |
+| — | Spec only; nothing published. Blocked on the core grant manager. |

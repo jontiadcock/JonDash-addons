@@ -1,82 +1,101 @@
-# Just-in-time elevation — the model for helpers that touch the host
+# Elevation — how helpers that touch the host get privilege
 
 Some capabilities cannot be delivered by an unprivileged web app: starting a Windows service,
 installing a package. This document is the **shared design** for how those helpers get privilege, and
 the constraints every one of them must obey.
 
-It exists because there are two ways to build this and only one of them is acceptable.
-
 ## The rejected design: a standing privileged agent
 
 The conventional answer is a small daemon running permanently as root, taking requests from the app
-over a local socket. It is how Docker Desktop and Chrome's updater work, and it was the first thing
-proposed here.
+over a local socket — how Docker Desktop and Chrome's updater work.
 
-**Rejected by the owner, 2026-07-25, and the objection is sound:** it means something on the machine is
-always root, always listening. Compromise it once and privilege is permanent. For a self-hosted
-personal dashboard, a root daemon that exists so a button can restart Plex is a poor trade.
+**Rejected by the owner, 2026-07-25, and the objection is sound:** something on the machine would
+always be root and always listening. Compromise it once and privilege is permanent. For a self-hosted
+personal dashboard, a root daemon existing so a button can restart Plex is a poor trade.
 
-## The model: privilege exists only for one approved action
+## Two grant models, and the rule that decides between them
 
-```
-module            asks the helper to do something privileged
-   ↓              (a request — inert, changes nothing)
-helper            queues it; nothing is elevated
-   ↓
-admin in JonDash  sees the EXACT action and approves it
-   ↓
-elevate shim      launched with `runas` → the OS shows its own prompt
-   ↓
-admin at the PC   clicks Yes on UAC
-   ↓
-action runs       elevated, once, then the process exits
-```
+> **A FIXED action can be granted once. A VARIABLE action must be approved every time.**
 
-Nothing is elevated before that click and nothing stays elevated after it. There is no persistent
-privileged process anywhere in this design.
+That single line settles which mechanism a helper uses, and it is a property of the *action*, not a
+preference.
 
-## The three constraints, and why each exists
+| | **Grant once** | **Approve each time** |
+| --- | --- | --- |
+| For | Actions with no variable part — `restart the "Plex" service` | Actions carrying a value — `install <package>` |
+| Windows | A **Scheduled Task** per action, "run with highest privileges" | The **elevate shim**, launched with `runas` |
+| Linux | A **sudoers/polkit rule** per action | `pkexec` |
+| Prompt | **Once**, when the admin adds the entry | **Every time**, at the moment of action |
+| Survives a JonDash restart? | **Yes** — the grant lives in the OS | n/a |
+| Standing process? | **No** | **No** |
 
-### 1. It requires a real desktop session
+### Why a fixed action can be granted once
 
-**UAC can only prompt on an interactive desktop.** JonDash today always runs in the signed-in user's
-session (`start-dashboard.bat`), so this works. It stops working if JonDash is ever run:
+The grant names the whole action. A Scheduled Task called `JonDash\svc-plex-restart` runs exactly
+`sc.exe stop "Plex"` / `start` — the service and the verb are baked into the task definition, and
+**`schtasks /run` accepts only a task name; it cannot pass arguments** (verified). So the set of things
+that can happen without a prompt is fixed at the moment the admin approved it, and enforced by Windows
+rather than by our code.
 
-- **as a Windows Service** — Session 0 isolation puts the prompt on a desktop nobody can see;
-- **in a container**, or on a **headless** box (a NAS in a cupboard).
+The UAC prompt therefore moves to where the admin's real decision actually is — *"may JonDash restart
+Plex?"* — instead of being re-asked on every click, which teaches people to stop reading it.
 
-**This is a hard boundary, not a rough edge.** A helper built on this model must detect that it cannot
-prompt and say so plainly — never fall back to a standing privilege, and never queue an action it
-cannot deliver.
+### Why a variable action cannot
 
-### 2. UAC proves presence, not comprehension
+`install <package>` has a hole in it. You cannot bake it into a task without either creating a task per
+package in advance (pointless) or having the task read the package name from a file — and **anything
+that can write that file then has SYSTEM.** The same is true of any "run the command in this file"
+shape. So installs keep a prompt per action, and that is not a limitation to engineer around.
 
-This is the constraint people get wrong. The UAC dialog names **the program being elevated**. It cannot
-be made to say *"install nginx, requested by the Docker module"*. So:
+## The one rule that must never be broken
+
+> **A granted action must be entirely self-contained. It must never read what to do from anywhere.**
+
+A task that runs a fixed command is a narrow, permanent capability. A task that runs
+`C:\JonDash\pending.bat` is a **local privilege escalation for every process on the machine**, because
+the unprivileged app — or anything that compromises it — can write that file.
+
+This is the difference between the design working and being actively dangerous, and it is why the
+"grant once" model is only offered for fixed actions.
+
+## What "grant once" honestly costs
+
+It **is** standing capability, and the docs must say so rather than implying privilege has vanished.
+What it is not, is a standing *process*:
+
+- **No daemon, no listening socket** — nothing is running between actions.
+- **A fixed, enumerable set of actions** — exactly the allowlist, no more.
+- **Visible in the OS's own UI.** The admin can open Task Scheduler and read every single thing JonDash
+  can do without asking. That is better auditing than a daemon offers.
+- **Removable there too**, independently of JonDash.
+
+**The residual risk, stated plainly:** any process running as that user can trigger those tasks. The
+blast radius is exactly the allowlist — someone could restart Plex. It is not arbitrary code
+execution, and it is bounded by a list the admin wrote.
+
+## Approval inside JonDash is a separate question
+
+The OS prompt and JonDash's own approval screen do different jobs. Once a fixed action is granted,
+whether *each request* still needs an admin click in JonDash is a **per-entry setting**:
+
+- **Ask me each time** (default) — a module requests, the admin clicks approve, the task runs. No UAC.
+- **Allow without asking** — the module can act directly. This is what makes automation possible at
+  all: a health check that restarts a hung service cannot wait for a human.
+
+Default to asking. The second option is a real choice with real consequences and should be made
+deliberately, per service.
+
+## For actions that still prompt every time: UAC proves presence, not comprehension
+
+Where a prompt does appear per action, know what it is worth. The UAC dialog names **the program being
+elevated**; it cannot be made to say *"install nginx, requested by the Docker module"*. So:
 
 - UAC is a **strong** check that a human is physically at the machine.
 - UAC is a **weak** check that the human understood what they approved.
 
-**Therefore JonDash's own approval screen is the real consent surface**, and it must show the exact
-action verbatim — the full command, the actual service name — before the admin clicks. The UAC prompt
-is the second factor, not the explanation.
-
-**Corollary: never elevate `powershell.exe` or `cmd.exe`.** A prompt reading "Windows PowerShell"
-teaches the admin to approve exactly what malware wants, and is indistinguishable from an attack. The
-elevated thing must be a **dedicated, meaningfully named binary** — ideally code-signed, so the prompt
-reads a publisher rather than the yellow "Publisher: Unknown".
-
-### 3. Structured actions, never a command string
-
-The shim accepts **an action type and validated arguments** — `service-restart` + a service name from
-the allowlist — and never a shell string composed by the caller.
-
-This is defence in depth: with UAC as the only gate, anything that could inject into the request could
-run arbitrary code the moment the admin clicks Yes. With structured actions, even a fully compromised
-JonDash can only ask for the verbs the shim implements.
-
-It also keeps the approval screen honest: an action you can render as a sentence is an action the admin
-can judge. A shell string is something they skim.
+**JonDash's own screen is therefore the real consent surface** and must show the exact command
+verbatim. **Never elevate `powershell.exe` or `cmd.exe`** — a prompt reading "Windows PowerShell"
+trains the admin to approve exactly what malware wants, and is indistinguishable from an attack.
 
 ## The bar to judge any of this against
 
@@ -84,43 +103,49 @@ Not *"is this safe in the abstract"* — nothing that installs software is. The 
 
 > **Is this worse than the admin typing the command themselves?**
 
-With the exact command displayed, one approval per action, physical presence required and no memory of
-past approvals, it is close to equivalent. What it adds over typing it yourself is a **confused
-deputy** risk: the suggestion originates from a module rather than from you. That is exactly what the
-verbatim display is there to counter, and why a request must never be able to approve itself.
+With the exact action displayed, granted deliberately, and bounded by a list the admin owns, it is
+close to equivalent. What it adds is a **confused deputy** risk: the suggestion originates from a
+module rather than from you. That is what the verbatim display counters, and why a request must never
+be able to approve itself.
 
 ## Rules every elevating helper must follow
 
 1. **A module can only request.** A request is inert and grants nothing.
-2. **One approval per action.** Never batched, never remembered, no "don't ask again".
-3. **The exact action is displayed** before approval, in full, never truncated.
-4. **An allowlist the admin owns**, stored helper-side. A module may name an entry; it may never add
-   one. (Same shape as the `filesystem` helper's approved roots, which works.)
-5. **No free-form commands from a module**, ever. A package name from an allowlisted manager is a
-   value; a shell string is a program.
-6. **"User declined" is a distinct, first-class outcome** — not an error, not a retry loop.
-7. **Every elevated action is audited** with who approved it, what ran, and its result.
-8. **If elevation is impossible** (service, container, headless), say so — never degrade to standing
-   privilege.
+2. **The allowlist is admin-owned**, stored helper-side. A module may name an entry; it may never add
+   one. (The `filesystem` helper's approved-roots shape, which has held up.)
+3. **A granted action is fully self-contained** — never parameterised, never read from a file.
+4. **Removing an entry removes its grant**, in the same action.
+5. **No free-form commands from a module**, ever. A package name is a value; a shell string is a
+   program.
+6. **"User declined" is a first-class outcome** — not an error, not a retry loop.
+7. **Every elevated action is audited**: who approved it, what ran, the result.
+8. **If elevation is impossible** — Session 0 (running as a Windows Service), a container, headless —
+   say so and refuse. Never degrade to something weaker without saying.
+
+## Where the prompt appears is a deployment constraint
+
+Creating the grant needs an interactive desktop session, because that is where UAC and polkit prompt.
+**Using** a grant does not — a Scheduled Task runs fine with nobody logged in, which is what makes
+unattended automation work afterwards.
+
+So a headless install can *use* grants created earlier, but cannot create new ones from the web UI.
+That should be reported plainly rather than worked around.
 
 ## What core must provide
 
-The shim is a **packaging** concern, so it belongs to the core app rather than this repo — a binary
-shipped with JonDash at a known path, ideally signed. Helpers may spawn processes (that is explicitly
-what helpers are for), so a helper can invoke it directly once it exists.
+Two things, and they are small:
 
-The contract is written up in the prompt sent to the core session; in short: a named executable that
-takes a structured action plus a result-file path, runs it elevated, writes `{ok, exitCode, output}`,
-and distinguishes a declined UAC prompt from a failed action.
+1. **A grant manager** — create/remove a Scheduled Task (Windows) or sudoers/polkit rule (Linux) for a
+   fixed action, itself run elevated once via UAC. This is the piece that needs a signed, named binary.
+2. **The elevate shim** — for variable actions that prompt every time, taking a structured action and
+   writing a result file.
+
+Both are packaging concerns, so they belong to the core app. Helpers may spawn processes, so a helper
+can invoke either once it exists.
 
 ## Helpers built on this model
 
-| Helper | Status | Actions |
-| ------ | ------ | ------- |
-| `host-services` | spec — see `host-services/HELPER.md` | start / stop / restart an allowlisted service |
-| `host-install` | planned | install a package from an allowlisted package manager |
-
-**`host-install` inherits every rule above plus one:** the module supplies a **package name only**,
-never arguments and never a command. `winget install Foo.Bar` is displayed in full and run as a fixed
-shape. The residual risk is honest and must be documented where a user will read it: approve
-`install nginx` and you get whatever that publisher ships today — the same risk as typing it yourself.
+| Helper | Model | Status |
+| ------ | ----- | ------ |
+| `host-services` | **Grant once** — fixed actions on an allowlisted service | spec — `host-services/HELPER.md` |
+| `host-install` | **Approve each time** — the package name is variable | planned |
