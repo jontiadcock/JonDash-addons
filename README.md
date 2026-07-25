@@ -32,12 +32,14 @@ never updated automatically.
 | ------ | ------------ | ----- |
 | `health-monitor` | Watches your services with HTTP, TCP, ping, DNS and certificate checks; records uptime and response times; alerts by email or webhook when something goes down. | JonDash 1.5.0 |
 | `backup-manager` | Copies folders you choose to another location — a network share, an external drive — on a schedule, keeps dated copies, tidies old ones away, and tells you when a backup stops being healthy. | JonDash 1.5.2 |
+| `host-vitals` | Shows how the server itself is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page. | JonDash 1.5.2 |
 | `template` | **For developers** — a working module to copy when building your own. Installs to `modules/template`; read `MODULE.md` in that folder for the guide, and `AI-PROMPT.md` to have an AI build one for you. Safe to install and uninstall. | JonDash 1.4.1 |
 
 | Helper | What it gives a module | Needs |
 | ------ | ---------------------- | ----- |
 | `scheduler` | Recurring background work that runs from **server start**, declared rather than started. | JonDash 1.5.0 |
 | `filesystem` | Copying and archiving folders to another location, confined to folders an admin approved. Exposes no way to read a file's contents, and never copies JonDash's own secrets. | JonDash 1.5.2 |
+| `system-metrics` | Reading how the server itself is doing — CPU, memory, disk usage, uptime and temperatures. Read-only: it reports numbers and changes nothing. | JonDash 1.5.2 |
 
 Current versions per channel are in [`addons.json`](addons.json) on this branch — `main` is stable, `beta`
 is pre-release. Each entry's `notes` field is what JonDash shows on the update card.
