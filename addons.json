@@ -62,7 +62,7 @@
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.1",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "system-metrics:read"
@@ -71,7 +71,7 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.1-beta.1",
+      "tag": "host-vitals/v0.0.1",
       "notes": "First release. A dashboard tile that says at a glance whether the server is healthy — leading with the problem, like a disk nearly full or tight memory, rather than a count — plus a page with every disk, load average and temperatures. Read-only. Needs JonDash 1.5.2."
     }
   ],
@@ -115,7 +115,7 @@
       "id": "system-metrics",
       "name": "System metrics",
       "description": "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.1",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         {
@@ -124,7 +124,7 @@
         }
       ],
       "path": "helpers/system-metrics",
-      "tag": "system-metrics/v0.0.1-beta.1",
+      "tag": "system-metrics/v0.0.1",
       "notes": "First release. Lets a module show how the server itself is doing — CPU load, memory, how full each disk is, uptime, and temperatures where the hardware reports them. Read-only: it can see these numbers and change nothing. The first module to use it is Host vitals."
     }
   ]
