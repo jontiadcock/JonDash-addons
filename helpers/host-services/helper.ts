@@ -23,10 +23,25 @@ import { readGrants, revokeEverything } from "./lib/grant";
  * INCOMPLETE entry naming the tasks and both ways to remove them, since once this returns
  * there is no JonDash screen left that knows they exist.
  */
-async function revokeGrantsOnUninstall(ctx: Parameters<NonNullable<HelperDefinition["onUninstall"]>>[0]): Promise<void> {
+async function revokeGrantsOnUninstall(
+  ctx: Parameters<NonNullable<HelperDefinition["onUninstall"]>>[0],
+  answers: Record<string, boolean>,
+): Promise<void> {
   const existing = await readGrants();
   if (existing.length === 0) {
     await ctx.audit("host-services.uninstall", "no grants to revoke");
+    return;
+  }
+
+  // Absent is not false, and neither is consent. The question defaults to ON, so a screen that
+  // failed to render it must not silently mean "keep the permissions" — but an explicit
+  // untick must be honoured. Hence `=== false` rather than a falsy check.
+  if (answers.revoke === false) {
+    await ctx.audit(
+      "host-services.uninstall",
+      `left ${existing.length} grant(s) in place at your request: ${existing.map((g) => g.name).join(", ")}. ` +
+        `Remove them in Task Scheduler under \\JonDash\\ if you change your mind.`,
+    );
     return;
   }
 
@@ -73,7 +88,7 @@ async function revokeGrantsOnUninstall(ctx: Parameters<NonNullable<HelperDefinit
  *
  * See HELPER.md, and ../ELEVATION.md for the model this is an application of.
  *
- * **Working end to end since JonDash 1.7.1-beta.4** (OPS-18). Proven on a real machine: one
+ * **Working end to end since JonDash 1.7.1-beta.7** (OPS-18). Proven on a real machine: one
  * approval when a service is added, then start and stop with no further prompt, verified by
  * reading the service's actual state either side. Removing an entry prompts again, because
  * withdrawing a standing privilege is itself an administrator action.
@@ -88,7 +103,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.1-beta.3",
+  version: "0.0.1-beta.4",
   /**
    * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
    *
@@ -103,7 +118,7 @@ const helper: HelperDefinition = {
    * The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
    * "1.7.1" would be refused on every 1.7.1 beta — exactly the builds beta users run.
    */
-  minAppVersion: "1.7.1-beta.4",
+  minAppVersion: "1.7.1-beta.7",
 
   /**
    * Two lines, and the split is for honesty rather than scoping — a consuming module
@@ -138,6 +153,32 @@ const helper: HelperDefinition = {
    * because reading grants needs no elevation.
    */
   uninstallMayPrompt: true,
+
+  /**
+   * Asked rather than assumed, now that core can put a question on the uninstall screen.
+   *
+   * Defaults to **on**, which is the opposite of `host-install`'s and deliberately so: a grant
+   * is a standing Windows permission that exists only to serve JonDash. Nobody else wants it,
+   * and leaving one behind is the orphan the elevation design forbids. Installed software is
+   * the admin's and might be in use; a permission to restart Plex is not.
+   *
+   * Only asked when there is something to revoke — reading grants needs no elevation, so the
+   * empty case adds a question to nobody's screen.
+   */
+  uninstallQuestions: async () => {
+    const grants = await readGrants();
+    if (grants.length === 0) return [];
+    return [
+      {
+        id: "revoke",
+        label: `Withdraw the ${grants.length} Windows permission${grants.length === 1 ? "" : "s"} JonDash holds?`,
+        detail:
+          "These let JonDash start and stop services without asking. Leaving them means they stay on " +
+          "this machine with nothing in JonDash to show them. Windows will ask you to confirm.",
+        default: true,
+      },
+    ];
+  },
 
   onUninstall: revokeGrantsOnUninstall,
 };

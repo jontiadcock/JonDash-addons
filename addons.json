@@ -78,8 +78,8 @@
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.1-beta.3",
-      "minAppVersion": "1.7.1-beta.4",
+      "version": "0.0.1-beta.4",
+      "minAppVersion": "1.7.1-beta.7",
       "permissions": [
         "host-services:read",
         "host-services:control"
@@ -88,7 +88,7 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.1-beta.3",
+      "tag": "service-control/v0.0.1-beta.4",
       "notes": "A dashboard tile and a page for the services you approve, with start, stop and restart. Needs JonDash 1.7.1-beta.2, where no elevated action can happen unrecorded. The approved-services list is edited here for now; it belongs to the helper and will move. Windows only."
     }
   ],
@@ -148,8 +148,8 @@
       "id": "host-services",
       "name": "Host services",
       "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-      "version": "0.0.1-beta.3",
-      "minAppVersion": "1.7.1-beta.4",
+      "version": "0.0.1-beta.4",
+      "minAppVersion": "1.7.1-beta.7",
       "provides": [
         {
           "id": "host-services:read",
@@ -161,8 +161,8 @@
         }
       ],
       "path": "helpers/host-services",
-      "tag": "host-services/v0.0.1-beta.3",
-      "notes": "Approving a service asks Windows for permission once; after that a module can start and stop it with no prompt. Removing it asks again. Uninstalling now offers to withdraw every permission it granted, so nothing is left behind on your machine. Windows only for now."
+      "tag": "host-services/v0.0.1-beta.4",
+      "notes": "Approving a service asks Windows for permission once; after that a module can start and stop it with no prompt. Removing it asks again. Uninstalling now ASKS whether to withdraw the permissions it holds, rather than deciding for you. Windows only for now."
     }
   ]
 }

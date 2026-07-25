@@ -1,6 +1,7 @@
 import type { HelperDefinition } from "@/lib/helpers/types";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
+import { uninstallPackage } from "@/lib/elevation";
 
 /**
  * Host install helper — installs and removes software, with the administrator approving every
@@ -30,9 +31,9 @@ const helper: HelperDefinition = {
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
   version: "0.0.1-beta.1",
   // The package API (installPackage / uninstallPackage / packageState) arrived in
-  // 1.7.1-beta.6. The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its
+  // 1.7.1-beta.7. The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its
   // release, so "1.7.1" would be refused on every 1.7.1 beta — the builds beta users run.
-  minAppVersion: "1.7.1-beta.6",
+  minAppVersion: "1.7.1-beta.7",
 
   /**
    * Two capabilities, split for honesty. Checking whether something is installed is a
@@ -59,29 +60,60 @@ const helper: HelperDefinition = {
   migrations: "./migrations",
 
   /**
-   * Nothing is uninstalled when this helper is removed, and that is deliberate.
+   * **Ask, rather than decide.** Removing software automatically would be destructive in a way
+   * no audit entry excuses; removing nothing silently leaves the admin unaware they still have
+   * software JonDash put there. So the question is put to the person while they are on the
+   * screen — which is what `uninstallQuestions` is for.
    *
-   * `host-services` revokes its grants on uninstall because a grant is a standing permission
-   * that exists only to serve JonDash — nobody else wants it, and leaving it behind is the
-   * orphan the elevation design forbids. Installed software is the opposite: it is the
-   * admin's, it is probably in use, and silently uninstalling Docker because a dashboard
-   * module was pruned would be destructive in a way no audit entry could excuse.
-   *
-   * What IS kept is the record of what we installed, in `hlp_host_install_installed`, since
-   * helper tables survive removal. Reinstalling the helper therefore restores the ability to
-   * offer removal of exactly what JonDash put there — which is the useful half.
+   * Defaults to **off**, and only ever offers packages JonDash installed. Ten is core's cap;
+   * anything beyond that is summarised rather than listed, since an uninstall screen with
+   * fifteen tickboxes is one nobody reads.
    */
-  onUninstall: async (ctx) => {
+  uninstallQuestions: async () => {
+    const rows = await prisma.$queryRawUnsafe<{ packageId: string; label: string | null }[]>(
+      `SELECT packageId, label FROM ${helperTableName("host-install", "installed")} ORDER BY installedAt`,
+    );
+    return rows.slice(0, 10).map((r) => ({
+      id: `remove:${r.packageId}`,
+      label: `Also remove ${r.label ?? r.packageId}?`,
+      detail:
+        "JonDash installed this. Removing it runs the uninstaller as administrator, and anything it " +
+        "owns — containers, volumes, settings — goes with it.",
+      default: false,
+    }));
+  },
+
+  /**
+   * Only what was ticked, and nothing else.
+   *
+   * `answers` is namespaced to this helper, and an unticked or unasked question is **absent
+   * rather than false** — so this reads `=== true` instead of trusting a lookup to be present.
+   * A missing key must never be read as consent.
+   */
+  onUninstall: async (ctx, answers) => {
     const rows = await prisma.$queryRawUnsafe<{ packageId: string }[]>(
       `SELECT packageId FROM ${helperTableName("host-install", "installed")}`,
     );
     if (rows.length === 0) return;
-    await ctx.audit(
-      "host-install.uninstall",
-      `left ${rows.length} package(s) installed, deliberately: ${rows.map((r) => r.packageId).join(", ")}. ` +
-        `Software JonDash installed is not removed automatically — remove it yourself if you no longer want it.`,
-    );
+
+    const wanted = rows.filter((r) => answers[`remove:${r.packageId}`] === true).map((r) => r.packageId);
+    const kept = rows.filter((r) => !wanted.includes(r.packageId)).map((r) => r.packageId);
+
+    for (const packageId of wanted) {
+      const r = await uninstallPackage(packageId, { userId: null });
+      await ctx.audit(
+        r.ok ? "host-install.uninstall.removed" : "host-install.uninstall.FAILED",
+        r.ok ? packageId : `${packageId} — ${r.message}. It is still installed.`,
+      );
+    }
+
+    if (kept.length > 0) {
+      await ctx.audit("host-install.uninstall", `left installed at your request: ${kept.join(", ")}`);
+    }
   },
+
+  /** Uninstalling a package raises a UAC prompt, so this hook has to outlive the 5s default. */
+  uninstallMayPrompt: true,
 };
 
 export default helper;
