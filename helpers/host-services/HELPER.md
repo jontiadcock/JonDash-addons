@@ -1,7 +1,16 @@
 # Host services helper
 
-**Status: SPEC — not built.** Awaiting the owner's approval, and the **grant manager from core** (see
-`../ELEVATION.md`), without which no action can run.
+**Status: BUILT, NOT PUBLISHED.** The helper exists and passes `tsc`, `eslint` and its own tests. It is
+not on any channel, because two things are still missing:
+
+1. **Core's grant manager (OPS-18)** — accepted, not shipped. Until it lands, `capability()` reports
+   `grant-manager-missing`, adding an allowlist entry refuses, and no action can run. Nothing degrades to
+   a weaker privilege in the meantime; it refuses and says why.
+2. **Its first consumer** — `service-control`. A helper cannot be live-tested alone, because the install
+   path, the consent roll-up and the prune all run through a consuming module.
+
+**What already works without any privilege:** reading the state of allowlisted services. Querying a
+service needs no elevation, so the dashboard is useful on a machine where no grant has ever been made.
 
 **Elevation is granted once per service, not per action.** Adding a service to the allowlist creates a
 fixed OS-level grant — a Scheduled Task on Windows, a sudoers/polkit rule on Linux — and that is the
@@ -111,7 +120,7 @@ type Service = {
 };
 
 type RequestResult =
-  | { ok: true; requestId: string; status: "pending" }
+  | { ok: true; requestId: string; status: "pending" | "ran" }
   | { ok: false; reason: string };
 
 type RequestOutcome =
@@ -121,6 +130,11 @@ type RequestOutcome =
   | { status: "cancelled-at-uac"; at: string } // admin said no at the UAC prompt
   | { status: "expired"; at: string };
 ```
+
+**`status: "ran"` exists because an unattended entry acts immediately.** The spec originally returned only
+`"pending"`, which would have made a module poll for an outcome that had already happened. A caller that
+only understands `"pending"` still behaves correctly — it polls once and gets the finished status — so
+this widened the type without breaking the contract.
 
 **`declined` and `cancelled-at-uac` are separate outcomes on purpose.** They mean different things: one
 is "I don't want this", the other is "not right now, or not on this machine". A module that retries the
@@ -240,4 +254,4 @@ instruction source and that is the hole, not the batching.
 
 | Version | Notes |
 | ------- | ----- |
-| — | Spec only; nothing published. Blocked on the core grant manager. |
+| 0.0.1 (unpublished) | Built: allowlist, requests, suggestions, state reading, grant bridge, risk warnings. 22 tests. Not on any channel — needs OPS-18 and the `service-control` consumer. |
