@@ -46,8 +46,12 @@ A helper is built with or just before its first consumer.
 2. ⏳ **AH-01 `docker` helper** → **AM-01 Docker manager** — the flagship; owner-led. Spec written.
    **Blocked on a testing decision**, not on design: there is no Docker engine on the development
    machine, so the connected-engine path can't be exercised the way `system-metrics` was.
-3. ⏳ **AH-04 `host-services`** → a service control module — spec written, **blocked on the core
-   elevate shim**. See `helpers/ELEVATION.md` for the model both this and AH-05 use.
+3. ✅ **AH-04 `host-services`** → **AM-06 Service manager** — **SHIPPED 2026-07-25**, both
+   `0.0.1-beta.2` on beta, needing JonDash **1.7.1-beta.2**. The elevation model in
+   `helpers/ELEVATION.md` is now proven end to end rather than designed: one approval when a service
+   is added, then start and stop with no prompt, and a grant that a standard user cannot edit,
+   disable or delete. **This unblocks AH-05, and it is the model AM-01 leans on for installing
+   Docker.**
 4. ⏳ **AM-04 Dynamic DNS** — no helper, small, a homelab staple. A quick win slottable anywhere.
 5. ⏳ **AM-05 health-monitor: speed-test check** — enhancement to a shipped module, no helper. Small.
 6. ⏳ **AH-05 `host-install`** — same elevation model as AH-04, so it follows it.
@@ -120,6 +124,24 @@ resource, time it) rather than a `speedtest` binary, so it stays inside the modu
 - **Home:** a new check kind in `addons/health-monitor`, shipped as a normal version bump of that
   module, promoted to stable like any other change to it (see `VERSIONING.md`).
 
+#### AM-06 · Service manager (`service-control`) — ✅ SHIPPED 2026-07-25 (`0.0.1-beta.2`)
+Start, stop and restart the services an administrator has approved, from a dashboard tile and a page.
+The consumer that `AH-04 host-services` needed — a helper cannot be tested alone, because the install
+path, the consent roll-up and the prune all run through a consuming module.
+
+- **Needs:** `AH-04 host-services`, and JonDash **1.7.1-beta.2** — not merely for the imports, but
+  because on beta.1 an elevated action could still proceed when its audit entry failed to write, and
+  this module tells administrators that every elevated action is recorded.
+- **Proven on real hardware, not asserted:** one UAC prompt when a service is approved, then stop and
+  start with none, verified by reading the service's actual state either side; removing prompts again;
+  and a grant cannot be repointed, disabled or deleted by the account that uses it.
+- **Known wrong, and deliberate:** the approved-services list is edited from *this module's* settings
+  panel. It is helper configuration and outlives the module, so an ordinary uninstall would strand live
+  OS grants with no screen to revoke them. Core has been asked to carry helper settings
+  (`HelperDefinition`); when that lands the UI moves to Admin → Helpers and the helper's `admin.*` API
+  is deleted outright, leaving modules no mutator at all.
+- **Not promotable to stable** until JonDash 1.7.1 itself reaches the stable channel.
+
 ### AH — Helpers
 
 #### AH-01 · `docker` helper — ⏳ Planned
@@ -151,7 +173,11 @@ taken microseconds apart. Stateless — no tables, no migrations, no `onBoot`, n
 > point where the docs came up short was fixed in the docs rather than worked around. The process is
 > worth repeating for `AH-01 docker`.
 
-#### AH-04 · `host-services` helper — ⏳ Spec written, BLOCKED on core
+#### AH-04 · `host-services` helper — ✅ SHIPPED 2026-07-25 (`0.0.1-beta.2`)
+Consumer: **AM-06 Service manager**. Needs JonDash **1.7.1-beta.2**. Everything below was the design;
+all of it is now measured. Everything privileged goes through core's `@/lib/elevation` rather than
+spawning the binary, so every elevated action — including the restart itself — reaches the audit log.
+
 Start / stop / restart **services the administrator explicitly listed**, so a module can be a control
 panel for its own machine. Two capabilities: `host-services:read` and `host-services:control` — where
 "control" means *may raise a request*, not *may act*, and the label says so.
