@@ -62,7 +62,7 @@
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.2-beta.1",
+      "version": "0.0.2",
       "minAppVersion": "1.5.2-beta.1",
       "permissions": [
         "system-metrics:read"
@@ -71,7 +71,7 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.2-beta.1",
+      "tag": "host-vitals/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery. Each can be switched off, and one you switch off is not collected at all rather than just hidden. Sizes now read GB and TB. Several of the new readings are Linux-only."
     }
   ],
@@ -115,7 +115,7 @@
       "id": "system-metrics",
       "name": "System metrics",
       "description": "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-      "version": "0.0.2-beta.1",
+      "version": "0.0.2",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         {
@@ -124,7 +124,7 @@
         }
       ],
       "path": "helpers/system-metrics",
-      "tag": "system-metrics/v0.0.2-beta.1",
+      "tag": "system-metrics/v0.0.2",
       "notes": "Adds swap, per-core CPU, clock speed, network interfaces and throughput, disk read/write rates, fan speeds and battery, and lets a module gather only what it will show. Nothing was removed, so anything built against the previous version keeps working. Most new readings are Linux-only."
     }
   ]

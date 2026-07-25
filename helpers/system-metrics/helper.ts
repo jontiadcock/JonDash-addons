@@ -14,7 +14,7 @@ const helper: HelperDefinition = {
   name: "System metrics",
   description:
     "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-  version: "0.0.2-beta.1",
+  version: "0.0.2",
   // `ctx.can()` enforcement arrived in JonDash 1.5.2, and `api.ts` uses it to refuse a
   // module that didn't declare the capability. The PRE-RELEASE, not a bare "1.5.2": semver
   // ranks a pre-release below its release, so "1.5.2" would be refused on every 1.5.2 beta.
