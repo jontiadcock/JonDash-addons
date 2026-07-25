@@ -1,21 +1,14 @@
 import type { DeclaredPermission, ModuleContext } from "@/lib/modules/types";
 import type { HelperApiFor } from "@/lib/helpers/types";
-import { addEntry, findEntry, listEntries, removeEntry, setUnattended } from "./lib/allowlist";
-import {
-  createRequest,
-  decline,
-  execute,
-  openSuggestions,
-  pendingRequests,
-  requestStatus,
-  suggest,
-  type RequestOutcome,
-} from "./lib/requests";
+import { findEntry, listEntries } from "./lib/allowlist";
+import { createRequest, execute, pendingRequests, requestStatus, suggest, type RequestOutcome } from "./lib/requests";
 import { capability, type ElevationSupport } from "./lib/grant";
-import { readState, readStates, type ServiceState } from "./lib/services";
+import { readStates, type ServiceState } from "./lib/services";
 import { isVerb, type Verb } from "./lib/names";
-import { assessRisk, type Risk } from "./lib/risk";
+import type { Risk } from "./lib/risk";
 
+// Still exported for the helper's own settings page to use once core provides one. Nothing a
+// module can reach returns it.
 export type { Risk };
 
 /**
@@ -23,36 +16,41 @@ export type { Risk };
  * nothing else — the verifier refuses any deeper path — so everything exported here is
  * supported forever, and everything not exported here is unreachable.
  *
- * TWO surfaces, and the split is the security boundary:
+ * > **A module can name a service. It can never add one.**
  *
- *  - **The module surface** (`list`, `request`, `requestStatus`, `suggest`, `capability`)
- *    is what a module uses at runtime, gated on the permissions it declared.
- *  - **`admin.*`** is for the consumer's settings panel and requires an authenticated
- *    ADMIN in `ctx.user`. A module running on its own — a background job, a widget render,
- *    anything with no signed-in admin behind it — cannot reach it at all.
+ * ## The `admin.*` surface was REMOVED, and why it should never come back
  *
- * **Why there is an admin surface here at all**, since an earlier draft of HELPER.md said a
- * module could never add an allowlist entry: a helper has no UI of its own, and core has no
- * generic editor for helper configuration. With no mutator anywhere the allowlist could
- * never be populated, so that guarantee was not strict — it was unimplementable. The real
- * boundary in this app is not module-versus-helper, it is *whether an admin is behind the
- * call*, which is the shape `filesystem` already uses for approved roots.
+ * Versions up to `0.0.1-beta.4` exposed `admin.add`/`remove`/`setUnattended`/`approve` here,
+ * so the consuming module could render the allowlist editor. It was gated on
+ * `ctx.user.role === "ADMIN"` and justified by "there is nowhere else to put the UI".
  *
- * **What actually stops a hostile module**, since `ctx.user` is forgeable exactly as
- * `ctx.can` is — a module can spread its context and hand back a doctored one:
+ * **That was a privilege-escalation path, found by the owner.** The consent screen says only:
  *
- *  - The admin check catches accidents and honest mistakes, which is most of them.
- *  - **UAC catches the rest, and it cannot be forged.** Creating an entry creates an OS
- *    grant, which raises a real elevation prompt a human must approve at the machine. A
- *    module that fakes an admin context still cannot obtain a standing privilege silently.
+ *     "See whether the services you list are running"
+ *     "Start, stop and restart the services you list"
  *
- * Still absent, and must stay absent:
+ * Neither discloses *adding to that list* — yet `admin.add` took the service name **from the
+ * module's own form**. A module could display "Add Plex" and submit `sshd`. The UAC prompt
+ * names `jondash-grant.exe` and says nothing about which service, so nothing on screen would
+ * catch the substitution. **The allowlist is supposed to BE the boundary, and the thing it
+ * bounds could edit it.**
  *
+ * The two mitigations were weaker than they read. `ctx.user` is forgeable exactly as
+ * `ctx.can` is — a module can spread its context and hand back a doctored one. UAC is
+ * unforgeable but content-free: it proves a human was present, not what they agreed to.
+ *
+ * **The fix is placement, not another check.** The allowlist editor belongs on the helper's
+ * own settings page, where JonDash renders the form and the helper receives the values with
+ * no module in the path. Until core ships that slot (asked 2026-07-26), the allowlist cannot
+ * be edited at all — the feature is inert rather than unsound, which is the right way round.
+ *
+ * ## Still absent, and must stay absent
+ *
+ *  - **No way to add, remove or reconfigure an allowlist entry.**
  *  - **No way to run a command.** Three verbs against a list. This is not a shell.
  *  - **No way to enumerate services.** A module cannot discover what exists on the machine;
  *    that is a scoping decision and a privacy one.
- *  - **No `execute` on the module surface.** Turning a request into an action belongs to an
- *    administrator, or to an entry an administrator already marked unattended.
+ *  - **No `execute`.** Turning a request into an action belongs to an administrator.
  */
 
 export type { ServiceState, RequestOutcome, ElevationSupport, Verb };
@@ -67,53 +65,21 @@ export type Service = {
 
 export type RequestResult = { ok: true; requestId: string; status: "pending" | "ran" } | { ok: false; reason: string };
 
-/** Everything under here requires `ctx.user.role === "ADMIN"`. Rendered from the consuming
- *  module's SettingsPanel, which only an administrator can reach. */
-export type HostServicesAdminApi = {
-  /** Entries with their grant and automation state — more than the module surface shows. */
-  entries(): Promise<AdminEntry[]>;
-  /** Approve a service. **Raises a UAC prompt**, because it creates the OS grant. */
-  add(input: {
-    serviceName: string;
-    label?: string;
-    canControl?: boolean;
-    unattended?: boolean;
-  }): Promise<AddOutcome>;
-  /** Remove an entry and its grants together. */
-  remove(entryId: string): Promise<{ ok: boolean; reason?: string }>;
-  /** Per-entry: may a module act without an admin click? Never global, never module-settable. */
-  setUnattended(entryId: string, unattended: boolean): Promise<{ ok: boolean }>;
-  /** What adding this name would warn about. Pure — safe to call while typing in a form. */
-  assessRisk(serviceName: string): Risk;
-  /** The approval queue, and the two things an admin can do with an item in it. */
-  pending(): Promise<PendingRequest[]>;
-  approve(requestId: string): Promise<RequestOutcome>;
-  decline(requestId: string): Promise<{ ok: boolean }>;
-  /** Suggestions modules have raised, for the prefilled-form flow. */
-  suggestions(): Promise<Suggestion[]>;
-};
-
-export type AdminEntry = Service & {
-  unattended: boolean;
-  grantState: "none" | "granted" | "partial" | "error";
-  taskBase: string;
-  addedAt: string;
-};
-
-export type AddOutcome =
-  | { ok: true; entry: AdminEntry; risk: Risk }
-  | { ok: false; reason: string; cancelledAtUac?: boolean };
-
+/**
+ * A queued request, for a module to show its own pending asks.
+ *
+ * **Read-only, and scoped to the asking module.** There is deliberately no `approve` here:
+ * turning a request into an action is an administrator's decision, and it happens on
+ * JonDash's own screens where the service name comes from the allowlist rather than from a
+ * module's form.
+ */
 export type PendingRequest = {
   id: string;
-  moduleId: string;
   entryId: string;
   serviceLabel: string;
   action: Verb;
   createdAt: string;
 };
-
-export type Suggestion = { id: string; moduleId: string; serviceName: string; reason: string; createdAt: string };
 
 export type HostServicesApi = {
   /** Can this installation elevate at all? Needs no capability — a module must be able to
@@ -127,8 +93,8 @@ export type HostServicesApi = {
   requestStatus(requestId: string): Promise<RequestOutcome | null>;
   /** Ask the admin to allowlist a service. Inert. Needs `host-services:control`. */
   suggest(name: string, reason: string): Promise<RequestResult>;
-  /** Admin-only surface. Every call refuses unless `ctx.user` is an ADMIN. */
-  admin: HostServicesAdminApi;
+  /** This module's own queued requests, read-only. Needs `host-services:control`. */
+  myPending(): Promise<PendingRequest[]>;
 };
 
 /**
@@ -204,152 +170,23 @@ const api: HelperApiFor<HostServicesApi> = (ctx: ModuleContext) => ({
     return { ok: true, requestId: r.id, status: "pending" };
   },
 
-  admin: {
-    async entries() {
-      if (!isAdmin(ctx)) return [];
-      const rows = await listEntries();
-      const states = await readStates(rows.map((e) => e.serviceName));
-      return rows.map((e) => ({
-        id: e.id,
-        name: e.serviceName,
-        label: e.label,
-        state: states.get(e.serviceName) ?? "unknown",
-        canControl: e.canControl,
-        unattended: e.unattended,
-        grantState: e.grantState,
-        taskBase: e.taskBase,
-        addedAt: e.addedAt,
-      }));
-    },
-
-    async add(input) {
-      if (!isAdmin(ctx)) return { ok: false, reason: "administrator only" };
-      const r = await addEntry({ ...input, addedBy: ctx.user?.id ?? null });
-      if (!r.ok) {
-        // "Cancelled at UAC" is surfaced distinctly so the settings panel can say "you
-        // dismissed the prompt" rather than "it failed" — different words for a decision
-        // the admin made deliberately.
-        const cancelled = r.reason === "grant-refused" && r.outcome.status === "cancelled-at-uac";
-        await ctx.audit?.("host-services.entry.refused", `${input.serviceName}: ${r.reason}`);
-        return { ok: false, reason: explain(r), cancelledAtUac: cancelled };
-      }
-      await ctx.audit?.(
-        "host-services.entry.add",
-        `${r.entry.label} — ${r.entry.serviceName}${r.risk.level === "none" ? "" : ` (${r.risk.level} risk)`}`,
-      );
-      return {
-        ok: true,
-        risk: r.risk,
-        entry: {
-          id: r.entry.id,
-          name: r.entry.serviceName,
-          label: r.entry.label,
-          state: await readState(r.entry.serviceName),
-          canControl: r.entry.canControl,
-          unattended: r.entry.unattended,
-          grantState: r.entry.grantState,
-          taskBase: r.entry.taskBase,
-          addedAt: r.entry.addedAt,
-        },
-      };
-    },
-
-    async remove(entryId: string) {
-      if (!isAdmin(ctx)) return { ok: false, reason: "administrator only" };
-      const entry = await findEntry(entryId);
-      const r = await removeEntry(entryId);
-      if (!r.ok) return { ok: false, reason: r.outcome ? describeOutcome(r.outcome) : "could not remove the grant" };
-      if (entry) await ctx.audit?.("host-services.entry.remove", `${entry.label} — ${entry.serviceName}`);
-      return { ok: true };
-    },
-
-    async setUnattended(entryId: string, unattended: boolean) {
-      if (!isAdmin(ctx)) return { ok: false };
-      await setUnattended(entryId, unattended);
-      const entry = await findEntry(entryId);
-      await ctx.audit?.(
-        "host-services.entry.unattended",
-        `${entry?.label ?? entryId} — ${unattended ? "may act without asking" : "asks each time"}`,
-      );
-      return { ok: true };
-    },
-
-    assessRisk(serviceName: string) {
-      return assessRisk(serviceName);
-    },
-
-    async pending() {
-      if (!isAdmin(ctx)) return [];
-      const rows = await pendingRequests();
-      const entries = await listEntries();
-      return rows.map((r) => ({
+  /**
+   * This module's own queued requests. Read-only, and scoped to the caller — one module must
+   * not see another's, and nothing here can approve anything.
+   */
+  async myPending() {
+    if (!granted(ctx, "host-services:control")) return [];
+    const [rows, entries] = await Promise.all([pendingRequests(), listEntries()]);
+    return rows
+      .filter((r) => r.moduleId === ctx.moduleId)
+      .map((r) => ({
         id: r.id,
-        moduleId: r.moduleId,
         entryId: r.entryId,
         serviceLabel: entries.find((e) => e.id === r.entryId)?.label ?? "(removed)",
         action: r.action as Verb,
         createdAt: r.createdAt,
       }));
-    },
-
-    async approve(requestId: string) {
-      if (!isAdmin(ctx)) return { status: "failed", at: new Date().toISOString(), detail: "administrator only" };
-      const outcome = await execute(requestId, ctx.user?.id ?? null);
-      await ctx.audit?.("host-services.request.approve", `${requestId}: ${outcome.status}`);
-      return outcome;
-    },
-
-    async decline(requestId: string) {
-      if (!isAdmin(ctx)) return { ok: false };
-      await decline(requestId, ctx.user?.id ?? null);
-      await ctx.audit?.("host-services.request.decline", requestId);
-      return { ok: true };
-    },
-
-    async suggestions() {
-      if (!isAdmin(ctx)) return [];
-      return openSuggestions();
-    },
   },
 });
-
-/**
- * Forgeable exactly as `ctx.can` is — a module can spread its context and hand back a
- * doctored one. Checked anyway, because it catches every accident and every honest module,
- * which is nearly all of them. What catches the rest is UAC: creating an entry raises a
- * real elevation prompt, so a forged admin context still cannot obtain a standing privilege
- * silently. This check is the first layer, not the only one.
- */
-function isAdmin(ctx: ModuleContext): boolean {
-  return ctx.user?.role === "ADMIN";
-}
-
-function explain(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok: true }>): string {
-  switch (r.reason) {
-    case "duplicate":
-      return "that service is already on the list";
-    case "unusable-name":
-      return "that name has no characters that can be used";
-    case "name-clash":
-      // Names the other service, because "pick a different name" is useless advice when the
-      // service name is not yours to choose — knowing which entry is in the way is what lets
-      // the admin decide which of the two they actually want.
-      return `Windows would give this the same permission name as "${r.detail}", and two services cannot share one. Remove that entry first if this is the one you want.`;
-    case "grant-refused":
-      return describeOutcome(r.outcome);
-  }
-}
-
-function describeOutcome(o: { status: string; reason?: string; detail?: string }): string {
-  if (o.status === "cancelled-at-uac") return "you dismissed the Windows permission prompt";
-  if (o.status === "unavailable") {
-    return o.reason === "grant-manager-missing"
-      ? "this version of JonDash cannot grant that permission yet"
-      : o.reason === "no-interactive-session"
-        ? "JonDash cannot show a permission prompt on this machine"
-        : "this platform is not supported";
-  }
-  return o.detail || "the permission could not be granted";
-}
 
 export default api;

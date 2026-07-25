@@ -78,7 +78,7 @@
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.1-beta.4",
+      "version": "0.0.1-beta.5",
       "minAppVersion": "1.7.1-beta.7",
       "permissions": [
         "host-services:read",
@@ -88,8 +88,29 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.1-beta.4",
-      "notes": "A dashboard tile and a page for the services you approve, with start, stop and restart. Needs JonDash 1.7.1-beta.2, where no elevated action can happen unrecorded. The approved-services list is edited here for now; it belongs to the helper and will move. Windows only."
+      "tag": "service-control/v0.0.1-beta.5",
+      "notes": "SECURITY FIX — this module could add services to the list it was only supposed to control, which its permissions never said it could. That editor is gone. It can now see the approved services, ask for one to be started or stopped, and nothing else. Windows only."
+    },
+    {
+      "id": "docker-manager",
+      "name": "Docker manager",
+      "description": "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "permissions": [
+        "docker:read",
+        "docker:logs",
+        "docker:manage",
+        "host-install:read",
+        "host-install:manage"
+      ],
+      "helpers": [
+        "docker",
+        "host-install"
+      ],
+      "path": "addons/docker-manager",
+      "tag": "docker-manager/v0.0.1-beta.1",
+      "notes": "FIRST BUILD, never run against a real Docker engine — expect rough edges. Lists containers with live state and start, stop, pause and restart. If Docker isn't installed it tells you how, or offers to install it for you. It cannot run commands inside a container."
     }
   ],
   "helpers": [
@@ -148,7 +169,7 @@
       "id": "host-services",
       "name": "Host services",
       "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-      "version": "0.0.1-beta.4",
+      "version": "0.0.1-beta.5",
       "minAppVersion": "1.7.1-beta.7",
       "provides": [
         {
@@ -161,8 +182,52 @@
         }
       ],
       "path": "helpers/host-services",
-      "tag": "host-services/v0.0.1-beta.4",
-      "notes": "Approving a service asks Windows for permission once; after that a module can start and stop it with no prompt. Removing it asks again. Uninstalling now ASKS whether to withdraw the permissions it holds, rather than deciding for you. Windows only for now."
+      "tag": "host-services/v0.0.1-beta.5",
+      "notes": "SECURITY FIX — a module could add services to the list it was only meant to control. Modules can no longer change that list at all: they can see it, ask for an action, and suggest an addition. Editing moves to JonDash's own screens. Windows only for now."
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "description": "Lets a module see the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.5.2-beta.1",
+      "provides": [
+        {
+          "id": "docker:read",
+          "label": "See the containers on this server — their names, images, state and resource use"
+        },
+        {
+          "id": "docker:logs",
+          "label": "Read container logs, which often contain passwords, keys and personal data"
+        },
+        {
+          "id": "docker:manage",
+          "label": "Start, stop, pause and restart containers on this server"
+        }
+      ],
+      "path": "helpers/docker",
+      "tag": "docker/v0.0.1-beta.1",
+      "notes": "FIRST BUILD, never run against a real engine. Talks to Docker over its local socket and exposes only container operations — never the socket itself, because anything that reaches it can take over the machine. There is no way to run a command inside a container."
+    },
+    {
+      "id": "host-install",
+      "name": "Install software",
+      "description": "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.1-beta.7",
+      "provides": [
+        {
+          "id": "host-install:read",
+          "label": "See whether a piece of software is installed on this server"
+        },
+        {
+          "id": "host-install:manage",
+          "label": "Install and remove software on this server — you approve each one, and see its name before it runs"
+        }
+      ],
+      "path": "helpers/host-install",
+      "tag": "host-install/v0.0.1-beta.1",
+      "notes": "FIRST BUILD, no install has ever been performed with it. A module can only ask; you approve it in JonDash where the package name is shown in full, and Windows asks again. It will only ever offer to remove software JonDash installed. Windows only."
     }
   ]
 }

@@ -103,7 +103,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.1-beta.4",
+  version: "0.0.1-beta.5",
   /**
    * 1.7.1-beta.**2**, not beta.1, and the reason is a guarantee rather than a feature.
    *

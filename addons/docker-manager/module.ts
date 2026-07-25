@@ -23,10 +23,10 @@ const dockerManager: ModuleDefinition = {
   description:
     "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
   version: "0.0.1-beta.1",
-  // The floor comes from host-install, which needs core's package API (1.7.1-beta.6). The
+  // The floor comes from host-install, which needs core's package API (1.7.1-beta.7). The
   // docker helper alone would run on 1.5.2. The PRE-RELEASE, not a bare "1.7.1": semver ranks
   // a pre-release below its release, so "1.7.1" would be refused on every 1.7.1 beta.
-  minAppVersion: "1.7.1-beta.6",
+  minAppVersion: "1.7.1-beta.7",
 
   permissions: ["docker:read", "docker:logs", "docker:manage", "host-install:read", "host-install:manage"],
 
