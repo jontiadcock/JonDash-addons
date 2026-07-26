@@ -13,7 +13,7 @@ import {
   contains,
 } from "./lib/paths";
 import { assessRoot, riskSummary, type RootRisk } from "./lib/risk";
-import { loadRegistry } from "./lib/secrets";
+import { identityReason, loadRegistry } from "./lib/secrets";
 import { planPrune, runPrune, type PrunePlan } from "./lib/prune";
 import { DEFAULT_GFS, describePolicy, toSnapshots, type GfsPolicy } from "./lib/snapshots";
 import {
@@ -379,16 +379,32 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
 
   testLocation: (input, opts) => probeLocation(input, opts),
 
+  /**
+   * Listing honours the secret registry, exactly as copying does.
+   *
+   * It did not until 0.0.5. The copy engine has always refused to carry a secret off the
+   * machine, so no *contents* were ever reachable — but a root at JonDash's own folder let a
+   * module read back the NAMES and sizes inside `.data`: that `secrets.json` exists, how big
+   * it is, which TLS keys are present. That is reconnaissance, not a leak, and it is still
+   * not something a module should be able to ask for.
+   *
+   * The check is by identity on a `stat` this loop already took, so it costs nothing and it
+   * follows the secrets if `JONDASH_DATA_DIR` or `DATABASE_URL` moves them. Protected entries
+   * are omitted rather than marked — telling a caller "something is here you may not see"
+   * hands back the fact it was asking for.
+   */
   async browse(rootId, subpath) {
     if (requires(ctx, "filesystem:read")) return [];
     const at = await resolveIn(rootId, "source", subpath);
     if (!at.ok) return [];
     const entries = await fsp.readdir(at.path, { withFileTypes: true }).catch(() => []);
+    const registry = await loadRegistry();
     const out = [];
     for (const e of entries) {
       if (e.isSymbolicLink()) continue;
       const stat = await fsp.stat(path.join(at.path, e.name)).catch(() => null);
       if (!stat) continue;
+      if (identityReason(registry, stat)) continue;
       out.push({
         name: e.name,
         isDir: e.isDirectory(),

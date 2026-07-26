@@ -129,7 +129,7 @@
       "id": "filesystem",
       "name": "Files and folders",
       "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-      "version": "0.0.4",
+      "version": "0.0.5-beta.1",
       "minAppVersion": "1.5.2-beta.1",
       "provides": [
         {
@@ -146,8 +146,8 @@
         }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.4",
-      "notes": "A documentation fix only — the helper itself is unchanged. Its claim that every copy removed by retention reaches the audit trail holds on JonDash 1.5.3 and later, and never did before it. It now says so, and what still holds on older versions: the log records every removal either way."
+      "tag": "filesystem/v0.0.5-beta.1",
+      "notes": "Browsing a folder now hides JonDash's own secrets, as copying always has. A module given a location that contained JonDash itself could not copy the key or the database, but could see their names and sizes. Nothing else changes, and no backup behaves differently."
     },
     {
       "id": "system-metrics",
