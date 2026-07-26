@@ -10,7 +10,7 @@ import { writeNotice } from "./lib/notice";
  *
  * The allowlist actions lived here for one release and are gone. They let this module choose
  * the service name that got approved while its consent screen promised only that it could
- * control services already on the list. Editing now happens on Admin → Helpers, rendered by
+ * control services already on the list. Editing now happens on Admin → Permissions, rendered by
  * JonDash with no module in the path — HELPERS-DESIGN rule 8.
  *
  * `moduleAction` wraps each handler: same-origin asserted, refused if the module is disabled,
@@ -50,7 +50,7 @@ export const requestAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
 
 /**
  * Suggest a service for the allowlist. **Inert** — it writes a suggestion an administrator may
- * act on from Admin → Helpers, and there is no call anywhere that promotes one.
+ * act on from Admin → Permissions, and there is no call anywhere that promotes one.
  */
 export const suggestAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const name = str(form, "serviceName");
@@ -60,7 +60,7 @@ export const suggestAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
     ctx,
     r.ok ? "ok" : "warn",
     r.ok
-      ? `Suggested "${name}". An administrator has to add it under Admin → Helpers before anything can happen.`
+      ? `Suggested "${name}". An administrator has to add it under Admin → Permissions before anything can happen.`
       : `Could not suggest "${name}": ${r.reason}.`,
   );
   revalidatePath(ADMIN_PATH);

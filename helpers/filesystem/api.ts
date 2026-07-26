@@ -317,7 +317,7 @@ export type FilesystemApi = {
   assessPath(input: string): PathAssessment;
   /**
    * Ask the admin to approve a folder. **Inert** — it records the request and nothing else.
-   * Approving happens on Admin → Helpers, where no module is in the path.
+   * Approving happens on Admin → Permissions, where no module is in the path.
    */
   suggestRoot(path: string, reason: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
   /** This module's own suggestions and what became of them. Read-only, scoped to the caller. */
@@ -348,7 +348,7 @@ export type FilesystemApi = {
   logsSize(): Promise<{ count: number; bytes: number }>;
   /**
    * How long logs are kept. Read-only here — the policy is GLOBAL, so a module changing it
-   * would prune every other module's logs too. It lives on Admin → Helpers.
+   * would prune every other module's logs too. It lives on Admin → Permissions.
    */
   retention(): Promise<RetentionPolicy>;
 
@@ -463,7 +463,7 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
    * it false. It needed no exploit, just the call it was already given.
    *
    * HELPERS-DESIGN rule 8: a helper's module-facing API carries read and request, never add,
-   * remove or approve. The editor is on Admin → Helpers, where `ctx.user` comes from the
+   * remove or approve. The editor is on Admin → Permissions, where `ctx.user` comes from the
    * session and no module is anywhere in the path.
    */
   async suggestRoot(input, reason) {
@@ -689,7 +689,7 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   /* `setRetention` has gone to helper.ts. The policy is GLOBAL — one row pair, not one per
      module — so any module holding this helper could shorten it and prune every other
      module's logs, including the audit trail of what it had just done. Read stays here;
-     the write is on Admin → Helpers. */
+     the write is on Admin → Permissions. */
 
   async listSnapshots(rootId, subpath) {
     if (requires(ctx, "filesystem:read")) return [];

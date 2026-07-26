@@ -93,7 +93,7 @@ of it has any controls; see [Configuring](#configuring).
 
 ## Settings
 
-Rendered by the framework under **Admin → Modules → Health monitoring**.
+Rendered by the framework under **Admin → Addons → Health monitoring**.
 
 These are defaults and safety limits. **Monitors and alert destinations are not set up here** — they
 live on the module's own page; see [Configuring](#configuring).
@@ -211,7 +211,7 @@ is switched on* to pause without losing the history; *Delete this check* asks fi
 history with it. *Check now* on each row runs it on demand.
 
 **Defaults and limits** — how long to wait, how many failures before alerting, how long history is
-kept — are in **Admin → Modules → Health monitoring**, along with an optional bulk import for
+kept — are in **Admin → Addons → Health monitoring**, along with an optional bulk import for
 restoring a saved configuration ([`CONFIG.md`](CONFIG.md)). That import **only adds and updates; it
 never deletes**, so an old copy can't undo what you set up in the interface.
 
@@ -260,7 +260,7 @@ must match its `addons.json` entry exactly.
 ## Testing
 
 1. Install it from a source, or put the folder at `modules/health-monitor/`, then enable it in
-   **Admin → Modules**.
+   **Admin → Addons**.
 2. On the module's page, add two monitors: something you know works, and something you know doesn't —
    `http://127.0.0.1:9/` is reliably refused. Each is checked the moment you save it.
 3. The broken one turns red once its failures are confirmed, an outage is recorded, and the widget

@@ -17,7 +17,7 @@ import { DEFAULT_RETENTION, pruneLogs, type RetentionPolicy } from "./logfile";
  * approved folders could approve its own — the consent wording held only until the module
  * decided otherwise. See HELPERS-DESIGN rule 8 and the same fix in `host-services` 0.0.2.
  *
- * Callers: `helper.ts`'s `onSettingsSubmit`, reached from Admin → Helpers, where `ctx.user`
+ * Callers: `helper.ts`'s `onSettingsSubmit`, reached from Admin → Permissions, where `ctx.user`
  * is resolved from the session.
  */
 

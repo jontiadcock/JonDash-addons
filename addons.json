@@ -8,7 +8,7 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.6",
+      "version": "0.0.7-beta.1",
       "minAppVersion": "1.5.0-beta.1",
       "permissions": [
         "network:outbound",
@@ -20,27 +20,27 @@
         "scheduler"
       ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.6",
-      "notes": "Housekeeping only — monitoring behaves exactly as before. Corrects the JonDash version this module says it needs, which named the release where it should have named the pre-release, and repairs a shipped test that no longer compiled against JonDash 1.5.2."
+      "tag": "health-monitor/v0.0.7-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.6",
+      "version": "0.0.7-beta.1",
       "minAppVersion": "1.4.1-beta.1",
       "permissions": [
         "audit:write"
       ],
       "path": "addons/template",
-      "tag": "template/v0.0.6",
-      "notes": "The template depends on nothing: no helpers and no background work, so copying it gives you a module that installs on its own. Adds a done toggle — showing a follow-up migration and a permission the code actually uses — and a fuller guide, including a paste-in AI prompt for building a module."
+      "tag": "template/v0.0.7-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.2.3-beta.1",
+      "version": "0.2.3-beta.2",
       "minAppVersion": "1.7.2-beta.2",
       "permissions": [
         "filesystem:read",
@@ -55,14 +55,14 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.2.3-beta.1",
-      "notes": "Same as the 0.2.2 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "backup-manager/v0.2.3-beta.2",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.5-beta.1",
+      "version": "0.0.5-beta.2",
       "minAppVersion": "1.7.2-beta.1",
       "permissions": [
         "system-metrics:read"
@@ -71,14 +71,14 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.5-beta.1",
-      "notes": "Same as the 0.0.4 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "host-vitals/v0.0.5-beta.2",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.5-beta.1",
+      "version": "0.0.5-beta.2",
       "minAppVersion": "1.7.2-beta.1",
       "permissions": [
         "host-services:read",
@@ -88,8 +88,8 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.5-beta.1",
-      "notes": "Same as the 0.0.4 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "service-control/v0.0.5-beta.2",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "docker-manager",
@@ -129,7 +129,7 @@
       "id": "filesystem",
       "name": "Files and folders",
       "description": "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-      "version": "0.0.9-beta.1",
+      "version": "0.0.9-beta.2",
       "minAppVersion": "1.7.2-beta.2",
       "provides": [
         {
@@ -146,8 +146,8 @@
         }
       ],
       "path": "helpers/filesystem",
-      "tag": "filesystem/v0.0.9-beta.1",
-      "notes": "Same as the 0.0.8 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "filesystem/v0.0.9-beta.2",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "system-metrics",
@@ -169,7 +169,7 @@
       "id": "host-services",
       "name": "Host services",
       "description": "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-      "version": "0.0.5-beta.1",
+      "version": "0.0.5-beta.2",
       "minAppVersion": "1.7.2-beta.1",
       "provides": [
         {
@@ -182,8 +182,8 @@
         }
       ],
       "path": "helpers/host-services",
-      "tag": "host-services/v0.0.5-beta.1",
-      "notes": "Same as the 0.0.4 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "host-services/v0.0.5-beta.2",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "docker",

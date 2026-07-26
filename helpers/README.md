@@ -1,7 +1,9 @@
 # Helpers
 
-**Live as of JonDash 1.5.0.** Published: `scheduler` (needs JonDash 1.5.0) and `filesystem` (needs
-1.5.2) on both channels, and `system-metrics` (needs 1.5.2) on beta.
+**Which helpers are published, at what version, and what each needs from JonDash lives in
+[`addons.json`](../addons.json)** — this branch's copy is that channel's answer. It is deliberately
+not restated here: a version written into prose is a sentence that becomes false without anyone
+touching it, and this page said "live as of JonDash 1.5.0" for six releases.
 
 A **helper** is first-party shared capability that modules can depend on. Where a module is written by
 anyone and is deliberately fenced in, a helper is written by the JonDash project and is trusted to do
@@ -51,6 +53,19 @@ that need it.
 | `scheduler` | Periodic work that runs from server start, declared rather than started | none — adds nothing to a consent screen | [scheduler/HELPER.md](scheduler/HELPER.md) |
 | `filesystem` | Copying and archiving folders to another location, within folders an admin approved | `filesystem:read`, `filesystem:write`, `filesystem:delete` | [filesystem/HELPER.md](filesystem/HELPER.md) |
 | `system-metrics` | Reading how the server itself is doing — CPU, memory, disk usage, uptime, temperatures | `system-metrics:read` | [system-metrics/HELPER.md](system-metrics/HELPER.md) |
+| `host-services` | Seeing and controlling the services an admin approved — a Windows service, a systemd unit | `host-services:read`, `host-services:control` | [host-services/HELPER.md](host-services/HELPER.md) |
+| `docker` | Seeing containers and starting, stopping, pausing and restarting them. Never the socket, never `exec` | `docker:read`, `docker:logs`, `docker:manage` | [docker/HELPER.md](docker/HELPER.md) |
+| `host-install` | Installing and removing software through the OS package manager, approved one at a time | `host-install:read`, `host-install:manage` | [host-install/HELPER.md](host-install/HELPER.md) |
+
+**Three of these elevate**, and how that is done is a design decision in its own right — a *fixed*
+action can be granted once, a *variable* one must be approved every time. See
+[ELEVATION.md](ELEVATION.md) before adding any helper that needs privilege.
+
+**Two rules were learned the hard way and are now general.** Rule 8: a helper's module-facing API
+carries read and request, never add, remove or approve — `host-services` and `filesystem` both
+shipped an editor a consuming module could reach, which let the thing being bounded edit its own
+boundary. Rule 9: any capability with a looking-at-it form and a doing-something-to-it form declares
+**both**, so nobody has to grant the destructive half to get the harmless one.
 
 `filesystem` was built the way the rules above ask for: its API was driven by what its first real
 consumer (`backup-manager`) genuinely needed, decided *before* the API was designed — otherwise the

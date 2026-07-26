@@ -173,8 +173,8 @@ configuration, never fetch and run remote code, and treat anything a remote serv
 ## Testing it
 
 1. Copy the folder into a JonDash install at `modules/<id>/`, or zip it and use
-   **Admin → Modules → Import your own module**.
-2. Rebuild and restart, then **Admin → Modules** → review the permission list → **Enable**.
+   **Admin → Addons → Import your own module**.
+2. Rebuild and restart, then **Admin → Addons** → review the permission list → **Enable**.
 3. Check the widget appears on the dashboard, the page loads at `/m/<id>`, and the settings save.
 4. **Disable** it — the widget and page vanish and the base app is unchanged.
 5. **Uninstall** it — confirm the `mod_<id>_*` tables and its settings are gone.

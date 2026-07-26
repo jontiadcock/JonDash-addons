@@ -12,7 +12,7 @@ import { noticeColour, readNotice } from "../lib/notice";
  * display "Add Plex" and submit `sshd`, and the Windows prompt names JonDash rather than the
  * service. The thing being bounded could edit its own boundary.
  *
- * Editing now happens on **Admin → Helpers → Host services**, rendered by JonDash itself with
+ * Editing now happens on **Admin → Permissions**, rendered by JonDash itself with
  * no module in the path. That is HELPERS-DESIGN rule 8: a helper's module-facing API carries
  * read and request, never add, remove or approve.
  */
@@ -62,7 +62,7 @@ export default async function ServiceControlSettings({ ctx }: ModuleSettingsPane
         )}
 
         <p className="text-xs" style={{ color: "var(--muted)" }}>
-          Add or remove services under <strong>Admin → Helpers → Host services</strong>. This module can
+          Add or remove services under <strong>Admin → Permissions</strong>. This module can
           ask for a service to be added, but cannot add, change or remove one itself.
         </p>
 
@@ -81,7 +81,7 @@ export default async function ServiceControlSettings({ ctx }: ModuleSettingsPane
         <section className="card flex flex-col gap-2 p-3">
           <h3 className="font-medium">Waiting for an administrator</h3>
           <p className="text-xs" style={{ color: "var(--muted)" }}>
-            Raised by this module. Approving them happens under Admin → Helpers.
+            Raised by this module. Approving them happens under Admin → Permissions.
           </p>
           {mine.map((p) => (
             <p key={p.id} className="text-sm">

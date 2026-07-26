@@ -24,7 +24,7 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.6",
+  version: "0.0.7-beta.1",
   // The `scheduler` helper and `schedules` arrived in 1.5.0. Named as the PRE-RELEASE:
   // semver ranks `1.5.0-beta.4` below `1.5.0`, so a bare "1.5.0" would be refused on
   // every 1.5.0 beta — the builds beta-channel users are actually running.
@@ -50,7 +50,7 @@ const healthMonitor: ModuleDefinition = {
   /** Shown beside the module name; inherits the theme colour. */
   icon: HealthIcon,
 
-  /** Adding and changing checks happens here, in Admin -> Modules, below the settings
+  /** Adding and changing checks happens here, in Admin -> Addons, below the settings
    *  fields above. The module's own pages stay read-only. */
   SettingsPanel: HealthSettingsPanel,
   DashboardWidget: HealthWidget,

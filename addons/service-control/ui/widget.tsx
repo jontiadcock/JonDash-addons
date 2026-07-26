@@ -29,7 +29,7 @@ export default async function ServiceControlWidget({ ctx }: ModuleWidgetProps) {
 
       {services.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--muted)" }}>
-          No services approved yet. Add one under Admin → Modules → Service control.
+          No services approved yet. Add one under Admin → Addons → Service control.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

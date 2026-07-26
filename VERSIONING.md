@@ -21,8 +21,14 @@ Each add-on has its **own semver**, independent of other add-ons and of JonDash:
 - Stable: `X.Y.Z` (e.g. `1.0.0`)
 - Beta: `X.Y.Z-beta.N` (e.g. `1.1.0-beta.1`)
 
-The version is recorded in the add-on's `MODULE.md`, its `module.ts` (`version`), and its `addons.json`
-entry on the channel branch it lives on.
+The version is recorded in **two** places that must agree: the add-on's `module.ts` / `helper.ts`
+(`version`) and its `addons.json` entry on the channel branch it lives on. `check-manifest.mjs`
+compares them.
+
+**Not in `MODULE.md` / `HELPER.md`.** That was the old convention and it produced exactly the drift
+you would expect: nothing checks a sentence, so both docs that carried a version were stale by
+2026-07-26 (`backup-manager` said 0.1.1 when it was 0.2.2), while the seven docs that never restated
+it could not go wrong. Link to `addons.json` instead.
 
 ### Keeping beta ahead of stable — the step that closes a promotion
 
@@ -41,6 +47,13 @@ entry on the channel branch it lives on.
 >   this when nothing is in flight; the two channels agree until the next pre-release opens. This is
 >   the normal resting state, not a smell.
 > - **Open the next pre-release** — `X.Y.(Z+1)-beta.1` — when there is genuinely work in flight.
+>
+> **If you open the next pre-release, CREATE AND PUSH ITS TAG.** Matching stable reuses a tag that
+> already exists; opening a new version invents a tag name that does not, and the installer fetches
+> by tag — so a manifest naming an uncreated tag is a **404 for every user on that channel**, with
+> nothing anywhere saying so. Done wrong on 2026-07-26: nine entries advanced, nine tags never
+> created, and the beta channel was broken for an hour until a deep clean found it.
+> `check-manifest.mjs` now fails on a tag that does not exist, which is the only reliable catch.
 >
 > Never leave beta on the superseded pre-release. Found 2026-07-24 by the core session with **four of
 > five entries** stale; `node scripts/check-manifest.mjs` now diffs the two manifests and **fails** if
@@ -127,8 +140,9 @@ why a version is worth taking before they take it. Keep it to what changed and w
 >
 > **`node scripts/check-manifest.mjs` now does.** Run it before every publish. It fails on an
 > over-length note and prints where the cut would land, and also checks that each `tag` names its
-> `version`, that the manifest version matches the addon's own `module.ts` / `helper.ts`, and that a
-> pre-release never appears on the stable channel.
+> `version`, **that the tag actually exists**, that the manifest version matches the addon's own
+> `module.ts` / `helper.ts`, that beta never sorts below stable, and that a pre-release never appears
+> on the stable channel.
 
 Update it whenever you bump a version — it describes *that* version, not the module in general. Leaving
 it out is fine; the card simply shows the version numbers.
@@ -163,7 +177,9 @@ the release `A.B.C`, update the stable `addons.json`, commit, tag `X/vA.B.C`, pu
 
 ## Helpers — different rules on purpose
 
-**Live as of JonDash 1.5.0.** See [`helpers/README.md`](helpers/README.md).
+See [`helpers/README.md`](helpers/README.md) for what exists and the rules they obey, and
+[`addons.json`](addons.json) for what each one needs from JonDash. Not restated here — a version in
+prose goes stale silently, and this line claimed 1.5.0 for six releases.
 
 Helpers are first-party shared capability living in `helpers/<id>/` in this repository. They are
 published like add-ons but consumed differently:
@@ -178,7 +194,7 @@ published like add-ons but consumed differently:
   pulling it in, from the official manifest. There is no per-helper channel setting.
 - **Not user-installable.** They arrive automatically as dependencies of a module that declares them
   (`helpers: ["scheduler"]` in both `module.ts` and the module's `addons.json` entry), and are listed
-  read-only under **Admin → Helpers**. There is no install, import or remove button.
+  read-only under **Admin → Addons → Shared capabilities**. There is no install, import or remove button.
 - **Official source only**, enforced by JonDash's installer — a `helpers` array published by any other
   source is silently dropped. Otherwise a third party publishes a `helpers/` folder and inherits
   privilege that modules are specifically denied.

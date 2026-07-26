@@ -4,7 +4,7 @@ Shows how the server JonDash runs on is doing — CPU load, memory, how full eac
 where the hardware reports them, temperatures. A dashboard tile for the glance, a page for the detail.
 
 - **Module id:** `host-vitals`
-- **Version:** `0.0.1` on stable, `0.0.2-beta.1` on beta
+- **Version:** see [`addons.json`](../../addons.json) on this branch — stable on `main`, beta on `beta`. Deliberately not restated here: it drifts the moment a version is published, and both docs that carried it were stale.
 - **Minimum JonDash version:** `1.5.2-beta.1` — the **pre-release**, deliberately. Semver ranks it
   below `1.5.2`, so a bare `"1.5.2"` would be refused on every 1.5.2 beta. 1.5.2 is the release whose
   `ctx.can()` the `system-metrics` helper uses to enforce its capability.
@@ -36,7 +36,7 @@ anything on the host, and none that returns a file's contents. So this module ca
 
 ## What you can switch off
 
-Each optional vital has a switch in **Admin → Modules → Host vitals**:
+Each optional vital has a switch in **Admin → Addons → Host vitals**:
 
 | Setting | Default | Notes |
 | ------- | ------- | ----- |

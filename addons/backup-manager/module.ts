@@ -57,7 +57,7 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.2.3-beta.1",
+  version: "0.2.3-beta.2",
   // Follows the filesystem helper's floor, which has now moved three times: 0.0.6 put the
   // folder editor on the helper's own settings page, 0.0.7 declared CORE-10 `scope`, and 0.0.8
   // declares `unbounded.option` — the "exclude JonDash's own data" switch — which arrived in

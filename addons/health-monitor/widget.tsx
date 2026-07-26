@@ -60,7 +60,7 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
 
       {monitors.length === 0 ? (
         <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
-          No monitors yet — add some under Admin → Modules → Health monitoring.
+          No monitors yet — add some under Admin → Addons → Health monitoring.
         </p>
       ) : (
         <>

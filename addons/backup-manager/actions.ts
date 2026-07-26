@@ -66,7 +66,7 @@ export const assessPathAction = moduleAction(MODULE_ID, async (ctx, form: FormDa
  * `addRootAction` and `removeRootAction` used to live here and called straight through to the
  * helper. That made the consent wording — "within the folders you allow" — true only until
  * this module chose otherwise: the thing confined to approved folders could approve them.
- * The editor is now on Admin → Helpers → Files and folders, and all this can do is ask.
+ * The editor is now on Admin → Permissions → Files and folders, and all this can do is ask.
  */
 export const suggestRootAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const res = await filesystem(ctx).suggestRoot(str(form, "path"), str(form, "reason"));

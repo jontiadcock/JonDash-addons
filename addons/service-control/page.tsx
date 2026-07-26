@@ -52,7 +52,7 @@ export default async function ServiceControlPage({ ctx }: ModulePageProps) {
       {services.length === 0 ? (
         <p className="card p-4 text-sm" style={{ color: "var(--muted)" }}>
           No services have been approved yet. An administrator adds them under{" "}
-          <a href={ADMIN_PATH}>Admin → Modules → Service control</a>.
+          <a href={ADMIN_PATH}>Admin → Addons → Service control</a>.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

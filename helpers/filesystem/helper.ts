@@ -89,7 +89,7 @@ const helper: HelperDefinition = {
   name: "Files and folders",
   description:
     "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-  version: "0.0.9-beta.1",
+  version: "0.0.9-beta.2",
   // Raised for 0.0.6, from 1.5.2-beta.1. `SettingsPanel` / `onSettingsSubmit` arrived in
   // 1.7.1-beta.9, and this release cannot work without them: the folder editor moved off the
   // module-facing API and there is nowhere else for it to live. Declaring the old floor would

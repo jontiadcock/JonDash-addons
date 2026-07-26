@@ -23,7 +23,7 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.5-beta.1",
+  version: "0.0.5-beta.2",
   // Matches the helper's floor: beta.9 is the first build with helper settings pages, which
   // is where the allowlist editor now lives. The PRE-RELEASE, not a bare "1.7.1" — semver
   // ranks a pre-release below its release, so "1.7.1" would refuse every 1.7.1 beta,
@@ -42,7 +42,7 @@ const serviceControl: ModuleDefinition = {
    * Two, and `host-services:configure` is **gone** — it existed for one release because this
    * module hosted the allowlist editor, which let it choose what went on the list it was only
    * meant to use. JonDash 1.7.1 gave helpers their own settings page, so the editor moved to
-   * Admin → Helpers and the capability was deleted rather than left disclosed.
+   * Admin → Permissions and the capability was deleted rather than left disclosed.
    */
   permissions: ["host-services:read", "host-services:control"],
 
@@ -60,7 +60,7 @@ const serviceControl: ModuleDefinition = {
    *
    * This panel shows what this module can see through the helper — the approved services and
    * the requests it has raised — and offers no way to change any of it. The editor lives at
-   * Admin → Helpers → Host services, rendered by JonDash with no module in the path.
+   * Admin → Permissions, rendered by JonDash with no module in the path.
    *
    * That split is the security property, not a layout choice. The allowlist is *helper*
    * configuration: it outlives this module, along with the OS grants it represents. While the

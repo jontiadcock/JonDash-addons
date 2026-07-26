@@ -41,7 +41,7 @@ import { isVerb, type Verb } from "./lib/names";
  *
  * ## Absent, and must stay absent
  *
- *  - **Anything that edits the allowlist.** It lives on Admin → Helpers.
+ *  - **Anything that edits the allowlist.** It lives on Admin → Permissions.
  *  - **No way to run a command.** Verbs against a list. This is not a shell.
  *  - **No way to enumerate services.** A module cannot discover what exists on the machine;
  *    that is a scoping decision and a privacy one.
