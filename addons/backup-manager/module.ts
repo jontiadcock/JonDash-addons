@@ -57,11 +57,14 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.1.1",
+  version: "0.2.0-beta.1",
   // `ctx.can()` enforcement and GFS retention arrived in filesystem 0.0.3, which needs
   // JonDash 1.5.2. The pre-release, not a bare "1.5.2" — semver ranks a pre-release below
   // its release, so a bare number is refused on every 1.5.2 beta.
-  minAppVersion: "1.5.2-beta.1",
+  // Follows the filesystem helper's floor. 0.0.6 of that helper moved the folder editor onto
+  // its own settings page, which needs 1.7.1-beta.9 — and this module cannot install without
+  // a helper that has the API it now calls.
+  minAppVersion: "1.7.1-beta.9",
 
   /**
    * `filesystem:*` come from the helper, not core.
@@ -103,7 +106,9 @@ const backupManager: ModuleDefinition = {
    * version has supported. Stating a floor we don't require would make the break-analysis
    * wrong in the other direction.
    */
-  helpers: [{ id: "filesystem", minVersion: "0.0.3-beta.1" }, "scheduler"],
+  // Pinned to 0.0.6-beta.1: the release that removed addRoot/removeRoot/setRetention and added
+  // suggestRoot. An older helper simply has no suggestRoot to call.
+  helpers: [{ id: "filesystem", minVersion: "0.0.6-beta.1" }, "scheduler"],
 
   /** Backups are infrastructure: the paths alone tell you how the machine is laid out. */
   adminOnly: true,

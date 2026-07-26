@@ -321,12 +321,13 @@ Imported by a consuming module as `@/helpers/filesystem/api`, which the verifier
 module declares `helpers: ["filesystem"]`.
 
 ```ts
-// Roots — admin-approved locations
+// Roots — admin-approved locations. READ AND ASK ONLY (since 0.0.6).
 listRoots()                       → Root[]
-registerRoot(path, { label })     → Root            // validates; throws with a reason
-removeRoot(rootId)                → void            // does not touch files
+suggestRoot(path, reason)         → { ok, id } | { ok: false, reason }  // INERT: records a request
+mySuggestions()                   → RootSuggestion[]   // this module's own, and their outcome
 
-// Looking — for a folder picker. Names and sizes only, never contents.
+// Looking — for a folder picker. Names and sizes only, never contents, and
+// JonDash's own secrets are omitted entirely (since 0.0.5).
 browse(rootId, subpath?)          → { name, isDir, bytes, modifiedAt }[]
 
 // Testing — the explicit check an admin runs BEFORE saving a root.
@@ -339,6 +340,15 @@ progress(runId)                   → { filesDone, bytesDone, currentPath } | nu
 status(runId)                     → RunStatus | null   // PERSISTED outcome; survives the run ending AND a restart
 cancel(runId)                     → void
 ```
+
+**`addRoot`, `removeRoot` and `setRetention` are gone from this API as of 0.0.6, and must never
+return.** They let a module confined to approved folders approve its own — the consent wording
+("within the folders you allow") held only until the module chose otherwise, and it needed no
+exploit, just the call it was already given. Retention was worse in one way: the policy is global,
+so any module could shorten it and prune every other module's logs, including the record of what
+it had just done. All three now live in `lib/admin.ts`, reachable only from the helper's settings
+page on Admin → Helpers, where `ctx.user` comes from the session and no module is in the path.
+This is HELPERS-DESIGN rule 8: **read and request, never add, remove or approve.**
 
 **A consumer reconciles against `status`, it does not poll `progress`.** `start` returns an id and
 returns; the copy runs in the helper's background and writes its outcome to

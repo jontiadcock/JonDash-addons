@@ -60,15 +60,20 @@ export const assessPathAction = moduleAction(MODULE_ID, async (ctx, form: FormDa
   revalidatePath(ADMIN_PATH);
 });
 
-/** Allow a folder. Refusals are audited by the helper itself, so nothing is silent. */
-export const addRootAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
-  const res = await filesystem(ctx).addRoot({ path: str(form, "path"), label: str(form, "label") });
-  await ctx.store?.set("lastRoot", res.ok ? `Allowed ${res.root.path}` : `Refused: ${res.reason}`);
-  revalidatePath(ADMIN_PATH);
-});
-
-export const removeRootAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
-  await filesystem(ctx).removeRoot(str(form, "rootId"));
+/**
+ * ASK for a folder. This module cannot approve one, and that is deliberate.
+ *
+ * `addRootAction` and `removeRootAction` used to live here and called straight through to the
+ * helper. That made the consent wording — "within the folders you allow" — true only until
+ * this module chose otherwise: the thing confined to approved folders could approve them.
+ * The editor is now on Admin → Helpers → Files and folders, and all this can do is ask.
+ */
+export const suggestRootAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
+  const res = await filesystem(ctx).suggestRoot(str(form, "path"), str(form, "reason"));
+  await ctx.store?.set(
+    "lastRoot",
+    res.ok ? "Asked an administrator to approve that folder." : `Not asked: ${res.reason}`,
+  );
   revalidatePath(ADMIN_PATH);
 });
 
@@ -332,12 +337,7 @@ export const setDigestAction = moduleAction(MODULE_ID, async (ctx, form: FormDat
   revalidatePath(ADMIN_PATH);
 });
 
-/** How long RUN LOGS are kept. Distinct from GFS retention, which is about the backups. */
-export const setLogRetentionAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
-  const res = await filesystem(ctx).setRetention({
-    keepDays: int(form, "keepDays", 30),
-    keepRuns: int(form, "keepRuns", 50),
-  });
-  await ctx.store?.set("lastLogRetention", `Saved. Removed ${res.removed} old log(s).`);
-  revalidatePath(ADMIN_PATH);
-});
+/* `setLogRetentionAction` has gone to the helper's own settings page. Log retention is GLOBAL
+   across every module using the filesystem helper, so this module changing it pruned other
+   modules' logs — including the record of what this one had just done. GFS retention, which is
+   about the BACKUPS and is per-job, still lives in this module and is unaffected. */
