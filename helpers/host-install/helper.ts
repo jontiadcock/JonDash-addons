@@ -29,7 +29,7 @@ const helper: HelperDefinition = {
   name: "Install software",
   description:
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-  version: "0.0.3-beta.1",
+  version: "0.0.4-beta.1",
   // The package API arrived in 1.7.1-beta.7, but CORE-10's `label` / `risk` raise the floor
   // again: optional to omit, not to declare — on a 1.7.1 clone they fail to compile (TS2353),
   // and a helper compiles into the app, so that is a failed build rather than a plainer screen.
