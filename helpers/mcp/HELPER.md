@@ -177,12 +177,17 @@ Inherited from the MCP session's catalogue, which survives the change of transpo
 
 | Tool | Requires of the bound account | Returns |
 | ---- | ----------------------------- | ------- |
-| `get_server_status` | — | version, channel, uptime, update-available |
-| `list_services` | — | title, url, group, order |
+| `get_server_status` | — | version, uptime, started-at |
+| `list_services` | — | title, url, source |
 | `list_modules` | modules.manage | id, name, version, enabled, channel |
 | `list_sessions` | sessions.manage | user, ip, last seen |
 | `query_audit_log` | audit.read | filtered, paginated, hard cap 100 rows |
-| `list_users` | users.manage | email, role, status, mfaEnabled |
+| `list_users` | users.manage | display name (email only as a fallback), role, status, whether 2FA is on, whether it is a service account |
+
+**A tool's `description` is read by the model, so it is part of the contract, not a comment.**
+`get_server_status` once advertised the release channel and update-availability it does not return —
+which is how an assistant ends up confidently answering a question from data it never received.
+Keep every description to what `run` actually returns.
 
 **Never returned by any read tool:** password hashes, TOTP secrets, recovery codes, session tokens,
 API keys, or the contents of `.data/secrets.json`. Not "filtered out" — **never selected**. Every
@@ -246,4 +251,5 @@ repo. The endpoint is deliberately off on install, and the owner's pentest is th
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.1-beta.2` | Text only, no behaviour change: `api.ts` pointed at the wrong admin screen. The controls live under **Admin → Addons → Shared capabilities**. Republished rather than edited on the branch, because tags are immutable and an already-installed copy would otherwise keep the wrong text. |
 | `0.0.1-beta.1` | First release. Streamable HTTP on 2025-11-25, 6 read tools + 2 acting tools, keys bound to service accounts only, two-gate authorization. Not yet promoted to stable — awaiting the owner's pentest. |

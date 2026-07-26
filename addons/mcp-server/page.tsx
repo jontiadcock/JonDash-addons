@@ -5,7 +5,7 @@ import mcp from "@/helpers/mcp/api";
  * The page. Explains what the tile means, and — more usefully — what an assistant *cannot* do,
  * since that is the part nobody can infer from a status line.
  *
- * Display only. Every control lives on Admin → Permissions, and this page says so rather than
+ * Display only. Every control lives on Admin → Addons → Shared capabilities, and this page says so rather than
  * pretending the module could offer them.
  */
 export default async function McpPage({ ctx }: ModulePageProps) {
@@ -54,8 +54,8 @@ export default async function McpPage({ ctx }: ModulePageProps) {
 
       <p className="text-sm" style={muted}>
         Keys, what each one may do, and whether this is switched on are all managed under{" "}
-        <strong>Admin &rarr; Permissions</strong>. This page cannot change any of it &mdash; the
-        module you are looking at has no power to grant an assistant anything.
+        <strong>Admin &rarr; Addons &rarr; Shared capabilities</strong>. This page cannot change any
+        of it &mdash; the module you are looking at has no power to grant an assistant anything.
       </p>
     </div>
   );

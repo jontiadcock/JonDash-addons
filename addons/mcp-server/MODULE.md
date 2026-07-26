@@ -4,9 +4,12 @@ Lets an AI assistant read and manage this server through the Model Context Proto
 create and can revoke at any time.
 
 - **Module id:** `mcp-server`
-- **Version:** `0.0.1-beta.1`
+- **Version:** `0.0.1-beta.2`
 - **Requires:** JonDash `1.7.3-beta.2` or newer, and the `mcp` helper (installed automatically).
 - **Permissions:** `mcp:read` — and deliberately **not** `mcp:act`. See below.
+
+> **Connecting an assistant: [CONNECTING.md](./CONNECTING.md)** — the technical guide. Endpoint,
+> headers, the handshake, every tool, the refusal shape, security notes and troubleshooting.
 
 ---
 
@@ -74,4 +77,5 @@ settings that control it.
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.1-beta.2` | The dashboard tile drew no card, so it rendered as loose text — a nameless box reading "Off", with no way to click through. Also corrected the menu this points you at: the controls are under **Admin → Addons → Shared capabilities**, not Permissions. Both found by loading the dashboard after a real install; the build was green throughout. |
 | `0.0.1-beta.1` | First release, alongside `mcp` helper `0.0.1-beta.1`. |

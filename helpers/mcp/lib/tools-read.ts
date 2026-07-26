@@ -27,8 +27,12 @@ import { register } from "./tools";
 
 register({
   name: "get_server_status",
+  // Describes exactly what `run` returns and nothing more. It previously advertised the release
+  // channel and whether an update was available — neither of which this returns — and a tool
+  // description is read by the MODEL, so an overstated one makes an assistant confidently answer a
+  // question from data it never received.
   description:
-    "The JonDash server's version, release channel, uptime and whether an update is available. Read-only; changes nothing.",
+    "The JonDash server's version, how long it has been running, and when it started. Read-only; changes nothing.",
   kind: "read",
   // Deliberately available to any valid key: an agent must be able to say what it is connected to
   // without having been granted anything.

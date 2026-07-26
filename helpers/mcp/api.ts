@@ -17,7 +17,7 @@ import { allTools } from "./lib/tools";
  *
  * ## Absent, and must stay absent
  *
- *  - **Anything that mints, revokes or re-modes a key.** Admin → Permissions, where `ctx.user`
+ *  - **Anything that mints, revokes or re-modes a key.** Admin → Addons → Shared capabilities, where `ctx.user`
  *    comes from the session.
  *  - **The key itself, or its hash.** `keyCount` is a number. Even the display hint stays out — a
  *    module has no use for it and it is one step closer to a credential than a count is.

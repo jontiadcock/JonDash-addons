@@ -115,8 +115,8 @@
     {
       "id": "mcp-server",
       "name": "AI assistant access",
-      "description": "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Permissions.",
-      "version": "0.0.1-beta.1",
+      "description": "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
+      "version": "0.0.1-beta.2",
       "minAppVersion": "1.7.3-beta.2",
       "permissions": [
         "mcp:read"
@@ -125,8 +125,8 @@
         "mcp"
       ],
       "path": "addons/mcp-server",
-      "tag": "mcp-server/v0.0.1-beta.1",
-      "notes": "First release. Installing it opens no port — the endpoint starts only once an administrator switches it on and a key exists, on 127.0.0.1 unless you open it up. A key binds to a service account, never a person, and can never exceed that account's permissions."
+      "tag": "mcp-server/v0.0.1-beta.2",
+      "notes": "Fixes the dashboard tile, which rendered with no title and no link — a nameless box reading \"Off\". Also corrects where the app sends you: the controls are under Admin → Addons → Shared capabilities, not Permissions. No behaviour change."
     }
   ],
   "helpers": [
@@ -249,7 +249,7 @@
       "id": "mcp",
       "name": "AI assistant access",
       "description": "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-      "version": "0.0.1-beta.1",
+      "version": "0.0.1-beta.2",
       "minAppVersion": "1.7.3-beta.2",
       "provides": [
         {
@@ -262,8 +262,8 @@
         }
       ],
       "path": "helpers/mcp",
-      "tag": "mcp/v0.0.1-beta.1",
-      "notes": "First release. Installing it opens no port — the endpoint starts only once an administrator switches it on and a key exists, on 127.0.0.1 unless you open it up. A key binds to a service account, never a person, and can never exceed that account's permissions."
+      "tag": "mcp/v0.0.1-beta.2",
+      "notes": "Fixes the dashboard tile, which rendered with no title and no link — a nameless box reading \"Off\". Also corrects where the app sends you: the controls are under Admin → Addons → Shared capabilities, not Permissions. No behaviour change."
     }
   ]
 }
