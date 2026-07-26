@@ -86,3 +86,17 @@ export async function bindableAccounts(): Promise<BindableAccount[]> {
   const { listBindableAccounts } = await import("@/lib/auth/service-accounts");
   return listBindableAccounts();
 }
+
+/**
+ * Is any add-on that depends on this helper actually enabled?
+ *
+ * `startListener` refuses to bind when nothing is, so the settings page has to be able to say so —
+ * otherwise an admin reads "switched on", sees no endpoint, and has no way to find out why. The
+ * same condition, asked in the same terms, rather than a second rule that could drift from it.
+ */
+export async function carrierEnabled(): Promise<boolean> {
+  const { dependentsOf } = await import("@/lib/helpers/registry");
+  const ids = dependentsOf("mcp").map((d) => d.id);
+  if (ids.length === 0) return false;
+  return (await prisma.module.count({ where: { id: { in: ids }, enabled: true } })) > 0;
+}

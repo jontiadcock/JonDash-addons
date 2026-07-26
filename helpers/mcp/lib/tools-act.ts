@@ -97,9 +97,15 @@ register({
     if (!id) throw new Error("Give the module id from list_modules.");
 
     /**
-     * **An assistant may not disable the module carrying its own helper.** Doing so would not stop
-     * the endpoint — `bootHelpers()` ignores module state — but it would strand the settings page
-     * and the status widget, leaving an admin with a live listener and no screen describing it.
+     * **An assistant may not disable the module carrying its own helper.**
+     *
+     * Since `startListener` refuses to bind when no enabled add-on depends on this helper, doing so
+     * would shut the endpoint down — an agent severing its own connection mid-conversation, leaving
+     * an admin to work out from a dead assistant that it switched itself off. An action whose only
+     * outcome is "the caller disappears" is not one worth offering.
+     *
+     * A person may absolutely do this; it is the documented way to close the endpoint from Addons.
+     * The refusal is about who is asking, not about the change.
      */
     if (id === "mcp-server") {
       await record(identity, "set_module_enabled.refused", "refused: cannot disable its own module");

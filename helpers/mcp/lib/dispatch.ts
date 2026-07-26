@@ -20,7 +20,11 @@ type Req = { method?: string; id?: unknown; params?: unknown };
 
 const ok = (id: unknown, result: unknown) => ({ status: 200, body: { jsonrpc: "2.0", id, result } });
 
-/** A JSON-RPC-level error, for things that are NOT authorization: bad params, tool threw. */
+/**
+ * A JSON-RPC-level error, for things that are NOT authorization and NOT a tool's own outcome:
+ * an unknown method, an unknown tool name. A tool that ran and refused returns `isError` instead
+ * — see the `tools/call` catch.
+ */
 const err = (id: unknown, code: number, message: string) => ({
   status: 200,
   body: { jsonrpc: "2.0", id, error: { code, message } },
@@ -75,9 +79,26 @@ export const dispatch: Dispatch = async (message: Req, auth) => {
         content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result, null, 2) }],
       });
     } catch (e) {
-      // The message a tool throws reaches the model. Keep it about the request, never about the
-      // internals — a stack trace or a SQL error is an information leak with a model attached.
-      return err(id, -32603, e instanceof Error ? e.message : "The tool failed.");
+      /**
+       * **A tool that refuses is a RESULT, not a protocol error.**
+       *
+       * The spec draws the line at whose problem it is: a malformed request is the caller's and
+       * belongs in a JSON-RPC `error`; a tool that ran and declined is an outcome, and goes back
+       * as a normal result carrying `isError`. Clients only feed results to the model — a
+       * JSON-RPC error is surfaced as a transport failure and frequently never reaches it.
+       *
+       * That distinction is the whole point here. Every refusal in `tools-act.ts` is written to be
+       * READ BY THE ASSISTANT and passed on: "an assistant cannot sign an administrator out — do
+       * it from Admin → Sessions." Returned as -32603 that sentence is thrown away and the user
+       * gets an opaque failure, so the guard holds but the person never learns what to do instead.
+       *
+       * The message a tool throws reaches the model. Keep it about the request, never about the
+       * internals — a stack trace or a SQL error is an information leak with a model attached.
+       */
+      return ok(id, {
+        content: [{ type: "text", text: e instanceof Error ? e.message : "The tool failed." }],
+        isError: true,
+      });
     }
   }
 

@@ -1,5 +1,5 @@
 import type { HelperSettingsContext } from "@/lib/helpers/types";
-import { bindableAccounts, keyRows, recentRefusals, explainRefusal } from "../lib/admin";
+import { bindableAccounts, carrierEnabled, keyRows, recentRefusals, explainRefusal } from "../lib/admin";
 import { ALLOWED_PORTS, getPort, isEnabled, isNetworkExposed } from "../lib/keys";
 import { isListening } from "../lib/transport";
 import PanelClient from "./panel-client";
@@ -15,13 +15,14 @@ import PanelClient from "./panel-client";
  * switching the listener on. A module holding `mcp:read` sees status and nothing else.
  */
 export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext }) {
-  const [keys, accounts, refusals, enabled, exposed, port] = await Promise.all([
+  const [keys, accounts, refusals, enabled, exposed, port, carrier] = await Promise.all([
     keyRows(),
     bindableAccounts(),
     recentRefusals(),
     isEnabled(),
     isNetworkExposed(),
     getPort(),
+    carrierEnabled(),
   ]);
 
   return (
@@ -32,6 +33,9 @@ export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext 
       // state a fresh install is in. The page says which, because "on" that isn't listening is
       // exactly the sort of thing an admin should not have to infer.
       listening={isListening()}
+      // Switched on with keys and STILL not listening is the one state an admin cannot work out
+      // for themselves — the reason is on a different screen entirely.
+      carrierEnabled={carrier}
       exposed={exposed}
       port={port}
       ports={[...ALLOWED_PORTS]}

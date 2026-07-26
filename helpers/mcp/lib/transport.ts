@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
+import { dependentsOf } from "@/lib/helpers/registry";
 import { getPort, isEnabled, isNetworkExposed, type RefusalReason } from "./keys";
 
 /**
@@ -150,6 +151,30 @@ export async function startListener(dispatch: Dispatch): Promise<{ started: bool
     `SELECT count(*) AS n FROM ${helperTableName("mcp", "keys")}`,
   );
   if (Number(keyCount[0]?.n ?? 0) === 0) return { started: false };
+
+  /**
+   * **A disabled add-on must not leave a live endpoint behind.**
+   *
+   * `bootHelpers()` deliberately ignores module state — a helper is not its carrier — and for every
+   * other helper that is right, because they only act when a module calls them. This one is
+   * different: it listens on a port whether any module ever calls it or not. Without this check, an
+   * admin who switches "AI assistant access" off in Addons has done nothing at all, and the screen
+   * they used says nothing to the contrary. Someone reasonably believes they closed the door.
+   *
+   * Phrased over dependents rather than the id `mcp-server`, so it stays true if this helper is
+   * ever carried by something else, and so it means what it says: nothing enabled needs this, so
+   * nothing listens. It can only ever refuse to start — no arrangement of module state can cause
+   * an endpoint that `isEnabled()` and the key count would not already have allowed.
+   *
+   * The switch in the helper's own settings remains the real control, and stays reachable: the
+   * Shared capabilities section lists a helper by whether a module *depends* on it, not by whether
+   * that module is enabled. So this is recoverable from the same screen that shows it.
+   */
+  const dependents = dependentsOf("mcp");
+  const liveDependents = await prisma.module.count({
+    where: { id: { in: dependents.map((d) => d.id) }, enabled: true },
+  });
+  if (liveDependents === 0) return { started: false };
 
   const port = await getPort();
   const exposed = await isNetworkExposed();

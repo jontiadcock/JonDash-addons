@@ -27,6 +27,7 @@ export default function PanelClient({
   helperId,
   enabled,
   listening,
+  carrierEnabled,
   exposed,
   port,
   ports,
@@ -37,6 +38,7 @@ export default function PanelClient({
   helperId: string;
   enabled: boolean;
   listening: boolean;
+  carrierEnabled: boolean;
   exposed: boolean;
   port: number;
   ports: number[];
@@ -83,15 +85,23 @@ export default function PanelClient({
         <span className="font-medium" style={{ color: statusTone }}>
           {listening
             ? `Listening on ${exposed ? "this machine's network" : "127.0.0.1"}:${port}`
-            : enabled
-              ? "Switched on, but not listening — no keys exist yet"
-              : "Off. Nothing is listening."}
+            : !enabled
+              ? "Off. Nothing is listening."
+              : !carrierEnabled
+                ? "Switched on, but not listening — the AI assistant access addon is disabled"
+                : keys.length === 0
+                  ? "Switched on, but not listening — no keys exist yet"
+                  : "Switched on, but not listening."}
         </span>
         <span className="text-sm" style={{ color: "var(--muted)" }}>
           {keys.length} key{keys.length === 1 ? "" : "s"}.{" "}
           {listening
             ? "An assistant with a key can reach this."
-            : "Installing this opened no port — it starts only when switched on and a key exists."}
+            : enabled && !carrierEnabled
+              ? // Naming the screen, not just the cause: the control is in Addons, and an admin
+                // reading this is by definition on the wrong page to fix it.
+                "Turning the addon off closes the endpoint too. Re-enable it under Admin → Addons."
+              : "Installing this opened no port — it starts only when switched on and a key exists."}
         </span>
         <span className="mt-2 flex flex-wrap items-center gap-2">
           <button className="btn btn-sm" disabled={busy} onClick={() => send({ op: "enabled", value: !enabled })}>

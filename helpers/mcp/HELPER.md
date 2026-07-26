@@ -1,16 +1,19 @@
 # MCP helper
 
-**Status: SPEC — not built.** Awaiting the owner's approval of this document.
+**Status: BUILT — 0.0.1-beta.1, live-tested, awaiting the owner's pentest.**
 
 Lets an AI agent read and manage this JonDash install, over the Model Context Protocol, **as a
-JonDash user you choose**. The agent gets exactly that user's reach and nothing more.
+service account you choose**. The agent gets exactly that account's reach and nothing more.
 
 - **Helper id:** `mcp`
+- **Version:** `0.0.1-beta.1`
+- **`minAppVersion`:** `1.7.3-beta.2` — service accounts (beta.1) plus the helper id that
+  `resolveBindableAccount` takes (beta.2). The **pre-release**, not a bare `1.7.3`: semver ranks a
+  pre-release below its release, so `"1.7.3"` would be refused on exactly the builds beta users run.
 - **First consumer:** `mcp-server` — a thin module carrying this helper, with a status widget and page.
 - **Grants:** two capabilities, `mcp:read` and `mcp:act`.
-- **Needs from core:** the *transport and auth* need nothing — that is the point of the design. But
-  **service accounts are a hard blocker on shipping**, because a key may bind to nothing else. See
-  *Keys* below.
+- **Needs from core:** the *transport and auth* need nothing — that is the point of the design. The
+  one dependency is service accounts, since a key may bind to nothing else. See *Keys* below.
 
 ---
 
@@ -79,19 +82,23 @@ path.
 - **Each key binds to a SERVICE ACCOUNT, and only a service account.** Never a person's account.
 - Each key carries a mode (read / read+act) alongside its bound account.
 
-> **This is a hard dependency on core, accepted deliberately (owner, 2026-07-26).** Service accounts
-> — identities that hold permissions but can never be logged into — do not exist yet; core has been
-> asked for them. Until they land, the key dropdown has nothing to offer and **this helper cannot
-> ship**.
+> **Shipped by core in 1.7.3-beta.1 (SEC-07), which is why this helper's floor is that release.**
+> Service accounts are identities that hold permissions but can never be logged into.
 >
 > The alternative was to allow binding to an ordinary user now and restrict later. That was rejected
 > because it would break every key already minted, on a security boundary — and because an agent
 > bound to a person's account means that identity is also a live login surface, the audit log reads
 > as the person, and revoking the agent locks out the human. Never allowing it is cheaper than taking
-> it away.
+> it away. The audit rows bear this out: every `mcp.*` entry names the agent's own identity, so no
+> human is ever recorded as having done something an assistant did.
 >
 > **A service account must not satisfy "at least one admin exists"**, or deleting the last human
 > admin while an unreachable account keeps the check happy locks the owner out permanently.
+>
+> The gate is `resolveBindableAccount`, called on **every** request rather than at mint time — so an
+> account that stops being a service account fails closed, not just a deleted one. Core stamps
+> `lastUsedAt` / `lastUsedByHelper` from that same call, which is how an admin tells a live service
+> account from a forgotten one.
 - Revoking deletes the row and takes effect on the next call — no cache, no grace period.
 - A key is never written to the audit log, never logged, never echoed back.
 
@@ -107,14 +114,33 @@ path.
 - **Opening it to the network is opt-in, confirmed, and requires HTTPS** — a bearer key over plain
   HTTP on a LAN is sniffable. The warning is blocking, not advisory.
 
-### The off switch, and why it needs to be explicit
+### The off switch — three independent conditions, all required
 
 `bootHelpers()` runs every installed helper's `onBoot` **regardless of whether the consuming module
-is enabled** (verified against 1.7.2-beta.2). So disabling the module does **not** stop the endpoint,
-which is what an admin would reasonably expect it to do.
+is enabled** (verified against 1.7.2-beta.2, still true at 1.7.3-beta.2). For every other helper that
+is correct — a helper only acts when a module calls it. This one is different: it listens on a port
+whether a module ever calls it or not.
 
-Therefore: an explicit on/off on this helper's settings page, and **no keys means the listener does
-not start at all**. Uninstalling remains the last resort, not the only one.
+So the listener binds only when **all three** hold, and every one of them is checked in
+`startListener` rather than merely intended:
+
+1. **Switched on** here, on this helper's settings page. A fresh install binds no port at all.
+2. **At least one key exists.** A listener nothing can authenticate to is a surface with no purpose,
+   so revoking the last key closes the port immediately.
+3. **At least one enabled add-on depends on this helper.** Without this, an admin who switched
+   "AI assistant access" off in Addons had done nothing whatsoever — and the screen they used said
+   nothing to the contrary. Someone reasonably believes they closed the door.
+
+The third is phrased over *dependents*, not over the id `mcp-server`, so it stays true if this helper
+is ever carried by something else. It can only ever refuse to start: no arrangement of module state
+can open an endpoint that (1) and (2) would not already have allowed.
+
+Because it is recoverable it is also honest about itself — the settings page distinguishes "off",
+"on but no keys", and "on but the add-on is disabled", and names the screen that fixes the last one.
+The helper stays listed under Shared capabilities either way, because core lists a helper by whether
+a module *depends* on it, not by whether that module is enabled.
+
+Uninstalling remains the last resort, not the only one.
 
 ---
 
@@ -147,36 +173,42 @@ request, never add, remove or approve.
 
 Inherited from the MCP session's catalogue, which survives the change of transport unaltered.
 
-**Read (v1) — `mcp:read`**
+**Read (6 tools) — mode `read` or `act`**
 
-| Tool | Requires of the bound user | Returns |
-| ---- | -------------------------- | ------- |
+| Tool | Requires of the bound account | Returns |
+| ---- | ----------------------------- | ------- |
 | `get_server_status` | — | version, channel, uptime, update-available |
-| `list_services` | their own tiles | title, url, group, order |
-| `list_service_groups` | groups.read | bundles, member counts |
+| `list_services` | — | title, url, group, order |
 | `list_modules` | modules.manage | id, name, version, enabled, channel |
 | `list_sessions` | sessions.manage | user, ip, last seen |
 | `query_audit_log` | audit.read | filtered, paginated, hard cap 100 rows |
 | `list_users` | users.manage | email, role, status, mfaEnabled |
 
 **Never returned by any read tool:** password hashes, TOTP secrets, recovery codes, session tokens,
-API keys, or the contents of `.data/secrets.json`. Not "filtered out" — never selected.
+API keys, or the contents of `.data/secrets.json`. Not "filtered out" — **never selected**. Every
+read tool names its columns in a Prisma `select`, so a secret is not fetched and then dropped; it
+never leaves the database. A filter can be forgotten on the day someone adds a field.
 
-**Act (v1, same release — owner's decision 2026-07-26) — `mcp:act`**
+**Act (2 tools) — mode `act` only**
 
-`revoke_session`, `enable_module` / `disable_module`, `check_for_updates` (check only, never
-applies). Each additionally requires the bound user to hold the matching permission.
+| Tool | Requires | Refuses, even with the permission |
+| ---- | -------- | --------------------------------- |
+| `revoke_session` | sessions.manage | a **human administrator's** session |
+| `set_module_enabled` | modules.manage | its own carrier, `mcp-server` |
 
-> **Shipping both at once raises what has to be proven before release, not after.** The original
-> plan was reads first so the auth could be attacked before anything could change state. The owner
-> is testing both together instead, so the act path cannot rely on "nobody can reach it yet" as a
-> safety margin — every row of the guarantees table below must pass, and the escalation test (an
-> act-key on a read-only user) is the one that decides whether this ships at all.
+Both were shipped in the same release as the reads, on the owner's decision (2026-07-26). The
+original plan was reads first, so the auth could be attacked before anything could change state.
+Testing them together means the act path never got to rely on "nobody can reach it yet" as a safety
+margin — which is why the escalation case is tested from an **ADMIN** service account, where RBAC
+permits everything and only the helper's own rules can refuse.
+
+The lockout guard is deliberately blunt: **not** "is this the owner's current session", which is not
+knowable from here, but *any* administrator who is not a service account. A rule that has to guess is
+one that fails on the day it matters. An agent that can lock the owner out of their own install is
+the one outcome the owner has named as never acceptable.
 
 **Deliberately absent, permanently:** anything that runs a command, reads a file, changes a user's
-credentials or MFA, applies an update, or deletes data. An agent that can lock the owner out of their
-own install is the one outcome the owner has named as never acceptable — so `revoke_session` refuses
-to revoke the owner's own current session.
+credentials or MFA, applies an update, or deletes data.
 
 **Module-contributed tools** are designed for and not in v1. The MCP session's requirement stands: it
 must be discovery-based, never a hardcoded per-module list.
@@ -185,19 +217,33 @@ must be discovery-based, never a hardcoded per-module list.
 
 ## What you can rely on
 
-Only what will be tested before this ships.
+Only what has actually been driven against a running install — 1.7.3-beta.2, endpoint on 3030,
+40 live checks across three scripts. Nothing here is asserted from reading the code.
 
-| Guarantee | How it will be proven |
-| --------- | --------------------- |
-| An unauthenticated caller cannot list tools | Driven with no key and a bad key; responses byte-identical |
-| A key cannot exceed its user's RBAC | Act-key on a read-only user, asserted refused |
-| Revoking is immediate | Revoke mid-session, next call refused |
-| Nothing listens until a key exists | Fresh install, port checked closed |
-| Disabling the module does not silently leave it listening | Module disabled, endpoint state asserted |
-| No secret is reachable through any read tool | Every tool's output asserted against a deny-list |
+| Guarantee | How it was proven |
+| --------- | ----------------- |
+| An unauthenticated caller cannot list tools | Driven with no key and with a bad key: both 401, and the two responses are **byte-identical**, so a wrong key is indistinguishable from an unknown one |
+| A key cannot exceed its account's RBAC | Read-key on a permissionless account was offered only the two tools needing no permission, and was refused `revoke_session` and `list_users` |
+| An act key still cannot exceed its account | Act-key on an **ADMIN** service account — RBAC wide open — still refused by the helper's own rules below |
+| An assistant cannot sign out a human administrator | Attempted at full privilege; refused, and the session verified still present afterwards |
+| An assistant cannot disable its own carrier | Attempted; refused, module verified still enabled — while disabling a *different* module succeeded, so the refusal is the rule and not a broken tool |
+| Revoking is immediate | Key deleted mid-session; the very next call refused, with no restart and no cache |
+| Nothing listens until switched on **and** a key exists | Port checked closed with the module installed and enabled |
+| Disabling the add-on closes the endpoint | Disabled → port closed; re-enabled → port back, so the fix cannot strand it |
+| Actions are attributed to the agent, never a person | Every `mcp.*` audit row carries the service account's id — including the refusals, which are logged too |
+| DNS-rebinding defence | A request carrying any `Origin` → 403. A forged `Host` → 403, tested over a **raw socket**, because `fetch()` silently drops a `Host` override and made this look like it was failing when it was not |
+| No secret is reachable through any read tool | Every read tool uses a Prisma `select` allow-list, so `passwordHash`, `totpSecretEnc` and `tokenHash` are never loaded rather than filtered afterwards |
+
+### Known limitation
+
+**Helpers are not verifier-scanned.** Nothing mechanical checks this code, and the tests above are
+the author's own. That is true of every helper, and it matters more here than anywhere else in this
+repo. The endpoint is deliberately off on install, and the owner's pentest is the gate on stable.
 
 ---
 
 ## Version history
 
-Nothing published yet.
+| Version | What changed |
+| ------- | ------------ |
+| `0.0.1-beta.1` | First release. Streamable HTTP on 2025-11-25, 6 read tools + 2 acting tools, keys bound to service accounts only, two-gate authorization. Not yet promoted to stable — awaiting the owner's pentest. |

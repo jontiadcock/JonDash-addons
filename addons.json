@@ -111,6 +111,22 @@
       "path": "addons/docker-manager",
       "tag": "docker-manager/v0.0.4-beta.1",
       "notes": "Same as the 0.0.3 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+    },
+    {
+      "id": "mcp-server",
+      "name": "AI assistant access",
+      "description": "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Permissions.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.3-beta.2",
+      "permissions": [
+        "mcp:read"
+      ],
+      "helpers": [
+        "mcp"
+      ],
+      "path": "addons/mcp-server",
+      "tag": "mcp-server/v0.0.1-beta.1",
+      "notes": "First release. Installing it opens no port — the endpoint starts only once an administrator switches it on and a key exists, on 127.0.0.1 unless you open it up. A key binds to a service account, never a person, and can never exceed that account's permissions."
     }
   ],
   "helpers": [
@@ -228,6 +244,26 @@
       "path": "helpers/host-install",
       "tag": "host-install/v0.0.4-beta.1",
       "notes": "Same as the 0.0.3 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+    },
+    {
+      "id": "mcp",
+      "name": "AI assistant access",
+      "description": "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
+      "version": "0.0.1-beta.1",
+      "minAppVersion": "1.7.3-beta.2",
+      "provides": [
+        {
+          "id": "mcp:read",
+          "label": "See whether AI assistant access is switched on, and which keys exist"
+        },
+        {
+          "id": "mcp:act",
+          "label": "Allow assistants to make changes"
+        }
+      ],
+      "path": "helpers/mcp",
+      "tag": "mcp/v0.0.1-beta.1",
+      "notes": "First release. Installing it opens no port — the endpoint starts only once an administrator switches it on and a key exists, on 127.0.0.1 unless you open it up. A key binds to a service account, never a person, and can never exceed that account's permissions."
     }
   ]
 }
