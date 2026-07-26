@@ -147,5 +147,15 @@ can invoke either once it exists.
 
 | Helper | Model | Status |
 | ------ | ----- | ------ |
-| `host-services` | **Grant once** — fixed actions on an allowlisted service | spec — `host-services/HELPER.md` |
-| `host-install` | **Approve each time** — the package name is variable | planned |
+| `host-services` | **Grant once** — fixed actions on an allowlisted service | shipped · [`host-services/HELPER.md`](host-services/HELPER.md) |
+| `host-install` | **Approve each time** — the package name is variable | shipped · [`host-install/HELPER.md`](host-install/HELPER.md) |
+
+Both are on the stable channel. Versions are in [`addons.json`](../addons.json) rather than here,
+because a version in prose is a sentence that goes stale without anyone editing it — this table said
+`host-install` was "planned" for as long as it had been shipped.
+
+**What building both actually settled:** the split above is not a preference, it is forced. A grant is
+one Scheduled Task per fixed action, and `schtasks /run` takes a task name and cannot pass arguments —
+so anything whose *target* varies (a package id, an arbitrary path) has nothing to bake into a grant
+and must be approved as it happens. That is also why `host-services:control` can never offer an
+"allow everything" switch: there is no fixed action to grant.

@@ -4,7 +4,10 @@ The official **module source** for [JonDash](https://github.com/jontiadcock/JonD
 that plug into JonDash (a dashboard widget, their own pages, their own settings) **without changing the
 base app**. Remove one and JonDash behaves exactly as before.
 
-Installing from a source is live as of **JonDash 1.4.0**; **helpers** need **1.5.0**.
+Installing from a source arrived in **JonDash 1.4.0** and helpers in **1.5.0**, but that is the
+floor for the *mechanism*, not for what is here now — each add-on states the version it needs in
+[`addons.json`](addons.json), and several need considerably more than 1.5.0. JonDash tells you: an
+add-on that needs a newer build than yours is shown but not installable.
 
 ## The JonDash project
 
@@ -18,7 +21,7 @@ Installing from a source is live as of **JonDash 1.4.0**; **helpers** need **1.5
 
 ## Installing from here
 
-Nothing is cloned or downloaded by hand. In JonDash: **Admin → Modules → Browse modules**.
+Nothing is cloned or downloaded by hand. In JonDash: **Admin → Addons → Browse modules**.
 This source is already configured, so the list is populated on a fresh install. Tick one or more modules
 and install them together — one rebuild and one restart for the batch.
 
@@ -78,7 +81,7 @@ Full scheme, the manifest format, the `minAppVersion` rule and the publishing wo
 A **helper** is first-party shared capability that modules depend on for things modules are forbidden to
 do themselves. Helpers are installable **only from this official source** (enforced by JonDash's
 installer, not by convention), arrive automatically with the module that declares them, and are listed
-read-only under **Admin → Helpers**. There is no install, import or remove button.
+read-only under **Admin → Addons → Shared capabilities**. There is no install, import or remove button.
 
 Rules, current helpers and their specs: **[helpers/README.md](helpers/README.md)**.
 

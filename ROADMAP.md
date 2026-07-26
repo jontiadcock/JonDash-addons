@@ -140,7 +140,7 @@ for or sequence; and after a successful install the engine is not running, so th
 
 - **Needs:** nothing new from core — this is module-side sequencing and honesty about long operations.
 
-#### AM-01 · Docker manager — "Hyper-V, but for Docker" — 🔨 Built 2026-07-26 (`0.0.1-beta.1`)
+#### AM-01 · Docker manager — "Hyper-V, but for Docker" — ✅ SHIPPED 2026-07-26 (stable)
 Owner request, 2026-07-25, and the lead idea: **an easy, visual way to run Docker**, the way Hyper-V
 Manager is to VMs. A grid of containers, each a tile showing name, image, state and health, live
 CPU/memory, with start / stop / restart, and tail-the-logs in a panel. A dashboard widget summarises
@@ -155,7 +155,7 @@ CPU/memory, with start / stop / restart, and tail-the-logs in a panel. A dashboa
 - **Later modules the same helper unlocks:** a Compose stack up/down viewer, and a stale-image checker
   (flag containers whose image has a newer digest upstream — pairs with the scheduler).
 
-#### AM-02 · Host vitals — 🔨 Built 2026-07-25 (`0.0.1-beta.1`)
+#### AM-02 · Host vitals — ✅ SHIPPED 2026-07-26 (stable)
 Owner request, 2026-07-25. The homelab "is my box OK" widget: CPU, memory, load, disk free per mount,
 temperatures, uptime. Admin-only. **Built and verified; publishing to beta.**
 
@@ -200,7 +200,7 @@ resource, time it) rather than a `speedtest` binary, so it stays inside the modu
 - **Home:** a new check kind in `addons/health-monitor`, shipped as a normal version bump of that
   module, promoted to stable like any other change to it (see `VERSIONING.md`).
 
-#### AM-06 · Service manager (`service-control`) — ✅ SHIPPED 2026-07-25 (`0.0.1-beta.2`)
+#### AM-06 · Service manager (`service-control`) — ✅ SHIPPED 2026-07-26 (stable)
 Start, stop and restart the services an administrator has approved, from a dashboard tile and a page.
 The consumer that `AH-04 host-services` needed — a helper cannot be tested alone, because the install
 path, the consent roll-up and the prune all run through a consuming module.
@@ -211,16 +211,16 @@ path, the consent roll-up and the prune all run through a consuming module.
 - **Proven on real hardware, not asserted:** one UAC prompt when a service is approved, then stop and
   start with none, verified by reading the service's actual state either side; removing prompts again;
   and a grant cannot be repointed, disabled or deleted by the account that uses it.
-- **Known wrong, and deliberate:** the approved-services list is edited from *this module's* settings
-  panel. It is helper configuration and outlives the module, so an ordinary uninstall would strand live
-  OS grants with no screen to revoke them. Core has been asked to carry helper settings
-  (`HelperDefinition`); when that lands the UI moves to Admin → Helpers and the helper's `admin.*` API
-  is deleted outright, leaving modules no mutator at all.
-- **Not promotable to stable** until JonDash 1.7.1 itself reaches the stable channel.
+- **Was known wrong, now fixed (2026-07-26):** the approved-services list used to be edited from
+  *this module's* settings panel — helper configuration, edited by the thing it bounded. JonDash
+  1.7.1 gave helpers their own settings page and 1.7.2 the Permissions screen, so the editor moved
+  out and the helper's `admin.*` API was deleted outright. Modules now have no mutator at all, which
+  is HELPERS-DESIGN rule 8.
+- **Promoted to stable 2026-07-26**, once JonDash 1.7.2 reached the stable channel.
 
 ### AH — Helpers
 
-#### AH-01 · `docker` helper — ⏳ Planned
+#### AH-01 · `docker` helper — ✅ SHIPPED 2026-07-26 (stable)
 Talks to the **Docker Engine API over its socket** (`/var/run/docker.sock`, or the named pipe on
 Windows) — the structured HTTP API, **never the `docker` CLI**. Verbs, narrow: `listContainers`,
 `inspect(id)`, `stats(id)`, `logs(id, {tail})`, `start/stop/restart(id)`. Provides two capabilities,
@@ -228,7 +228,7 @@ Windows) — the structured HTTP API, **never the `docker` CLI**. Verbs, narrow:
 levels of trust. No `exec`, no image build, no arbitrary endpoint pass-through — those would reopen the
 command-execution door the module verifier exists to shut.
 
-#### AH-02 · `system-metrics` helper — 🔨 Built 2026-07-25 (`0.0.1-beta.1`)
+#### AH-02 · `system-metrics` helper — ✅ SHIPPED 2026-07-26 (stable)
 Reads host telemetry and returns it structured. Entirely read-only — one capability,
 `system-metrics:read`, and **no write verb of any kind**, which makes its consent line honest and its
 blast radius nil. Cross-platform was the real work (Linux `/proc` + `/sys` vs Windows drive letters);
@@ -249,7 +249,7 @@ taken microseconds apart. Stateless — no tables, no migrations, no `onBoot`, n
 > point where the docs came up short was fixed in the docs rather than worked around. The process is
 > worth repeating for `AH-01 docker`.
 
-#### AH-04 · `host-services` helper — ✅ SHIPPED 2026-07-25 (`0.0.1-beta.2`)
+#### AH-04 · `host-services` helper — ✅ SHIPPED 2026-07-26 (stable)
 Consumer: **AM-06 Service manager**. Needs JonDash **1.7.1-beta.2**. Everything below was the design;
 all of it is now measured. Everything privileged goes through core's `@/lib/elevation` rather than
 spawning the binary, so every elevated action — including the restart itself — reaches the audit log.
@@ -278,7 +278,7 @@ after a decline); nothing promotes a suggestion but an admin edit.
   (Session 0), in a container or headless, adding an entry refuses and says why. *Using* an existing
   grant works anywhere, logged out included.
 
-#### AH-05 · `host-install` helper — ⏳ Planned, after AH-04
+#### AH-05 · `host-install` helper — ✅ SHIPPED 2026-07-26 (stable)
 Install a package from an allowlisted package manager (`winget`, `apt`) at the admin's approval. Same
 elevation model, plus one rule: the module supplies a **package name only** — never arguments, never a
 command string. A package name is a value; a shell string is a program.
