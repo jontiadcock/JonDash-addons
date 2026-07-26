@@ -1,8 +1,21 @@
 import type { HelperDefinition } from "@/lib/helpers/types";
-import { revokeKeysForAccount } from "./lib/keys";
+import {
+  listKeys,
+  mintKey,
+  revokeKey,
+  revokeKeysForAccount,
+  setEnabled,
+  setKeyMode,
+  setNetworkExposed,
+  setPort,
+} from "./lib/keys";
+import { isBindableAccount } from "./lib/authorize";
 import { dispatch } from "./lib/dispatch";
 import { startListener, stopListener } from "./lib/transport";
 import { allTools } from "./lib/tools";
+import SettingsPanel from "./ui/settings-panel";
+// Imported for side effect: registering a tool happens at module load, so these must be pulled in
+// before anything calls the registry. Nothing is exported from them.
 import "./lib/tools-read";
 import "./lib/tools-act";
 
@@ -82,6 +95,89 @@ const helper: HelperDefinition = {
   migrations: "./migrations",
 
   onBoot: boot,
+
+  SettingsPanel,
+
+  /**
+   * The only way any of this changes. Core renders the form and resolves `ctx.user` from the
+   * session, so no module is in the path — the same shape as every other helper here.
+   *
+   * Refusals are returned rather than thrown: core catches and audits a throw, but an admin can act
+   * on "that is not a service account" and cannot act on a stack trace.
+   */
+  onSettingsSubmit: async (ctx, payload) => {
+    const op = String(payload.op ?? "");
+
+    switch (op) {
+      case "enabled": {
+        const on = payload.value === true;
+        await setEnabled(on);
+        // Applied immediately rather than at the next restart — an admin switching this off
+        // expects the port closed now, not eventually.
+        if (on) await startListener(dispatch);
+        else await stopListener();
+        return { ok: true, message: on ? "Switched on." : "Switched off — the port is closed." };
+      }
+
+      case "exposed": {
+        const on = payload.value === true;
+        await setNetworkExposed(on);
+        // Rebind, because the address is fixed when the socket opens.
+        await stopListener();
+        await startListener(dispatch);
+        return {
+          ok: true,
+          message: on
+            ? "Now reachable from your network. Turn on HTTPS if you have not — a key travels in clear text without it."
+            : "Back to this machine only.",
+        };
+      }
+
+      case "port": {
+        if (!(await setPort(Number(payload.value)))) return { ok: false, error: "That port is not one of the options." };
+        await stopListener();
+        await startListener(dispatch);
+        return { ok: true, message: `Now on port ${Number(payload.value)}.` };
+      }
+
+      case "mint": {
+        const accountId = String(payload.accountId ?? "");
+        // Re-checked here even though the dropdown only offers service accounts: the form is a
+        // suggestion, and this is the gate.
+        if (!(await isBindableAccount(accountId))) {
+          return { ok: false, error: "That is not a service account. A key can never act as a person." };
+        }
+        const mode = payload.mode === "act" ? "act" : "read";
+        const { key } = await mintKey({
+          label: String(payload.label ?? "").trim(),
+          accountId,
+          mode,
+          createdBy: ctx.user.id,
+        });
+        // The key itself rides back in `message` — the one time it is ever readable. The panel
+        // shows it and drops it; only a hash was stored.
+        await startListener(dispatch);
+        return { ok: true, message: key };
+      }
+
+      case "mode": {
+        await setKeyMode(String(payload.id ?? ""), payload.value === "act" ? "act" : "read");
+        return { ok: true, message: "Changed." };
+      }
+
+      case "revoke": {
+        await revokeKey(String(payload.id ?? ""));
+        // Revoking the last key closes the port: a listener with nothing able to authenticate is
+        // a surface with no purpose.
+        const remaining = await listKeys();
+        if (remaining.length === 0) await stopListener();
+        return { ok: true, message: "Revoked. It stops working immediately." };
+      }
+
+      default:
+        return { ok: false, error: "Unknown action." };
+    }
+  },
 
   /**
    * Hygiene, explicitly NOT the safety property.
