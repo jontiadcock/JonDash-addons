@@ -1,5 +1,9 @@
-import { prisma } from "@/lib/db";
-import { getEffectivePermissions, type Permission } from "@/lib/auth/permissions";
+import { getEffectivePermissionsUncached, type Permission } from "@/lib/auth/permissions";
+import {
+  listBindableAccounts,
+  resolveBindableAccount,
+  type BindableAccount,
+} from "@/lib/auth/service-accounts";
 import { touchKey, verifyKey, type KeyMode, type RefusalReason } from "./keys";
 import { decide } from "./decide";
 
@@ -67,24 +71,32 @@ export async function authorize(
     return { ok: false, reason: "mode" };
   }
 
-  // --- the bound account still has to exist ---------------------------------
+  // --- the bound account still has to exist, and still has to be bindable ----
   //
-  // Re-resolved every call rather than trusted from the key row: an account deleted or disabled
-  // since the key was minted must fail closed, immediately. This is also why `accountId` is not a
-  // foreign key — a helper must not constrain core's User table, so it verifies instead.
-  const account = await prisma.user.findUnique({
-    where: { id: key.accountId },
-    select: { id: true, role: true, status: true },
-  });
+  // Re-resolved every call through the SAME function the mint form uses, rather than a direct user
+  // lookup. That closes a case a plain existence check would miss: an account that is no longer a
+  // service account fails closed here, not just a deleted one. `null` covers deleted, unknown,
+  // disabled and human alike — one answer, so nothing distinguishes them.
+  //
+  // This is also why `accountId` is not a foreign key: a helper must not constrain core's User
+  // table, so it verifies on every call instead. `onIdentityRemoved` tidies the dead rows, but the
+  // security property lives here and does not depend on that hook firing.
+  const account = await resolveBindableAccount(key.accountId);
   if (!account || account.status !== "ACTIVE") {
     return { ok: false, reason: "account-gone" };
   }
 
   // --- gate 2: the account's real permissions -------------------------------
   //
-  // Core's own resolution, not a copy of it. ADMIN implies everything; otherwise it is the union
-  // of the account's access roles. If core changes how permissions work, this changes with it.
-  const permissions = await getEffectivePermissions({ id: account.id, role: account.role });
+  // Core's own resolution, not a copy of it. ADMIN implies everything — including for a service
+  // account, which may be ADMIN — otherwise it is the union of the account's access roles.
+  //
+  // The UNCACHED entry point, deliberately: `getEffectivePermissions` is wrapped in React's
+  // `cache()`, and this runs in a bare HTTP listener with no request scope. Core measured that the
+  // wrapper happens to work there, but that is undocumented React behaviour — and if it changed,
+  // authorization would fail SILENTLY. Core added this sibling so the authorization path never
+  // rests on an accident.
+  const permissions = await getEffectivePermissionsUncached({ id: account.id, role: account.role });
 
   // The full decision, through the same function the escalation test drives. Both gates are
   // re-evaluated together here so the final answer comes from one place rather than from the
@@ -109,23 +121,21 @@ export async function authorize(
 /**
  * Is this account one a key may bind to?
  *
- * **Service accounts only — never a person's account.** Core has been asked for service accounts
- * (identities that hold permissions but can never be logged into); until they land, this returns
- * false for everything and the helper cannot be used. That is deliberate: allowing a person's
- * account now and restricting later would break every key already minted, on a security boundary.
+ * **Service accounts only — never a person's.** `listBindableAccounts()` returns service accounts
+ * exclusively, so a person cannot appear in the mint dropdown and cannot be bound even by a forged
+ * id: `resolveBindableAccount` answers `null` for a human exactly as it does for a deleted or
+ * unknown one. There is no filtering to get wrong at this end, which was the point of asking core
+ * for the list rather than a predicate.
  *
- * When core ships them, this becomes the single place that decides — one predicate, not a check
- * scattered across the mint form, the settings page and the auth path.
+ * Shipped in JonDash 1.7.3-beta.1 (SEC-07). Until it existed this returned false for everything and
+ * the helper was deliberately unusable — allowing a person's account "for now" would have broken
+ * every key already minted when it was later restricted, on a security boundary.
  */
 export async function isBindableAccount(userId: string): Promise<boolean> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, status: true },
-  });
-  if (!user || user.status !== "ACTIVE") return false;
+  return (await resolveBindableAccount(userId)) !== null;
+}
 
-  // TODO(core): replace with the real service-account predicate once it exists. Returning false
-  // here is what makes the dependency honest — the helper visibly cannot be used yet, rather than
-  // quietly binding to a human.
-  return false;
+/** The accounts an administrator may choose from when minting a key. */
+export async function bindableAccounts(): Promise<BindableAccount[]> {
+  return listBindableAccounts();
 }
