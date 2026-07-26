@@ -4,7 +4,7 @@ import { helperTableName } from "@/lib/helpers/migrate";
 import { listRootPaths } from "./lib/roots";
 import { DEFAULT_RETENTION, pruneLogs } from "./lib/logfile";
 import { acceptSuggestion, addRoot, declineSuggestion, removeRoot, setRetention } from "./lib/admin";
-import { rootScope } from "./lib/scopes";
+import { rootScopeFor } from "./lib/scopes";
 import SettingsPanel from "./ui/settings-panel";
 
 /**
@@ -89,20 +89,19 @@ const helper: HelperDefinition = {
   name: "Files and folders",
   description:
     "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-  version: "0.0.7-beta.1",
+  version: "0.0.8-beta.1",
   // Raised for 0.0.6, from 1.5.2-beta.1. `SettingsPanel` / `onSettingsSubmit` arrived in
   // 1.7.1-beta.9, and this release cannot work without them: the folder editor moved off the
   // module-facing API and there is nowhere else for it to live. Declaring the old floor would
   // install on a build with no settings page at all, leaving the roots unpopulatable — which
   // is worse than not being offered the update.
   //
-  // Raised again for 0.0.7: CORE-10's `label` / `risk` / `scope` are optional to omit but not
-  // to declare — against a 1.7.1 clone they fail to compile (TS2353 / TS2724), and a helper
-  // compiles into the app, so that is a build failure rather than a missing screen.
-  //
-  // The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
-  // "1.7.2" would be refused on every 1.7.2 beta, including beta.1 which has the feature.
-  minAppVersion: "1.7.2-beta.1",
+  // beta.**2**, not beta.1: `unbounded.option` — the "exclude JonDash's own data" switch — was
+  // added in 1.7.2-beta.2. Same rule as every other floor here and now written down as
+  // HELPERS-DESIGN rule 11: an optional field is optional to OMIT, never optional to ADD.
+  // Declaring one against an older core fails to compile, and a helper compiles into the app,
+  // so it is a failed build rather than a plainer screen.
+  minAppVersion: "1.7.2-beta.2",
 
   /**
    * Three lines rather than one, deliberately — "delete" is far too important to be folded
@@ -118,26 +117,25 @@ const helper: HelperDefinition = {
    * is usually in when first reading a consent screen.
    */
   /**
-   * ## Why not one of these declares `unbounded` — an open question, not an oversight
+   * ## Three capabilities, three "everything" switches, one folder list
    *
-   * The owner's CORE-10 decision is that where "allow everything" would reach JonDash's own
-   * `.data/`, `prisma/` and `bin/`, it does, and the warning must say so. For most helpers that
-   * is a wording obligation. **For this one it is a contradiction**, and I have not resolved it
-   * on my own initiative.
+   * The owner's decision (2026-07-26), and both halves of it matter:
    *
-   * This helper's load-bearing invariant is that JonDash's own secrets are never readable — not
-   * by path, but by file identity, so they stay protected when `JONDASH_DATA_DIR` or
-   * `DATABASE_URL` moves them. `HELPER.md` states it as a guarantee. An unbounded read that
-   * genuinely included `.data/` would hand a module `secrets.json`, which is the AES master key
-   * that decrypts every TOTP secret and every backup; unbounded write or delete over `prisma/`
-   * or `bin/` could destroy the database or the elevation binaries, which is the one outcome
-   * the owner named as never acceptable — losing access to the install.
+   *  1. **"Everything" exists**, and it is not quietly carved out. Turning it on genuinely
+   *     reaches every folder on the machine.
+   *  2. **The carve-out is a switch of its own** — `unbounded.option`, "exclude JonDash's own
+   *     data", defaulting to protected. So the sentence beside the grant is true in both
+   *     states, which is what HELPERS-DESIGN rule 10 is actually asking for. Turning the
+   *     protection off is what exposes `.data/secrets.json`: the AES master key that decrypts
+   *     every TOTP secret and every backup, plus the database and the elevation binaries.
    *
-   * So the two readings are: carve JonDash out and the switch grants less than it says, which
-   * the owner explicitly ruled against; or honour it literally and delete the protection this
-   * helper exists to provide. That is the owner's call, and until they make it, omitting
-   * `unbounded` is the contract's own safe default — the capability stays bounded, and `browse`
-   * carries the weight of making a bounded list easy enough that nobody wants an escape hatch.
+   * **One switch per verb, not one for the helper.** Owner's rule 9: a read-only option and a
+   * full one. Letting a module read anywhere must not require letting it delete anywhere, and
+   * a single switch would have forced exactly that trade. `scope` being per-capability makes it
+   * fall out — three scopes, three `unbounded`s, one shared `list()`.
+   *
+   * The protection is deliberately NOT per verb: it names a set of files rather than an action,
+   * and "protected from reading but not from deletion" has no safe reading.
    */
   provides: [
     {
@@ -147,14 +145,14 @@ const helper: HelperDefinition = {
       // Reading is where the data leaves. Media is dull; a folder of documents is not, and the
       // admin chooses which this is when they approve a root.
       risk: "medium",
-      scope: rootScope,
+      scope: rootScopeFor("read"),
     },
     {
       permission: "filesystem:write",
       describe: (config) => `Create and change files in ${where(config)}`,
       label: "Create and change files",
       risk: "high",
-      scope: rootScope,
+      scope: rootScopeFor("write"),
     },
     {
       permission: "filesystem:delete",
@@ -163,7 +161,7 @@ const helper: HelperDefinition = {
       // Its own line rather than folded into write, and its own risk: this is the one that
       // destroys data an admin cannot get back.
       risk: "high",
-      scope: rootScope,
+      scope: rootScopeFor("delete"),
     },
   ],
 

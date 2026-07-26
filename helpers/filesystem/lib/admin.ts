@@ -125,6 +125,61 @@ export async function declineSuggestion(id: string): Promise<void> {
   );
 }
 
+/* --------------------------------------------------------------- the switches */
+
+/**
+ * "Everything" is **per verb**, not one switch for the helper.
+ *
+ * Owner's rule: *"ensure with all of it, there is a read only and full options."* A single
+ * unbounded switch would force somebody who wants a module to read anywhere into also letting
+ * it delete anywhere — which is the "useless or too much" choice the pairing rule exists to
+ * prevent. `scope` being per-capability makes this fall out naturally: three capabilities,
+ * three switches, one shared folder list.
+ */
+export type Verb = "read" | "write" | "delete";
+const UNBOUNDED = (v: Verb) => `roots.unbounded.${v}`;
+/** Whether JonDash's own data stays protected while unbounded. Absent = protected. */
+const PROTECT = "roots.protectJonDash";
+
+async function flag(key: string, dflt: boolean): Promise<boolean> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<{ value: string }[]>(
+      `SELECT value FROM ${SETTINGS} WHERE key = ?`,
+      key,
+    );
+    if (!rows[0]) return dflt;
+    return rows[0].value === "1";
+  } catch {
+    return dflt;
+  }
+}
+
+async function setFlagRow(key: string, on: boolean): Promise<void> {
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO ${SETTINGS} (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    key,
+    on ? "1" : "0",
+  );
+}
+
+export const isUnbounded = (v: Verb) => flag(UNBOUNDED(v), false);
+export const setUnbounded = (v: Verb, on: boolean) => setFlagRow(UNBOUNDED(v), on);
+
+/**
+ * **Defaults to protected, and stays protected until an administrator says otherwise.**
+ *
+ * This is the second half of the owner's decision: "everything" is offered honestly rather
+ * than quietly carved out, but the carve-out is a switch of its own rather than a silent
+ * assumption either way. Turning protection off is what actually exposes `.data/secrets.json`
+ * — the AES master key that decrypts every TOTP secret and every backup — plus the database
+ * and the elevation binaries.
+ *
+ * Absent means protected: a missing row must never read as consent.
+ */
+export const jondashProtected = () => flag(PROTECT, true);
+export const setJondashProtected = (on: boolean) => setFlagRow(PROTECT, on);
+
 export async function readRetention(): Promise<RetentionPolicy> {
   const rows = await prisma.$queryRawUnsafe<{ key: string; value: string }[]>(
     `SELECT key, value FROM ${SETTINGS} WHERE key IN ('log.keepDays', 'log.keepRuns')`,
