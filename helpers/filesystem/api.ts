@@ -13,7 +13,10 @@ import {
   contains,
 } from "./lib/paths";
 import { assessRoot, riskSummary, type RootRisk } from "./lib/risk";
-import { loadRegistry } from "./lib/secrets";
+import { identityReason, loadRegistry } from "./lib/secrets";
+// Read-only use of the admin switches. This file must never IMPORT a setter — `lib/admin.ts`
+// holds those, and nothing a module can reach may call them (HELPERS-DESIGN rule 8).
+import { isUnbounded, jondashProtected, type Verb } from "./lib/admin";
 import { planPrune, runPrune, type PrunePlan } from "./lib/prune";
 import { DEFAULT_GFS, describePolicy, toSnapshots, type GfsPolicy } from "./lib/snapshots";
 import {
@@ -59,6 +62,17 @@ import { planCopy, runCopy, type CopyMode, type CopyPlan, type CopyResult } from
 const ROOTS = helperTableName("filesystem", "roots");
 const RUNS = helperTableName("filesystem", "runs");
 const SETTINGS = helperTableName("filesystem", "settings");
+const SUGGESTIONS = helperTableName("filesystem", "suggestions");
+
+/** A module's request for a folder, and what the admin decided. */
+export type RootSuggestion = {
+  id: string;
+  moduleId: string;
+  path: string;
+  reason: string;
+  state: "open" | "accepted" | "declined";
+  createdAt: string;
+};
 
 export type Root = {
   id: string;
@@ -76,11 +90,92 @@ export type Progress = { filesDone: number; bytesDone: number; currentPath: stri
 
 const ROOT_COLS = "id, path, label, riskLevel, riskNote";
 
+/**
+ * The approved roots — plus a synthetic root per drive when "everything" is on.
+ *
+ * **Unbounded is expressed as roots rather than as a bypass, deliberately.** Every call in this
+ * API is root-id based; nothing takes a raw path from a module, which is what stops this
+ * becoming the general escape hatch the charter forbids. So "allow everything" adds the drive
+ * roots to the list instead of switching the confinement off, and every existing check —
+ * `resolveIn`, `contains`, the destination rules, the secret registry — keeps running exactly
+ * as it did. There is no second code path to get wrong.
+ *
+ * Synthetic ids are prefixed so nothing can mistake one for a stored row, and they carry the
+ * risk assessment a real root would.
+ */
 async function allRoots(): Promise<Root[]> {
-  return prisma.$queryRawUnsafe<Root[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} ORDER BY label`);
+  const stored = await prisma.$queryRawUnsafe<Root[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} ORDER BY label`);
+  if (!(await anyUnbounded())) return stored;
+
+  const known = new Set(stored.map((r) => r.path.toLowerCase()));
+  const drives = process.platform === "win32" ? await presentDrives() : ["/"];
+  const synthetic: Root[] = [];
+  for (const d of drives) {
+    if (known.has(d.toLowerCase())) continue;
+    const risk = assessRoot(d);
+    synthetic.push({
+      id: `everything:${d}`,
+      path: d,
+      label: `${d} (everything)`,
+      riskLevel: risk.level,
+      riskNote: riskSummary(risk) || null,
+    });
+  }
+  return [...stored, ...synthetic];
 }
 
+/** Drive letters that actually exist, so the list isn't full of roots that resolve nowhere. */
+async function presentDrives(): Promise<string[]> {
+  const out: string[] = [];
+  for (const letter of "CDEFGHIJKLMNOPQRSTUVWXYZ") {
+    const p = `${letter}:\\`;
+    try {
+      await fsp.stat(p);
+      out.push(p);
+    } catch {
+      /* not present */
+    }
+  }
+  return out;
+}
+
+/** True when any of read/write/delete has been switched to "everything". */
+async function anyUnbounded(): Promise<boolean> {
+  const [r, w, d] = await Promise.all([isUnbounded("read"), isUnbounded("write"), isUnbounded("delete")]);
+  return r || w || d;
+}
+
+/**
+ * The secret registry, or an empty one when an administrator has switched protection off.
+ *
+ * **This is the only place that decision is applied**, so every caller — the copy walk, the
+ * content check, `browse` — honours it identically. An empty registry means `identityReason`
+ * matches nothing and JonDash's own files are treated as ordinary ones: `.data/secrets.json`
+ * becomes readable and copyable. That is the point of the switch, and why it defaults to on
+ * and states plainly what turning it off exposes.
+ */
+async function activeRegistry() {
+  const registry = await loadRegistry();
+  if (await jondashProtected()) return registry;
+  return {
+    ...registry,
+    identities: new Map<string, string>(),
+    content: { hashes: new Map<string, string>(), literals: [] },
+  };
+}
+
+/**
+ * A root by id, including the synthetic ones "everything" produces.
+ *
+ * The synthetic branch re-derives the root from `allRoots()` rather than trusting the id's
+ * suffix: an id is a string a module supplies, and parsing a path out of it would be exactly
+ * the raw-path channel this API does not have. Deriving it means an `everything:` id only
+ * resolves while the switch is actually on.
+ */
 async function rootById(id: string): Promise<Root | null> {
+  if (id.startsWith("everything:")) {
+    return (await allRoots()).find((r) => r.id === id) ?? null;
+  }
   const rows = await prisma.$queryRawUnsafe<Root[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} WHERE id = ?`, id);
   return rows[0] ?? null;
 }
@@ -95,14 +190,8 @@ async function getSetting(key: string): Promise<string | null> {
   return rows[0]?.value ?? null;
 }
 
-async function setSetting(key: string, value: string): Promise<void> {
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO ${SETTINGS} (key, value) VALUES (?, ?)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
-    key,
-    value,
-  );
-}
+/* The settings WRITER lives in lib/admin.ts now. Nothing a module can reach may write to this
+   table: the only keys in it are the global retention policy. */
 
 /** Retention, with the defaults applied when nothing has been chosen. */
 async function readRetention(): Promise<RetentionPolicy> {
@@ -137,9 +226,36 @@ async function resolveIn(
   rootId: string,
   usage: "source" | "dest",
   subpath?: string,
+  /**
+   * Which "everything" switch this operation needs. Defaults from `usage`, but `dest` covers
+   * three different things — writing a copy, listing snapshots, and DELETING them — so the
+   * caller says which when the default would be wrong. Reading a destination folder must not
+   * require the write switch, and pruning must not be satisfied by it.
+   */
+  verb?: Verb,
 ): Promise<{ ok: true; path: string; root: Root } | { ok: false; reason: string }> {
   const root = await rootById(rootId);
   if (!root) return { ok: false, reason: "That location is no longer one of your allowed folders." };
+
+  /**
+   * **A synthetic root only satisfies the verb whose own switch is on.**
+   *
+   * The three "everything" switches are separate so that letting a module read anywhere does
+   * not let it write anywhere — that separation is the whole point of splitting them. But the
+   * synthetic drive roots appear as soon as ANY of the three is on, and without this check a
+   * read-only "everything" would still resolve as a destination for any module holding
+   * `filesystem:write`, quietly collapsing the distinction into one switch.
+   *
+   * Checked here rather than at the call sites because this is the single funnel every
+   * operation passes through — one place to get right instead of one per caller.
+   */
+  if (root.id.startsWith("everything:")) {
+    const needed: Verb = verb ?? (usage === "source" ? "read" : "write");
+    if (!(await isUnbounded(needed))) {
+      const what = { read: "Reading", write: "Writing to", delete: "Deleting from" }[needed];
+      return { ok: false, reason: `${what} every folder is not switched on.` };
+    }
+  }
 
   const stillValid = usage === "source" ? assertUsableAsSource(root.path) : assertUsableAsDestination(root.path);
   if (!stillValid.ok) return { ok: false, reason: stillValid.reason };
@@ -199,10 +315,13 @@ export type FilesystemApi = {
    * safe to call while rendering a form; it touches no disk and reaches no network.
    */
   assessPath(input: string): PathAssessment;
-  /** Approve a location. Refuses only malformed paths; breadth is warned about, not blocked. */
-  addRoot(input: { path: string; label: string }): Promise<{ ok: true; root: Root } | { ok: false; reason: string }>;
-  /** Forget a location. Touches no files. */
-  removeRoot(rootId: string): Promise<void>;
+  /**
+   * Ask the admin to approve a folder. **Inert** — it records the request and nothing else.
+   * Approving happens on Admin → Helpers, where no module is in the path.
+   */
+  suggestRoot(path: string, reason: string): Promise<{ ok: true; id: string } | { ok: false; reason: string }>;
+  /** This module's own suggestions and what became of them. Read-only, scoped to the caller. */
+  mySuggestions(): Promise<RootSuggestion[]>;
   /** The explicit "Test this location" check. Does real I/O — only call it on demand. */
   testLocation(input: string, opts?: { wantWritable?: boolean }): Promise<ProbeResult>;
   /** Folder contents for a picker: names, sizes and dates only — never file contents. */
@@ -227,10 +346,11 @@ export type FilesystemApi = {
   logText(runId: string): Promise<string | null>;
   /** What the logs currently cost on disk. */
   logsSize(): Promise<{ count: number; bytes: number }>;
-  /** How long logs are kept. */
+  /**
+   * How long logs are kept. Read-only here — the policy is GLOBAL, so a module changing it
+   * would prune every other module's logs too. It lives on Admin → Helpers.
+   */
   retention(): Promise<RetentionPolicy>;
-  /** Change it, and apply the new policy immediately. */
-  setRetention(policy: RetentionPolicy): Promise<{ removed: number }>;
 
   /** Snapshot folders at a destination, newest first. Names and dates only. */
   listSnapshots(rootId: string, subpath?: string): Promise<{ name: string; at: string }[]>;
@@ -333,62 +453,95 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
     };
   },
 
-  async addRoot({ path: input, label }) {
+  /**
+   * Ask. This is the whole of what a module may do about the root list.
+   *
+   * `addRoot` and `removeRoot` used to live here, and that was the same defect
+   * `host-services` carried until 0.0.2: **the thing being bounded could edit its own
+   * boundary.** A module confined to approved folders could approve one, so the consent
+   * wording — "within the folders you allow" — was only true until the module chose to make
+   * it false. It needed no exploit, just the call it was already given.
+   *
+   * HELPERS-DESIGN rule 8: a helper's module-facing API carries read and request, never add,
+   * remove or approve. The editor is on Admin → Helpers, where `ctx.user` comes from the
+   * session and no module is anywhere in the path.
+   */
+  async suggestRoot(input, reason) {
+    const denied = requires(ctx, "filesystem:read");
+    if (denied) return { ok: false, reason: denied };
+
+    const text = String(reason ?? "").trim();
+    if (!text) return { ok: false, reason: "Say why the folder is needed." };
+
+    // Validated for SHAPE only, and never canonicalised into the row. Resolving a module's
+    // string against the disk here would let it probe what exists by reading back which
+    // suggestions were accepted; the admin canonicalises when approving.
     const verdict = assertUsableAsSource(input);
     if (!verdict.ok) {
-      // Recorded by the HELPER, not left to the caller. A refusal is a module reaching
-      // outside its bounds — the single most interesting thing in this log — and a module
-      // that meant harm would simply decline to report it.
+      // Logged by the HELPER, not left to the caller — a module reaching outside its bounds
+      // is the most interesting line in this log, and one that meant harm wouldn't report it.
       await ctx.audit?.("filesystem.root.refused", `${input}: ${verdict.reason}`);
       return { ok: false, reason: verdict.reason };
     }
 
-    const existing = await prisma.$queryRawUnsafe<Root[]>(
-      `SELECT ${ROOT_COLS} FROM ${ROOTS} WHERE path = ?`,
-      verdict.path,
+    const already = await prisma.$queryRawUnsafe<{ id: string; state: string }[]>(
+      `SELECT id, state FROM ${SUGGESTIONS} WHERE moduleId = ? AND path = ? AND state IN ('open', 'declined')`,
+      ctx.moduleId, input,
     );
-    if (existing[0]) return { ok: true, root: existing[0] };
+    // A decline is remembered, not cleared. Re-asking after every refusal is how a module
+    // trains an admin to click yes without reading, and that costs more than the feature.
+    if (already[0]) {
+      return already[0].state === "declined"
+        ? { ok: false, reason: "You have already declined this folder." }
+        : { ok: true, id: already[0].id };
+    }
 
-    const risk = assessRoot(verdict.path);
-    const note = riskSummary(risk) || null;
-    const root: Root = {
-      id: randomUUID(),
-      path: verdict.path,
-      label: label.trim() || verdict.path,
-      riskLevel: risk.level,
-      riskNote: note,
-    };
+    const id = randomUUID();
     await prisma.$executeRawUnsafe(
-      `INSERT INTO ${ROOTS} (id, path, label, addedAt, addedBy, riskLevel, riskNote) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      root.id, root.path, root.label, new Date().toISOString(), ctx.user?.id ?? null, root.riskLevel, root.riskNote,
+      `INSERT INTO ${SUGGESTIONS} (id, moduleId, path, reason, state, createdAt) VALUES (?, ?, ?, ?, 'open', ?)`,
+      id, ctx.moduleId, input, text, new Date().toISOString(),
     );
-    // Recorded so a location that appears without the admin's knowledge is discoverable —
-    // and at what risk level, so a later `C:\` is visible in the log without re-deriving it.
-    await ctx.audit?.(
-      "filesystem.root.add",
-      `${root.label} — ${root.path}${risk.level === "none" ? "" : ` (${risk.level} risk)`}`,
-    );
-    return { ok: true, root };
+    await ctx.audit?.("filesystem.root.suggest", `${ctx.moduleId} asked for ${input}: ${text}`);
+    return { ok: true, id };
   },
 
-  async removeRoot(rootId) {
-    const root = await rootById(rootId);
-    await prisma.$executeRawUnsafe(`DELETE FROM ${ROOTS} WHERE id = ?`, rootId);
-    if (root) await ctx.audit?.("filesystem.root.remove", `${root.label} — ${root.path}`);
+  async mySuggestions() {
+    if (requires(ctx, "filesystem:read")) return [];
+    return prisma.$queryRawUnsafe<RootSuggestion[]>(
+      `SELECT id, moduleId, path, reason, state, createdAt FROM ${SUGGESTIONS}
+       WHERE moduleId = ? ORDER BY createdAt DESC`,
+      ctx.moduleId,
+    );
   },
 
   testLocation: (input, opts) => probeLocation(input, opts),
 
+  /**
+   * Listing honours the secret registry, exactly as copying does.
+   *
+   * It did not until 0.0.5. The copy engine has always refused to carry a secret off the
+   * machine, so no *contents* were ever reachable — but a root at JonDash's own folder let a
+   * module read back the NAMES and sizes inside `.data`: that `secrets.json` exists, how big
+   * it is, which TLS keys are present. That is reconnaissance, not a leak, and it is still
+   * not something a module should be able to ask for.
+   *
+   * The check is by identity on a `stat` this loop already took, so it costs nothing and it
+   * follows the secrets if `JONDASH_DATA_DIR` or `DATABASE_URL` moves them. Protected entries
+   * are omitted rather than marked — telling a caller "something is here you may not see"
+   * hands back the fact it was asking for.
+   */
   async browse(rootId, subpath) {
     if (requires(ctx, "filesystem:read")) return [];
     const at = await resolveIn(rootId, "source", subpath);
     if (!at.ok) return [];
     const entries = await fsp.readdir(at.path, { withFileTypes: true }).catch(() => []);
+    const registry = await activeRegistry();
     const out = [];
     for (const e of entries) {
       if (e.isSymbolicLink()) continue;
       const stat = await fsp.stat(path.join(at.path, e.name)).catch(() => null);
       if (!stat) continue;
+      if (identityReason(registry, stat)) continue;
       out.push({
         name: e.name,
         isDir: e.isDirectory(),
@@ -404,7 +557,7 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
     if (denied) return { ok: false, reason: denied };
     const r = await resolveSpec(spec);
     if (!r.ok) return r;
-    const registry = await loadRegistry();
+    const registry = await activeRegistry();
     return {
       ok: true,
       plan: await planCopy(r.source, r.dest, { mode: spec.mode, exclude: spec.exclude, registry }),
@@ -431,7 +584,7 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
 
     // Resolved per run, never cached: the admin may have moved the database or rotated the
     // key since the last one, and a stale registry protects the wrong place.
-    const registry = await loadRegistry();
+    const registry = await activeRegistry();
     const log = await RunLog.open({
       runId,
       moduleId: ctx.moduleId,
@@ -533,25 +686,15 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   logsSize: () => logsFootprint(),
   retention: () => readRetention(),
 
-  async setRetention(policy) {
-    const clamp = (n: number, max: number) =>
-      Number.isFinite(n) && n >= 0 ? Math.min(Math.trunc(n), max) : 0;
-    const next: RetentionPolicy = {
-      keepDays: clamp(policy.keepDays, 3650),
-      keepRuns: clamp(policy.keepRuns, 10_000),
-    };
-    await setSetting("log.keepDays", String(next.keepDays));
-    await setSetting("log.keepRuns", String(next.keepRuns));
-    await ctx.audit?.(
-      "filesystem.logs.retention",
-      `keep ${next.keepDays || "unlimited"} days, ${next.keepRuns || "unlimited"} runs`,
-    );
-    return pruneLogs(next);
-  },
+  /* `setRetention` has gone to helper.ts. The policy is GLOBAL — one row pair, not one per
+     module — so any module holding this helper could shorten it and prune every other
+     module's logs, including the audit trail of what it had just done. Read stays here;
+     the write is on Admin → Helpers. */
 
   async listSnapshots(rootId, subpath) {
     if (requires(ctx, "filesystem:read")) return [];
-    const at = await resolveIn(rootId, "dest", subpath);
+    // Listing a destination is a READ of it, so it must not need the write switch.
+    const at = await resolveIn(rootId, "dest", subpath, "read");
     if (!at.ok) return [];
     const names = await fsp.readdir(at.path).catch(() => [] as string[]);
     return toSnapshots(names).map((s) => ({ name: s.name, at: s.at.toISOString() }));
@@ -562,7 +705,9 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
     // destroyed, so it must be available to a module that can't actually delete.
     const denied = requires(ctx, "filesystem:read");
     if (denied) return { ok: false, reason: denied };
-    const at = await resolveIn(rootId, "dest", subpath);
+    // A preview of what deletion WOULD remove is a read, and must stay available to a module
+    // that cannot delete — so it is gated by the read switch, not the delete one.
+    const at = await resolveIn(rootId, "dest", subpath, "read");
     if (!at.ok) return { ok: false, reason: at.reason };
     return planPrune(at.path, clampPolicy(policy));
   },
@@ -573,7 +718,8 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
       await ctx.audit?.("filesystem.prune.refused", denied);
       return { ok: false, reason: denied };
     }
-    const at = await resolveIn(rootId, "dest", subpath);
+    // Destroying files, so gated by the DELETE switch rather than the write one.
+    const at = await resolveIn(rootId, "dest", subpath, "delete");
     if (!at.ok) return { ok: false, reason: at.reason };
 
     const safe = clampPolicy(policy);

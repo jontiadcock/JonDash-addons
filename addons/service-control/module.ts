@@ -23,13 +23,15 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.2",
-  // Matches the helper's floor, and for the same reason: on 1.7.1-beta.1 an elevated action
-  // could proceed without being recorded, so the audit guarantee this module relies on was
-  // not actually there. The PRE-RELEASE, not a bare "1.7.1" — semver ranks a pre-release
-  // below its release, so "1.7.1" would be refused on every 1.7.1 beta, the builds beta
-  // users run.
-  minAppVersion: "1.7.1-beta.9",
+  version: "0.0.4-beta.1",
+  // Matches the helper's floor: beta.9 is the first build with helper settings pages, which
+  // is where the allowlist editor now lives. The PRE-RELEASE, not a bare "1.7.1" — semver
+  // ranks a pre-release below its release, so "1.7.1" would refuse every 1.7.1 beta,
+  // including beta.9, which has the feature.
+  // Follows the helper. host-services 0.0.4-beta.1 declares CORE-10 `scope`, which does not
+  // compile on 1.7.1 — so a module that brought that helper onto a 1.7.1 install would take the
+  // whole app's build down with it. The floor has to move with the helper it pulls in.
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * Both helper capabilities. They render red on the consent screen — core assumes the worst
@@ -45,7 +47,7 @@ const serviceControl: ModuleDefinition = {
   permissions: ["host-services:read", "host-services:control"],
 
   /** Pinned to the version that introduced the API this module calls. */
-  helpers: [{ id: "host-services", minVersion: "0.0.2" }],
+  helpers: [{ id: "host-services", minVersion: "0.0.4-beta.1" }],
 
   /** Which services exist on the host, and the power to stop them, is admin information. */
   adminOnly: true,
@@ -54,17 +56,17 @@ const serviceControl: ModuleDefinition = {
   Page: ServiceControlPage,
 
   /**
-   * The allowlist UI lives here **for now, and it is the wrong owner.**
+   * **Read-only, and the allowlist editor is not here.**
    *
-   * The allowlist is HELPER configuration: it survives this module being uninstalled, along
-   * with the OS grants it represents. Hosting its only screen inside a module means
-   * uninstalling the module leaves standing privileges on the machine with nowhere to see or
-   * revoke them — exactly the orphan the helper's own spec warns about.
+   * This panel shows what this module can see through the helper — the approved services and
+   * the requests it has raised — and offers no way to change any of it. The editor lives at
+   * Admin → Helpers → Host services, rendered by JonDash with no module in the path.
    *
-   * Core reserves a per-helper settings slot at Admin → Helpers ("Reserved for helper
-   * settings once the contract carries them"), which is where this belongs. When
-   * `HelperDefinition` carries a settings panel, this moves there and the helper's `admin.*`
-   * API is deleted outright — modules would then have no mutator at all.
+   * That split is the security property, not a layout choice. The allowlist is *helper*
+   * configuration: it outlives this module, along with the OS grants it represents. While the
+   * editor lived here, this module supplied the service name being approved — it could display
+   * "Add Plex" and submit `sshd`, and the Windows prompt names JonDash rather than the service.
+   * The thing being bounded could edit its own boundary.
    */
   SettingsPanel: ServiceControlSettings,
 };

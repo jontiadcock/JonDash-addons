@@ -3,15 +3,13 @@ import filesystem from "@/helpers/filesystem/api";
 import { listJobs, type Job } from "../lib/store";
 import { formatBytes, formatTime } from "../lib/constants";
 import {
-  addRootAction,
   assessPathAction,
   deleteJobAction,
   previewBackupAction,
   previewPruneAction,
-  removeRootAction,
   runNowAction,
   saveJobAction,
-  setLogRetentionAction,
+  suggestRootAction,
   testLocationAction,
 } from "../actions";
 import FolderPicker from "./folder-picker";
@@ -82,7 +80,6 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
   const backupPreview = parse<BackupPreview>(await get("lastBackupPreview"));
   const lastRoot = String(await get("lastRoot"));
   const lastTest = String(await get("lastTest"));
-  const lastLogRetention = String(await get("lastLogRetention"));
   const lastJobSave = String(await get("lastJobSave"));
   const lastConcurrency = String(await get("lastConcurrency"));
   const concurrency = db ? await getConcurrency(db) : 1;
@@ -123,14 +120,16 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
                   <code className="text-xs" style={muted}>{r.path}</code>
                   {r.riskNote && <span className="mt-1 block text-xs" style={muted}>{r.riskNote}</span>}
                 </span>
-                <form action={removeRootAction}>
-                  <input type="hidden" name="rootId" value={r.id} />
-                  <button className="btn btn-ghost" type="submit">Remove</button>
-                </form>
               </li>
             ))}
           </ul>
         )}
+
+        <p className="text-xs" style={muted}>
+          Folders are approved on Admin &rarr; Helpers &rarr; Files and folders. This module can
+          ask for one, but cannot approve or remove it &mdash; otherwise the limit it works
+          within would be one it sets for itself.
+        </p>
 
         {/* Check before saving — the warning replaced an outright refusal, so it has to be
             somewhere an admin will actually read it. */}
@@ -184,18 +183,20 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
           {lastTest && <p className="w-full text-sm">{lastTest}</p>}
         </form>
 
-        <form action={addRootAction} className="card flex flex-col gap-2 p-3">
+        {/* Ask, don't take. The approval happens on the helper's own page, where no module
+            is in the path — see the note on suggestRootAction. */}
+        <form action={suggestRootAction} className="card flex flex-col gap-2 p-3">
           <div className="flex flex-wrap gap-2">
             <label className="min-w-64 flex-1 text-sm">
               Full path
               <input className="input mt-1 w-full" name="path" placeholder="D:\Photos" required />
             </label>
-            <label className="text-sm">
-              What to call it
-              <input className="input mt-1" name="label" placeholder="Photos" />
+            <label className="min-w-64 flex-1 text-sm">
+              Why it&rsquo;s needed
+              <input className="input mt-1 w-full" name="reason" placeholder="Nightly photo backup" required />
             </label>
           </div>
-          <button className="btn btn-primary self-start" type="submit">Allow this folder</button>
+          <button className="btn self-start" type="submit">Ask an administrator</button>
           {lastRoot && <p className="text-sm">{lastRoot}</p>}
         </form>
 
@@ -322,19 +323,18 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
           {logSize.count} log{logSize.count === 1 ? "" : "s"}, {Math.round(logSize.bytes / 1024)} KB.
           This is about the LOGS, not the backups themselves.
         </p>
-        <form action={setLogRetentionAction} className="card flex flex-wrap items-end gap-2 p-3">
-          <label className="text-sm">
-            Keep for (days)
-            <input className="input mt-1" type="number" name="keepDays" min={0} defaultValue={logRetention.keepDays} />
-          </label>
-          <label className="text-sm">
-            Keep at most (runs)
-            <input className="input mt-1" type="number" name="keepRuns" min={0} defaultValue={logRetention.keepRuns} />
-          </label>
-          <button className="btn" type="submit">Save</button>
-          <p className="w-full text-xs" style={muted}>0 in either box means &ldquo;keep forever&rdquo;.</p>
-          {lastLogRetention && <p className="w-full text-sm">{lastLogRetention}</p>}
-        </form>
+        <div className="card flex flex-col gap-1 p-3 text-sm">
+          <p>
+            Kept for {logRetention.keepDays || "unlimited"} day
+            {logRetention.keepDays === 1 ? "" : "s"}, at most{" "}
+            {logRetention.keepRuns || "unlimited"} run{logRetention.keepRuns === 1 ? "" : "s"}.
+          </p>
+          <p className="text-xs" style={muted}>
+            Changed on Admin &rarr; Helpers &rarr; Files and folders. The setting is shared by
+            every module using that helper, so one module changing it would prune another&rsquo;s
+            logs &mdash; including the record of what it had just done.
+          </p>
+        </div>
       </section>
 
       {/* ------------------------------------------------------------ weekly summary */}

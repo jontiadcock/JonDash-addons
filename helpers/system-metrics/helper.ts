@@ -14,11 +14,14 @@ const helper: HelperDefinition = {
   name: "System metrics",
   description:
     "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-  version: "0.0.2",
-  // `ctx.can()` enforcement arrived in JonDash 1.5.2, and `api.ts` uses it to refuse a
-  // module that didn't declare the capability. The PRE-RELEASE, not a bare "1.5.2": semver
-  // ranks a pre-release below its release, so "1.5.2" would be refused on every 1.5.2 beta.
-  minAppVersion: "1.5.2-beta.1",
+  version: "0.0.3-beta.1",
+  // Raised from 1.5.2-beta.1 for CORE-10. `label` and `risk` are optional to omit but not to
+  // declare: on a 1.7.1 clone they fail to compile (TS2353), and a helper compiles into the
+  // app, so an older core gets a failed build rather than a plainer screen.
+  //
+  // The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
+  // "1.7.2" would be refused on every 1.7.2 beta.
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * One capability, read-only, always rendered red (core assumes the worst of a
@@ -29,6 +32,11 @@ const helper: HelperDefinition = {
     {
       permission: "system-metrics:read",
       describe: () => "See this server's CPU, memory, disk usage, uptime and temperature.",
+      label: "See system health",
+      risk: "low",
+      /* No scope: the readings are the whole machine or nothing — there is no per-item set to
+         approve. And no paired acting capability, because this helper cannot act at all; it is
+         read-only by construction, so it is unpaired correctly rather than by omission. */
     },
   ],
 };

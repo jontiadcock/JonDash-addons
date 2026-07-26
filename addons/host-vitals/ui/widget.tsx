@@ -47,7 +47,16 @@ function totalNet(m: Snapshot): { rx: number; tx: number } | null {
   );
 }
 
-/** A slim usage bar that follows the app theme. */
+/**
+ * A slim usage bar that follows the app theme — including its STRUCTURE, not just colour.
+ *
+ * `min(3px, var(--radius-control))` rather than a hardcoded 3: the radius token runs from
+ * 999px on Crystal to 0px on Terminal, Brutalist and Paper, which are square-cornered on
+ * purpose. A fixed 3px left rounded bars sitting inside hard-edged cards on exactly the
+ * styles whose whole point is that nothing is rounded. `min` keeps the bar proportional on
+ * round styles — a 6px-tall bar wants 3px, not 999 — while collapsing to square where the
+ * style says square.
+ */
 function Bar({ usedPct }: { usedPct: number }) {
   return (
     <span
@@ -55,7 +64,7 @@ function Bar({ usedPct }: { usedPct: number }) {
         display: "inline-block",
         width: "100%",
         height: 6,
-        borderRadius: 3,
+        borderRadius: "min(3px, var(--radius-control))",
         background: "var(--border)",
         overflow: "hidden",
       }}

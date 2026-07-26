@@ -14,6 +14,8 @@ node_modules/
 # between that data and a public push. Weakening one, or putting a working
 # folder somewhere not listed here, publishes it.
 #
+# The working area lives inside the checkout by owner decision (2026-07-25), on
+# the condition that it is documented and ignored fully. See WORKING/README.md.
 # Verify rather than assume, whenever this file changes:
 #
 #     git check-ignore -v WORKING/testbed/s154/prisma/dev.db

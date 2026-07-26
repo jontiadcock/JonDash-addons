@@ -25,7 +25,9 @@ function Row({ label, value, usedPct }: { label: string; value: string; usedPct?
           style={{
             display: "block",
             height: 6,
-            borderRadius: 3,
+            // Follows the style's own radius rather than a fixed 3px — square on Terminal,
+            // Brutalist and Paper, gently rounded elsewhere. See the widget's Bar.
+            borderRadius: "min(3px, var(--radius-control))",
             background: "var(--border)",
             overflow: "hidden",
           }}
