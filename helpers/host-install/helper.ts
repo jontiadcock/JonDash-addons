@@ -1,4 +1,4 @@
-import type { HelperDefinition } from "@/lib/helpers/types";
+﻿import type { HelperDefinition } from "@/lib/helpers/types";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
 import { uninstallPackage } from "@/lib/elevation";
@@ -29,11 +29,14 @@ const helper: HelperDefinition = {
   name: "Install software",
   description:
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-  version: "0.0.2-beta.1",
-  // The package API (installPackage / uninstallPackage / packageState) arrived in
-  // 1.7.1-beta.7. The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its
-  // release, so "1.7.1" would be refused on every 1.7.1 beta — the builds beta users run.
-  minAppVersion: "1.7.1-beta.7",
+  version: "0.0.3-beta.1",
+  // The package API arrived in 1.7.1-beta.7, but CORE-10's `label` / `risk` raise the floor
+  // again: optional to omit, not to declare — on a 1.7.1 clone they fail to compile (TS2353),
+  // and a helper compiles into the app, so that is a failed build rather than a plainer screen.
+  //
+  // The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
+  // "1.7.2" would be refused on every 1.7.2 beta — the builds beta users run.
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * Two capabilities, split for honesty. Checking whether something is installed is a
@@ -45,15 +48,29 @@ const helper: HelperDefinition = {
    * `host-services`, that is a property of the capability rather than a setting, because
    * there is no grant model here to switch off.
    */
+  /**
+   * No `scope`, and no `unbounded`, for the same structural reason `host-services:control` has
+   * no unbounded: there is nothing to make one out of. Every install is approved individually
+   * at the moment it runs, with the package name on screen and a UAC prompt behind it — the
+   * bound is the per-request approval, not a stored list, so there is no set for core to render
+   * and no "allow everything" that would mean anything. Adding a package allowlist here would
+   * describe a gate that the request flow already applies one request at a time.
+   */
   provides: [
     {
       permission: "host-install:read",
       describe: () => "See whether a piece of software is installed on this server",
+      label: "See installed software",
+      risk: "low",
     },
     {
       permission: "host-install:manage",
       describe: () =>
         "Install and remove software on this server — you approve each one, and see its name before it runs",
+      label: "Install and remove software",
+      // Installing software is arbitrary code execution with the admin's blessing. Nothing
+      // ranks above this.
+      risk: "high",
     },
   ],
 

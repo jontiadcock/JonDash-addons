@@ -215,8 +215,18 @@ that keeps asking becomes visibly annoying, which is the correct outcome.
 - **No arbitrary commands.** Three verbs, against a list. This is not a shell.
 - **No installing, removing or reconfiguring services** — no changing a startup type, no editing a
   unit file. Those are a different capability with a different argument.
-- **No discovery of services outside the allowlist.** A module cannot enumerate what exists on the
-  machine; that is both a scoping and a privacy decision.
+- **No discovery of services outside the allowlist — unless the admin turns that on.** A module
+  cannot enumerate what exists on the machine, which is both a scoping and a privacy decision.
+  Since 0.0.4 an administrator may switch `host-services:read` to "allow everything — no list", and
+  then a module holding that capability does see every service and its state. That is a deliberate
+  widening, made on JonDash's own Permissions screen, behind a confirm step and a warning that says
+  what it means. **It does not widen control:** everything the unbounded path returns is marked
+  uncontrollable and carries a synthetic id no grant will ever resolve, so `request()` still refuses
+  anything that is not an allowlisted, controllable entry. There is no equivalent switch for
+  `host-services:control`, and there cannot be — see ELEVATION.md.
+- **No enumeration from a module, ever, even so.** The service list is read by `browse` on the admin
+  screen, which core calls behind `requirePermission("modules.manage")`. `lib/enumerate.ts` is not
+  re-exported from `api.ts` and must never be.
 - **No unattended action unless the admin chose it, per service.** "Allow without asking" is opt-in on
   one entry at a time — never global, never a default, and never something a module can set.
 - **No fallback when a grant cannot be created.** Creating one needs an interactive desktop session;

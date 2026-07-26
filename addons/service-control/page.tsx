@@ -19,9 +19,17 @@ export default async function ServiceControlPage({ ctx }: ModulePageProps) {
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
         <h1 className="text-lg font-medium">Services</h1>
+        {/*
+          Two sentences, because one of them stopped being true.
+          Until the helper gained an "allow everything" switch for READING, this said only
+          approved services appear — which is now false on an install where that switch is on,
+          and a page that overstates its own limits is worse than one that explains them. The
+          count decides: anything not controllable is something we can only look at.
+        */}
         <p className="text-sm" style={{ color: "var(--muted)" }}>
-          Only the services an administrator has approved appear here. Nothing else on this machine can
-          be reached from JonDash.
+          {services.some((s) => !s.canControl)
+            ? "Services an administrator has approved for control can be started and stopped here. The rest are shown for information only — nothing on this page can act on them."
+            : "Only the services an administrator has approved appear here. Nothing else on this machine can be reached from JonDash."}
         </p>
       </header>
 

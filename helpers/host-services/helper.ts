@@ -2,30 +2,9 @@ import type { HelperDefinition } from "@/lib/helpers/types";
 import { addEntry, listServiceLabels, readConfig, removeEntry, setUnattended } from "./lib/allowlist";
 import { decline, execute } from "./lib/requests";
 import { readGrants, revokeEverything } from "./lib/grant";
+import { controlScope, readScope } from "./lib/scopes";
+import { explainAdd } from "./lib/wording";
 import SettingsPanel from "./ui/settings-panel";
-
-/** Wording for a refused add. Separate so the panel gets a sentence, not a code. */
-function explainAdd(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok: true }>): string {
-  switch (r.reason) {
-    case "duplicate":
-      return "That service is already on the list.";
-    case "unusable-name":
-      return "That name has no characters that can be used.";
-    case "name-clash":
-      // Names the entry in the way, because "pick another name" is useless advice when the
-      // service name is not yours to choose.
-      return `Windows would give this the same permission name as "${r.detail}". Remove that entry first if this is the one you want.`;
-    case "grant-refused": {
-      const o = r.outcome;
-      if (o.status === "cancelled-at-uac") return "You dismissed the Windows permission prompt.";
-      if (o.status === "timed-out") return "The permission prompt was not answered in time.";
-      if (o.status === "unavailable") return "This installation cannot grant that permission.";
-      // Narrowed via the discriminant rather than reaching for `.detail` on the union — `ok`
-      // has no such field, and TypeScript is right to say so.
-      return o.status === "failed" ? o.detail : "The permission could not be granted.";
-    }
-  }
-}
 
 /**
  * Last chance to take back what this helper gave the operating system.
@@ -128,7 +107,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.3-beta.2",
+  version: "0.0.4-beta.1",
   /**
    * 1.7.1-beta.**9**, the first build carrying `SettingsPanel` / `onSettingsSubmit` — checked
    * tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this
@@ -138,10 +117,17 @@ const helper: HelperDefinition = {
    * audit-before-acting so an elevated action cannot happen unrecorded (beta.2), `runGrant`
    * so the restart itself is logged (beta.2), and `uninstallQuestions` (beta.7).
    *
-   * The PRE-RELEASE, not a bare "1.7.1": semver ranks a pre-release below its release, so
-   * "1.7.1" would refuse every 1.7.1 beta — including beta.9, which has the feature.
+   * The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
+   * "1.7.2" would refuse every 1.7.2 beta — including beta.1, which has the feature.
+   *
+   * **Raised to 1.7.2-beta.1 for CORE-10, and this is a hard floor rather than a preference.**
+   * The new `label` / `risk` / `scope` fields are optional in the contract, so a helper that
+   * omits them still installs on an older core — but a helper that DECLARES them does not.
+   * Measured against a 1.7.1 clone: `TS2353 'label' does not exist in type 'HelperCapability'`
+   * and `TS2724 no exported member 'HelperCapabilityScope'`. Helpers compile into the app, so
+   * that is a failed build and an app that will not start, not a degraded screen.
    */
-  minAppVersion: "1.7.1-beta.9",
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * Two lines, and the split is for honesty rather than scoping — a consuming module
@@ -159,10 +145,20 @@ const helper: HelperDefinition = {
     {
       permission: "host-services:read",
       describe: (config) => `See whether ${which(config)} are running`,
+      label: "See service status",
+      // Names and run states of software installed here. Worth disclosing, but it changes
+      // nothing on the machine — reserving "high" for what actually can.
+      risk: "low",
+      scope: readScope,
     },
     {
       permission: "host-services:control",
       describe: (config) => `Start, stop and restart ${which(config)}`,
+      label: "Start and stop services",
+      // Stopping the wrong service takes this machine off the network, off remote access, or
+      // takes JonDash itself down. That is the definition of high.
+      risk: "high",
+      scope: controlScope,
     },
     /*
      * There is no third capability, and there must not be one again.

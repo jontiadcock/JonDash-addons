@@ -3,6 +3,8 @@ import type { HelperApiFor } from "@/lib/helpers/types";
 import { findEntry, listEntries } from "./lib/allowlist";
 import { createRequest, execute, pendingRequests, requestStatus, suggest, type RequestOutcome } from "./lib/requests";
 import { capability, type ElevationSupport } from "./lib/grant";
+import { findServices } from "./lib/enumerate";
+import { readIsUnbounded } from "./lib/scopes";
 import { readStates, type ServiceState } from "./lib/services";
 import { isVerb, type Verb } from "./lib/names";
 
@@ -104,17 +106,45 @@ const api: HelperApiFor<HostServicesApi> = (ctx: ModuleContext) => ({
     return capability();
   },
 
+  /**
+   * The approved services — or every service on the machine, if the admin turned that on.
+   *
+   * The unbounded switch widens READING only, and the widening is real rather than cosmetic:
+   * a module genuinely sees services nobody listed. What it does not do is make any of them
+   * controllable. Everything returned by the unbounded path carries `canControl: false` and a
+   * synthetic id that `request()` will not resolve, so the control path is unchanged — it
+   * still refuses anything that is not an allowlisted, controllable entry.
+   */
   async list() {
     if (!granted(ctx, "host-services:read")) return [];
     const entries = await listEntries();
     const states = await readStates(entries.map((e) => e.serviceName));
-    return entries.map((e) => ({
+    const listed = entries.map((e) => ({
       id: e.id,
       name: e.serviceName,
       label: e.label,
       state: states.get(e.serviceName) ?? "unknown",
       canControl: e.canControl,
     }));
+
+    if (!(await readIsUnbounded())) return listed;
+
+    const known = new Set(entries.map((e) => e.serviceName.toLowerCase()));
+    // Empty query = everything. This is the one caller allowed to ask for that, and only
+    // because an admin explicitly turned the switch on.
+    const all = await findServices("");
+    const extra = all
+      .filter((s) => !known.has(s.name.toLowerCase()))
+      .map((s) => ({
+        // Prefixed rather than a real row id: there is no entry to remove, and `findEntry`
+        // will not match it, so an id from here can never reach a grant.
+        id: `unlisted:${s.name}`,
+        name: s.name,
+        label: s.display,
+        state: s.state,
+        canControl: false,
+      }));
+    return [...listed, ...extra];
   },
 
   async request(serviceId: string, action: Verb) {

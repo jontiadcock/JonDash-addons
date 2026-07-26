@@ -1,4 +1,4 @@
-import type { ModuleContext, ModuleDefinition } from "@/lib/modules/types";
+﻿import type { ModuleContext, ModuleDefinition } from "@/lib/modules/types";
 import filesystem from "@/helpers/filesystem/api";
 import BackupPage from "./page";
 import BackupSettingsPanel from "./ui/settings-panel";
@@ -57,14 +57,12 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.2.0-beta.1",
-  // `ctx.can()` enforcement and GFS retention arrived in filesystem 0.0.3, which needs
-  // JonDash 1.5.2. The pre-release, not a bare "1.5.2" — semver ranks a pre-release below
-  // its release, so a bare number is refused on every 1.5.2 beta.
-  // Follows the filesystem helper's floor. 0.0.6 of that helper moved the folder editor onto
-  // its own settings page, which needs 1.7.1-beta.9 — and this module cannot install without
-  // a helper that has the API it now calls.
-  minAppVersion: "1.7.1-beta.9",
+  version: "0.2.1-beta.1",
+  // Follows the filesystem helper's floor, which has moved twice: 0.0.6 put the folder editor
+  // on the helper's own settings page (1.7.1-beta.9), and 0.0.7 declares CORE-10 `scope`,
+  // which does not compile on anything older than 1.7.2-beta.1. A helper compiles into the
+  // app, so bringing 0.0.7 onto a 1.7.1 install would fail the build rather than degrade.
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * `filesystem:*` come from the helper, not core.
@@ -106,9 +104,10 @@ const backupManager: ModuleDefinition = {
    * version has supported. Stating a floor we don't require would make the break-analysis
    * wrong in the other direction.
    */
-  // Pinned to 0.0.6-beta.1: the release that removed addRoot/removeRoot/setRetention and added
-  // suggestRoot. An older helper simply has no suggestRoot to call.
-  helpers: [{ id: "filesystem", minVersion: "0.0.6-beta.1" }, "scheduler"],
+  // Pinned to 0.0.7-beta.1. 0.0.6 removed addRoot/removeRoot/setRetention and added
+  // suggestRoot — an older helper has no suggestRoot to call — and 0.0.7 is the CORE-10 build
+  // this module's floor now assumes.
+  helpers: [{ id: "filesystem", minVersion: "0.0.7-beta.1" }, "scheduler"],
 
   /** Backups are infrastructure: the paths alone tell you how the machine is laid out. */
   adminOnly: true,

@@ -23,12 +23,15 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.3-beta.1",
+  version: "0.0.4-beta.1",
   // Matches the helper's floor: beta.9 is the first build with helper settings pages, which
   // is where the allowlist editor now lives. The PRE-RELEASE, not a bare "1.7.1" — semver
   // ranks a pre-release below its release, so "1.7.1" would refuse every 1.7.1 beta,
   // including beta.9, which has the feature.
-  minAppVersion: "1.7.1-beta.9",
+  // Follows the helper. host-services 0.0.4-beta.1 declares CORE-10 `scope`, which does not
+  // compile on 1.7.1 — so a module that brought that helper onto a 1.7.1 install would take the
+  // whole app's build down with it. The floor has to move with the helper it pulls in.
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * Both helper capabilities. They render red on the consent screen — core assumes the worst
@@ -44,7 +47,7 @@ const serviceControl: ModuleDefinition = {
   permissions: ["host-services:read", "host-services:control"],
 
   /** Pinned to the version that introduced the API this module calls. */
-  helpers: [{ id: "host-services", minVersion: "0.0.3-beta.1" }],
+  helpers: [{ id: "host-services", minVersion: "0.0.4-beta.1" }],
 
   /** Which services exist on the host, and the power to stop them, is admin information. */
   adminOnly: true,

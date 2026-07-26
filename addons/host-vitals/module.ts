@@ -1,4 +1,4 @@
-import type { ModuleDefinition } from "@/lib/modules/types";
+﻿import type { ModuleDefinition } from "@/lib/modules/types";
 import HostVitalsWidget from "./ui/widget";
 import HostVitalsPage from "./page";
 import { TOGGLES } from "./lib/groups";
@@ -18,11 +18,11 @@ const hostVitals: ModuleDefinition = {
   name: "Host vitals",
   description:
     "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-  version: "0.0.3-beta.1",
+  version: "0.0.4-beta.1",
   // The `system-metrics` capability is enforced by `ctx.can()`, which arrived in JonDash
   // 1.5.2. The pre-release, not a bare "1.5.2": semver ranks a pre-release below its release,
   // so "1.5.2" would be refused on every 1.5.2 beta — the builds beta users run.
-  minAppVersion: "1.5.2-beta.1",
+  minAppVersion: "1.7.2-beta.1",
 
   /**
    * The only permission is the helper's read capability. It renders red on the consent
