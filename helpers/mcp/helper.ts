@@ -57,11 +57,14 @@ const helper: HelperDefinition = {
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
   version: "0.0.1-beta.1",
-  // `listBindableAccounts` / `resolveBindableAccount` / `getEffectivePermissionsUncached` and the
-  // `onIdentityRemoved` hook all arrived in 1.7.3-beta.1 (SEC-07). This helper cannot bind a key
-  // without them, so an older core is not a degraded experience — it is a helper with nothing to
-  // bind to. The PRE-RELEASE, not a bare "1.7.3": semver ranks a pre-release below its release.
-  minAppVersion: "1.7.3-beta.1",
+  // Service accounts arrived in 1.7.3-beta.1 (SEC-07) — without them this helper has nothing to
+  // bind a key to, so an older core is not a degraded experience, it is an unusable one.
+  //
+  // beta.**2**, because `resolveBindableAccount` takes the helper id there. That argument is
+  // optional and non-breaking, so beta.1 would still RUN — but it is called on the hot path of
+  // every request, and declaring a floor the code does not match is how a doc becomes a lie.
+  // The PRE-RELEASE, not a bare "1.7.3": semver ranks a pre-release below its release.
+  minAppVersion: "1.7.3-beta.2",
 
   /**
    * Two capabilities, because a capability with a looking-at-it form and a doing-something-to-it

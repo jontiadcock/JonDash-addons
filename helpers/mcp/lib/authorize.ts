@@ -81,7 +81,11 @@ export async function authorize(
   // This is also why `accountId` is not a foreign key: a helper must not constrain core's User
   // table, so it verifies on every call instead. `onIdentityRemoved` tidies the dead rows, but the
   // security property lives here and does not depend on that hook firing.
-  const account = await resolveBindableAccount(key.accountId);
+  // The helper id is passed so core can stamp "last used, by which add-on" onto the service
+  // account and show it on its own page — the owner wanted an unused account distinguishable from
+  // a live one. Fire-and-forget and throttled on core's side, so it cannot add latency here or
+  // fail an authorization.
+  const account = await resolveBindableAccount(key.accountId, "mcp");
   if (!account || account.status !== "ACTIVE") {
     return { ok: false, reason: "account-gone" };
   }
