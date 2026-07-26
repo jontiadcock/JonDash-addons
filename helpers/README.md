@@ -56,6 +56,14 @@ that need it.
 | `host-services` | Seeing and controlling the services an admin approved — a Windows service, a systemd unit | `host-services:read`, `host-services:control` | [host-services/HELPER.md](host-services/HELPER.md) |
 | `docker` | Seeing containers and starting, stopping, pausing and restarting them. Never the socket, never `exec` | `docker:read`, `docker:logs`, `docker:manage` | [docker/HELPER.md](docker/HELPER.md) |
 | `host-install` | Installing and removing software through the OS package manager, approved one at a time | `host-install:read`, `host-install:manage` | [host-install/HELPER.md](host-install/HELPER.md) |
+| `mcp` | Letting an AI assistant read and manage this install over MCP, as a service account an admin picks | `mcp:read`, `mcp:act` | [mcp/HELPER.md](mcp/HELPER.md) |
+
+**`mcp` is the only helper here that holds a resource of its own** — a listening socket — rather than
+acting only when a module calls it. That makes it the one where "installed" and "running" are
+genuinely different states, and it is why HELPERS-DESIGN rule 12 exists. If you write another helper
+that holds a socket, a file watcher, or a timer with side effects: **nothing may start until an
+admin has switched it on, and you fail closed yourself** rather than assuming core's boot gate got
+there first.
 
 **Three of these elevate**, and how that is done is a design decision in its own right — a *fixed*
 action can be granted once, a *variable* one must be approved every time. See
