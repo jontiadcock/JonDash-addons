@@ -130,7 +130,10 @@ register({
   inputSchema: {
     type: "object",
     properties: {
-      contains: { type: "string", description: "Only entries whose action contains this text." },
+      contains: {
+        type: "string",
+        description: "Only entries whose action contains this text, matched literally and case-insensitively.",
+      },
       limit: { type: "number", description: "How many rows, 1-100. Defaults to 50." },
     },
   },
@@ -139,9 +142,34 @@ register({
     // Clamped here rather than trusted: the model chooses this number, and "give me everything"
     // is a reasonable thing for it to try.
     const limit = Math.min(100, Math.max(1, Number(args.limit) || 50));
+
+    /**
+     * **Substring means substring — `%` and `_` are literal here.**
+     *
+     * Prisma's `contains` compiles to SQL `LIKE` and does not escape the wildcards, so
+     * `contains: "%"` matched every row and `revoke_session` also matched `revokeXsession`. Not an
+     * injection (Prisma parameterises, and `' UNION SELECT …` comes back as literal text) — but a
+     * search that quietly means something other than what was asked is worth being exact about,
+     * especially when the thing asking is a model that cannot see it went wrong.
+     *
+     * Prisma offers no `ESCAPE` clause, so rather than drop to raw SQL — and lose the explicit
+     * column list that is what actually keeps secrets unreachable — the match is done against the
+     * distinct action vocabulary, which is bounded and small (dozens of values, not rows). The
+     * filter is then an exact `in`, and the database still does the ordering and the limit.
+     */
+    let actionFilter: { in: string[] } | undefined;
+    if (contains !== undefined) {
+      const vocabulary = await prisma.auditLog.findMany({
+        select: { action: true },
+        distinct: ["action"],
+      });
+      const needle = contains.toLowerCase();
+      actionFilter = { in: vocabulary.map((v) => v.action).filter((a) => a.toLowerCase().includes(needle)) };
+    }
+
     const rows = await prisma.auditLog.findMany({
       select: { action: true, detail: true, createdAt: true, source: true, user: { select: { email: true } } },
-      where: contains ? { action: { contains } } : undefined,
+      where: actionFilter ? { action: actionFilter } : undefined,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
