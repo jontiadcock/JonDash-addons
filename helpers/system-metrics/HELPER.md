@@ -1,8 +1,7 @@
 # System metrics helper
 
-**Status: SHIPPED. `0.0.1` on stable, `0.0.2-beta.1` on beta. Requires JonDash 1.5.2** (the release
-that added `ctx.can()` enforcement, which this helper uses to refuse a module that didn't declare its
-capability).
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had. (the release
+It uses `ctx.can()` to refuse a module that did not declare the capability.
 
 Reads read-only telemetry about the machine JonDash runs on — CPU, memory, disk usage, uptime and,
 where the hardware exposes them, temperatures — and hands it to a module as plain numbers.

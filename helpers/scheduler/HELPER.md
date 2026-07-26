@@ -1,8 +1,6 @@
 # Scheduler helper
 
-**Status: published on BOTH channels — `0.0.2` on stable, `0.0.2-beta.1` on beta. The runtime lives here
-and is maintained here. Proven end to end on 2026-07-22 (see the version history), and `health-monitor`
-now runs on it — its in-module poller is gone as of 0.0.5.**
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had.
 
 Lets a module run work on a schedule **from the moment the server starts**, rather than the first time
 somebody happens to open a page.

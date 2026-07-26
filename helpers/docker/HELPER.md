@@ -1,7 +1,7 @@
 # Docker helper
 
-**Status: SPEC — not built.** Awaiting the owner's approval of this document, and a decision on how it
-gets tested (see *Testing* at the bottom — there is no Docker engine on the development machine).
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had. Awaiting the owner's approval of this document, and a decision on how it
+Shipped and in use by `docker-manager`.
 
 Lets a module see and control the containers on this server's Docker engine, so a module can be a
 container dashboard without JonDash ever handing a module the Docker socket.
