@@ -1,6 +1,6 @@
 # Host install helper
 
-**Status: BUILT, not published.** `0.0.1-beta.1`, needs JonDash **1.7.1-beta.6**.
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had. `0.0.1-beta.1`, needs JonDash **1.7.1-beta.6**.
 
 Installs and removes software using Windows' own package manager, with an administrator
 approving every single one.

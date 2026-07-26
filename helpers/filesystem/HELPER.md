@@ -1,13 +1,7 @@
 # Filesystem helper
 
-**Status: SHIPPED. `0.0.4` on stable, `0.0.4-beta.1` on beta.** Proven end to end in a browser
-against real **1.5.1-beta.1**, **1.5.2** and **1.5.3-beta.5** installs (see *Live test* below).
-0.0.3 onwards requires JonDash **1.5.2-beta.1** — the release that added `ctx.can()` and
-`readConfig`.
-
-**0.0.4 is a documentation release — the runtime is byte-identical to 0.0.3-beta.1.** It exists
-because the audit note under *Retention* was wrong for anyone on JonDash 1.5.3 or later, and a tag
-is immutable, so the correction could not reach an installed copy without a new version.
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had. Proven end to end in a browser
+Proven end to end in a browser against real installs — see *Live test* below.
 
 | Piece | State |
 | ----- | ----- |
@@ -347,7 +341,7 @@ return.** They let a module confined to approved folders approve its own — the
 exploit, just the call it was already given. Retention was worse in one way: the policy is global,
 so any module could shorten it and prune every other module's logs, including the record of what
 it had just done. All three now live in `lib/admin.ts`, reachable only from the helper's settings
-page on Admin → Helpers, where `ctx.user` comes from the session and no module is in the path.
+page on Admin → Addons → Shared capabilities, where `ctx.user` comes from the session and no module is in the path.
 This is HELPERS-DESIGN rule 8: **read and request, never add, remove or approve.**
 
 **A consumer reconciles against `status`, it does not poll `progress`.** `start` returns an id and

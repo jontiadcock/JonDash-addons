@@ -1,38 +1,15 @@
 # Host services helper
 
-**Status: BUILT, NOT PUBLISHED.** The helper exists and passes `tsc`, `eslint` and its own tests. It is
-not on any channel, because two things are still missing:
+**Status: SHIPPED on both channels.** Versions live in [`addons.json`](../../addons.json) on this branch — not restated here, because a version in prose goes stale silently and every one of these lines had. The helper exists and passes `tsc`, `eslint` and its own tests. It is
+Shipped and proven on a real machine: one approval when a service is added, then start and stop
+with no further prompt, verified by reading the service state either side. Removing an entry prompts
+again, because withdrawing a standing privilege is itself an administrator action.
 
-1. **Core's grant manager (OPS-18)** — accepted, not shipped. Until it lands, `capability()` reports
-   `grant-manager-missing`, adding an allowlist entry refuses, and no action can run. Nothing degrades to
-   a weaker privilege in the meantime; it refuses and says why.
-2. **Its first consumer** — `service-control`. A helper cannot be live-tested alone, because the install
-   path, the consent roll-up and the prune all run through a consuming module.
-
-**What already works without any privilege:** reading the state of allowlisted services. Querying a
+**What still needs no privilege at all:** reading the state of allowlisted services. Querying a
 service needs no elevation, so the dashboard is useful on a machine where no grant has ever been made.
 
-### What has actually been exercised, and what has not
-
-Recorded because "it compiles" and "it works" are different claims, and the gap is where privileged
-code goes wrong.
-
-| Module | How it was tested |
-| --- | --- |
-| `lib/names.ts` | 14 unit tests, including the `\` path-escape and collision suffixing |
-| `lib/risk.ts` | 8 unit tests |
-| `lib/services.ts` | **Run against real Windows services**, cross-checked against `sc.exe` output — not just against its own parser |
-| `lib/allowlist.ts` | 23-check harness on a real SQLite database, migration applied by **core's own `runHelperMigrations`** |
-| `lib/requests.ts` | Same harness — queue, decline, expiry, cross-module isolation, suggestion cooldown |
-| `api.ts` | 20-check harness: every permission gate, the identical-refusal probing defence, and assertions that the surface is exactly five calls and exposes no `addEntry`/`setUnattended`/`execute` |
-| `lib/grant.ts` | **Only the refusal path.** `capability()` correctly reports `grant-manager-missing`, and adding a controllable entry refuses and writes no row |
-
-**Not yet exercised, and honestly blocked:**
-
-- `createGrants`, `removeGrants`, `runGrant` on success — all need the OPS-18 binary.
-- `requests.execute()` on success — needs a real grant to run.
-- **The consent screen has never been seen.** That needs the `service-control` consumer, because the
-  install path and the consent roll-up only happen through a consuming module.
+**What remains unproven, and must not be claimed:** whether the Scheduled Task security descriptor
+stops a standard user *editing* a grant. It is coded that way and has not been tested.
 
 **Elevation is granted once per service, not per action.** Adding a service to the allowlist creates a
 fixed OS-level grant — a Scheduled Task on Windows, a sudoers/polkit rule on Linux — and that is the
