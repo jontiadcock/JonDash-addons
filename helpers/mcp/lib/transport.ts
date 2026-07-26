@@ -155,11 +155,16 @@ export async function startListener(dispatch: Dispatch): Promise<{ started: bool
   /**
    * **A disabled add-on must not leave a live endpoint behind.**
    *
-   * `bootHelpers()` deliberately ignores module state — a helper is not its carrier — and for every
-   * other helper that is right, because they only act when a module calls them. This one is
-   * different: it listens on a port whether any module ever calls it or not. Without this check, an
-   * admin who switches "AI assistant access" off in Addons has done nothing at all, and the screen
-   * they used says nothing to the contrary. Someone reasonably believes they closed the door.
+   * `bootHelpers()` used to ignore module state — a helper is not its carrier — and for every other
+   * helper that is right, because they only act when a module calls them. This one is different: it
+   * listens on a port whether any module ever calls it or not. Without this check, an admin who
+   * switched "AI assistant access" off in Addons had done nothing at all, and the screen they used
+   * said nothing to the contrary. Someone reasonably believes they closed the door.
+   *
+   * **Core fixed this centrally in 1.7.3-beta.4** and this check stays anyway, per HELPERS-DESIGN
+   * rule 12: fail closed yourself rather than assume core got there first. They cannot conflict —
+   * both only ever refuse to open a socket — and this helper's floor is 1.7.3-beta.2, so it must
+   * still hold on a core that predates the fix.
    *
    * Phrased over dependents rather than the id `mcp-server`, so it stays true if this helper is
    * ever carried by something else, and so it means what it says: nothing enabled needs this, so

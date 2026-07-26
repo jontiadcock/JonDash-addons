@@ -116,10 +116,21 @@ path.
 
 ### The off switch — three independent conditions, all required
 
-`bootHelpers()` runs every installed helper's `onBoot` **regardless of whether the consuming module
-is enabled** (verified against 1.7.2-beta.2, still true at 1.7.3-beta.2). For every other helper that
-is correct — a helper only acts when a module calls it. This one is different: it listens on a port
-whether a module ever calls it or not.
+Historically `bootHelpers()` ran every installed helper's `onBoot` **regardless of whether the
+consuming module was enabled** (verified against 1.7.2-beta.2, still true at 1.7.3-beta.2). For every
+other helper that is correct — a helper only acts when a module calls it, so a disabled module means
+a dormant helper by definition. This one was the first that is different: it listens on a port
+whether a module ever calls it or not, so switching the add-on off left the endpoint open with
+nothing on screen saying otherwise.
+
+**Core closed that in 1.7.3-beta.4** — `onBoot` now runs only for a helper some *enabled* module
+depends on, while migrations still run for every *installed* helper so a re-enabled module never
+meets a layout its helper wasn't written against.
+
+**The check below stays regardless, and that is deliberate.** HELPERS-DESIGN rule 12: *"You should
+still fail closed yourself rather than assume core got there first."* The two cannot fight — both
+can only ever refuse to open a socket, never open one — and this helper's floor is `1.7.3-beta.2`,
+so it must still be correct on a core that predates the fix.
 
 So the listener binds only when **all three** hold, and every one of them is checked in
 `startListener` rather than merely intended:
@@ -234,7 +245,7 @@ Only what has actually been driven against a running install — 1.7.3-beta.2, e
 | An assistant cannot disable its own carrier | Attempted; refused, module verified still enabled — while disabling a *different* module succeeded, so the refusal is the rule and not a broken tool |
 | Revoking is immediate | Key deleted mid-session; the very next call refused, with no restart and no cache |
 | Nothing listens until switched on **and** a key exists | Port checked closed with the module installed and enabled |
-| Disabling the add-on closes the endpoint | Disabled → port closed; re-enabled → port back, so the fix cannot strand it |
+| Disabling the add-on closes the endpoint | Disabled → restart → port closed; re-enabled → restart → port back, so the rule cannot strand it. **The listener is bound at boot**, so a change to module state takes effect at the next restart, or immediately if an administrator touches the on/off switch (which rebinds there and then) |
 | Actions are attributed to the agent, never a person | Every `mcp.*` audit row carries the service account's id — including the refusals, which are logged too |
 | DNS-rebinding defence | A request carrying any `Origin` → 403. A forged `Host` → 403, tested over a **raw socket**, because `fetch()` silently drops a `Host` override and made this look like it was failing when it was not |
 | No secret is reachable through any read tool | Every read tool uses a Prisma `select` allow-list, so `passwordHash`, `totpSecretEnc` and `tokenHash` are never loaded rather than filtered afterwards |
