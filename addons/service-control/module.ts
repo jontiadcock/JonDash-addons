@@ -53,17 +53,17 @@ const serviceControl: ModuleDefinition = {
   Page: ServiceControlPage,
 
   /**
-   * The allowlist UI lives here **for now, and it is the wrong owner.**
+   * **Read-only, and the allowlist editor is not here.**
    *
-   * The allowlist is HELPER configuration: it survives this module being uninstalled, along
-   * with the OS grants it represents. Hosting its only screen inside a module means
-   * uninstalling the module leaves standing privileges on the machine with nowhere to see or
-   * revoke them — exactly the orphan the helper's own spec warns about.
+   * This panel shows what this module can see through the helper — the approved services and
+   * the requests it has raised — and offers no way to change any of it. The editor lives at
+   * Admin → Helpers → Host services, rendered by JonDash with no module in the path.
    *
-   * Core reserves a per-helper settings slot at Admin → Helpers ("Reserved for helper
-   * settings once the contract carries them"), which is where this belongs. When
-   * `HelperDefinition` carries a settings panel, this moves there and the helper's `admin.*`
-   * API is deleted outright — modules would then have no mutator at all.
+   * That split is the security property, not a layout choice. The allowlist is *helper*
+   * configuration: it outlives this module, along with the OS grants it represents. While the
+   * editor lived here, this module supplied the service name being approved — it could display
+   * "Add Plex" and submit `sshd`, and the Windows prompt names JonDash rather than the service.
+   * The thing being bounded could edit its own boundary.
    */
   SettingsPanel: ServiceControlSettings,
 };
