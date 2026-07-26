@@ -1,4 +1,4 @@
-﻿import type { ModuleContext, ModuleDefinition } from "@/lib/modules/types";
+import type { ModuleContext, ModuleDefinition } from "@/lib/modules/types";
 import filesystem from "@/helpers/filesystem/api";
 import BackupPage from "./page";
 import BackupSettingsPanel from "./ui/settings-panel";

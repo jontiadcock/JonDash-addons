@@ -1,4 +1,4 @@
-﻿import type { HelperDefinition } from "@/lib/helpers/types";
+import type { HelperDefinition } from "@/lib/helpers/types";
 
 /**
  * Docker helper — lets a module see and control containers on this server.

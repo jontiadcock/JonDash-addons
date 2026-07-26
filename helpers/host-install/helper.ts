@@ -1,4 +1,4 @@
-﻿import type { HelperDefinition } from "@/lib/helpers/types";
+import type { HelperDefinition } from "@/lib/helpers/types";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
 import { uninstallPackage } from "@/lib/elevation";

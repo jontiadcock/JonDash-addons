@@ -1,4 +1,4 @@
-﻿import type { ModuleDefinition } from "@/lib/modules/types";
+import type { ModuleDefinition } from "@/lib/modules/types";
 import HostVitalsWidget from "./ui/widget";
 import HostVitalsPage from "./page";
 import { TOGGLES } from "./lib/groups";

@@ -1,4 +1,4 @@
-﻿import type { ModuleDefinition } from "@/lib/modules/types";
+import type { ModuleDefinition } from "@/lib/modules/types";
 import DockerWidget from "./ui/widget";
 import DockerPage from "./page";
 import DockerSettings from "./ui/settings-panel";

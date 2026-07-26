@@ -1,4 +1,4 @@
-﻿import type { HelperDefinition } from "@/lib/helpers/types";
+import type { HelperDefinition } from "@/lib/helpers/types";
 
 /**
  * System metrics helper — reads read-only host telemetry (CPU, memory, disks, uptime,
