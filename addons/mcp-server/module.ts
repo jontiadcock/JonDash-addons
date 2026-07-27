@@ -18,7 +18,7 @@ const mcpServer: ModuleDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
-  version: "0.0.1-beta.2",
+  version: "0.0.1-beta.3",
   // Follows the helper's floor — a module that pulls a helper in must not install where that
   // helper cannot work. The helper needs service accounts (1.7.3-beta.1) and passes its id to
   // `resolveBindableAccount` (1.7.3-beta.2).

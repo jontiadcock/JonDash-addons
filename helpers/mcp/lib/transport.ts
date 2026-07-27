@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { helperTableName } from "@/lib/helpers/migrate";
 import { dependentsOf } from "@/lib/helpers/registry";
+import { rateLimit } from "@/lib/security/rate-limit";
 import { getPort, isEnabled, isNetworkExposed, type RefusalReason } from "./keys";
 
 /**
@@ -66,21 +67,69 @@ async function recordRefusal(ip: string, reason: RefusalReason): Promise<void> {
 }
 
 /**
+ * **Per-source backoff, then a temporary block.** (Pentest finding F1, 2026-07-27.)
+ *
+ * This was documented and surfaced in the UI — the `blocked` refusal reason and its
+ * "Too many attempts — temporarily blocked" label both existed — and **nothing ever set it**. A
+ * control that is described, typed, given a label, and never written is worse than one that was
+ * never claimed: 500 concurrent bad keys were answered instantly, while the settings page implied
+ * they would not be.
+ *
+ * Counting is core's `rateLimit()` — the same sliding window it already uses for login, setup and
+ * account actions — rather than a second implementation of the same idea living in an add-on.
+ *
+ * **Only FAILURES are counted.** A client holding a correct key never fails, so a legitimate
+ * assistant can never throttle itself no matter how busy it is. Twenty failures in a minute from
+ * one source is not a busy client, it is someone trying keys.
+ */
+const AUTH_FAILURE_LIMIT = 20;
+const AUTH_FAILURE_WINDOW_MS = 60_000;
+
+/** Sources currently serving a block, and until when. Small, and pruned as it is read. */
+const blockedUntil = new Map<string, number>();
+
+/** True when this source is inside a block. Does NOT count against the limit — see `reject`. */
+function isBlocked(ip: string): boolean {
+  const until = blockedUntil.get(ip);
+  if (until === undefined) return false;
+  if (until <= Date.now()) {
+    blockedUntil.delete(ip);
+    return false;
+  }
+  return true;
+}
+
+/**
  * The single rejection.
  *
  * **Every auth failure funnels through here** so no caller can distinguish "no key" from "revoked
  * key" from "valid key, deleted account". Same status, same body, every time. The reason travels to
  * the refusal log, never to the client.
+ *
+ * It is also the one place every failure is guaranteed to pass through, which is why the failure
+ * count is incremented here rather than at each call site — a new refusal path added later is
+ * counted automatically instead of being silently exempt.
  */
 function reject(res: ServerResponse, status: number, ip: string, reason: RefusalReason): void {
   void recordRefusal(ip, reason);
-  const body = JSON.stringify({
-    jsonrpc: "2.0",
-    error: { code: -32001, message: status === 403 ? "Forbidden" : "Unauthorized" },
-  });
+
+  // `blocked` is the block being served; counting it would extend the block for free every time a
+  // blocked caller retries, which is a self-inflicted denial of service on a legitimate client
+  // that has merely misconfigured its key.
+  if (reason !== "blocked") {
+    const verdict = rateLimit(`mcp:auth:${ip}`, AUTH_FAILURE_LIMIT, AUTH_FAILURE_WINDOW_MS);
+    if (!verdict.allowed) blockedUntil.set(ip, Date.now() + verdict.retryAfterSec * 1000);
+  }
+  const message = status === 403 ? "Forbidden" : status === 429 ? "Too Many Requests" : "Unauthorized";
+  const body = JSON.stringify({ jsonrpc: "2.0", error: { code: -32001, message } });
   res.writeHead(status, {
     "content-type": "application/json",
     "content-length": Buffer.byteLength(body),
+    // Standard, and useful to a legitimate client that has misconfigured its key: it can back off
+    // rather than spin. Only ever sent with a 429, so it says nothing about any key.
+    ...(status === 429
+      ? { "retry-after": String(Math.max(1, Math.ceil(((blockedUntil.get(ip) ?? Date.now()) - Date.now()) / 1000))) }
+      : {}),
     // No CORS headers, ever. Nothing that would let a page read a response.
   });
   res.end(body);
@@ -211,6 +260,16 @@ async function handle(
   port: number,
 ): Promise<void> {
   const ip = req.socket.remoteAddress ?? "unknown";
+
+  // --- a source serving a block does no work at all --------------------------
+  //
+  // Before parsing, before the Origin check, before any database access: the whole point is that a
+  // caller who has already failed twenty times in a minute stops being able to spend this server's
+  // time. Answered 429 rather than the standard 401 — that is the honest status, and it reveals
+  // nothing about keys, only about a request count the caller already knows.
+  if (isBlocked(ip)) {
+    return reject(res, 429, ip, "blocked");
+  }
 
   // --- the spec's security warning, first, before anything is parsed ---------
   const origin = originIsAcceptable(req, exposed, port);

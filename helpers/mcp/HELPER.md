@@ -72,8 +72,24 @@ path.
   disabled user — identical body, identical status, identical timing. Nothing distinguishes "wrong
   key" from "no such key".
 - **Constant-time comparison** of the key hash, so timing does not leak how much of a key was right.
-- **Backoff, then a temporary block, per source.** A key is high-entropy, but online guessing should
-  not be free.
+- **A temporary block, per source.** Twenty failures inside a minute and that source is refused
+  `429` with a `Retry-After` until the window passes — before parsing, before any database access,
+  so a caller who has already failed twenty times stops being able to spend this server's time.
+  Only *failures* count, so a client holding a correct key can never throttle itself however busy it
+  is. The block applies to a valid key from that source too: one that a valid key walks through
+  would not slow guessing at all.
+
+  > **This was claimed here and not implemented until `0.0.1-beta.3`.** The pentest found 500
+  > concurrent bad keys answered instantly (F1). The `blocked` refusal reason and its
+  > "Too many attempts — temporarily blocked" label both existed, and no code ever set them. It now
+  > uses core's own `rateLimit()` — the sliding window already behind login and account actions —
+  > rather than a second implementation of the same idea living in an add-on.
+
+  **What this does not cover, stated plainly:** a flood using a *valid* key is not throttled. The
+  pentest drove 400,000 requests without crashing the server (no restarts, full recovery in
+  seconds), but ~11% were dropped and worst-case latency reached 8s while it ran. Throttling a
+  legitimate agent's own key is a worse failure than that degradation, so it is deliberately not
+  done.
 - **Every refusal is audited.** That log is the tripwire.
 
 ### Keys
@@ -111,8 +127,18 @@ path.
 - **Port is chosen from a dropdown, defaulting to 3030.** A list rather than a free-text field: it
   keeps the choice away from ports JonDash and its testbeds already use, and a typo'd port that
   silently binds nothing is worse than no choice at all.
-- **Opening it to the network is opt-in, confirmed, and requires HTTPS** — a bearer key over plain
-  HTTP on a LAN is sniffable. The warning is blocking, not advisory.
+- **Opening it to the network is opt-in, and refused without HTTPS unless explicitly confirmed** —
+  a bearer key over plain HTTP on a LAN is sniffable, and a sniffed key is a *working* key carrying
+  everything its account holds.
+
+  > **This said "blocking, not advisory" and was advisory** until `0.0.1-beta.3`. The code returned
+  > the sentence "Turn on HTTPS if you have not" and opened the port anyway; during the pentest the
+  > key crossed the LAN in clear text (F2). The refusal now lives in `onSettingsSubmit`, so it holds
+  > however the form is submitted — the settings page asks first purely so the reason arrives before
+  > the refusal rather than after it.
+
+  The override is deliberate (owner, 2026-07-27): plain HTTP on a trusted LAN is a legitimate
+  choice, and one confirmation is the difference between choosing it and stumbling into it.
 
 ### The off switch — three independent conditions, all required
 
@@ -247,7 +273,9 @@ Only what has actually been driven against a running install — 1.7.3-beta.2, e
 | Nothing listens until switched on **and** a key exists | Port checked closed with the module installed and enabled |
 | Disabling the add-on closes the endpoint | Disabled → restart → port closed; re-enabled → restart → port back, so the rule cannot strand it. **The listener is bound at boot**, so a change to module state takes effect at the next restart, or immediately if an administrator touches the on/off switch (which rebinds there and then) |
 | Actions are attributed to the agent, never a person | Every `mcp.*` audit row carries the service account's id — including the refusals, which are logged too |
-| DNS-rebinding defence | A request carrying any `Origin` → 403. A forged `Host` → 403, tested over a **raw socket**, because `fetch()` silently drops a `Host` override and made this look like it was failing when it was not |
+| DNS-rebinding defence | A request carrying any `Origin` → 403. A forged `Host` → 403, tested over a **raw socket**, because `fetch()` silently drops a `Host` override and made this look like it was failing when it was not. Independently confirmed over the network by the pentest |
+| Guessing is not free | 25 bad keys from one source: 20 × 401 then 429 with `Retry-After`; a valid key from that source is refused too while the block runs, and works again once the window passes |
+| Network exposure without HTTPS is refused | Driven in the browser: the confirmation appears and no port opens, Cancel leaves it shut, confirming rebinds to `0.0.0.0`, and returning to loopback needs no confirmation |
 | No secret is reachable through any read tool | Every read tool uses a Prisma `select` allow-list, so `passwordHash`, `totpSecretEnc` and `tokenHash` are never loaded rather than filtered afterwards |
 
 ### Known limitation
@@ -262,5 +290,6 @@ repo. The endpoint is deliberately off on install, and the owner's pentest is th
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.1-beta.3` | **Penetration tested; two documented controls turned out not to exist, and now do.** F1: per-source backoff and temporary block, via core's `rateLimit()` — the claim, the `blocked` reason and its UI label had all shipped without the code. F2: opening to the network without HTTPS is now refused in `onSettingsSubmit` unless explicitly confirmed, instead of a warning that opened the port anyway. F4: `query_audit_log`'s `contains` is a literal, case-insensitive substring rather than a SQL `LIKE` pattern. Everything security-critical held under attack — no bypass, no escalation, no lockout, no secret disclosure, no injection, no crash under 400k requests. |
 | `0.0.1-beta.2` | Text only, no behaviour change: `api.ts` pointed at the wrong admin screen. The controls live under **Admin → Addons → Shared capabilities**. Republished rather than edited on the branch, because tags are immutable and an already-installed copy would otherwise keep the wrong text. |
 | `0.0.1-beta.1` | First release. Streamable HTTP on 2025-11-25, 6 read tools + 2 acting tools, keys bound to service accounts only, two-gate authorization. Not yet promoted to stable — awaiting the owner's pentest. |

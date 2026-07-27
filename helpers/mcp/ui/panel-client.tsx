@@ -28,6 +28,7 @@ export default function PanelClient({
   enabled,
   listening,
   carrierEnabled,
+  httpsEnabled,
   exposed,
   port,
   ports,
@@ -39,6 +40,7 @@ export default function PanelClient({
   enabled: boolean;
   listening: boolean;
   carrierEnabled: boolean;
+  httpsEnabled: boolean;
   exposed: boolean;
   port: number;
   ports: number[];
@@ -68,6 +70,24 @@ export default function PanelClient({
         location.reload();
       }
     });
+  }
+
+  /**
+   * Opening the endpoint to the network with HTTPS off is refused by the server. This asks first
+   * so the admin sees why *before* the refusal, rather than being told no afterwards — and so the
+   * override is a deliberate second action, not a checkbox they slid past.
+   *
+   * **This is not the gate.** `onSettingsSubmit` refuses regardless of what this component does;
+   * a form is a suggestion. This only decides whether the question is asked politely.
+   */
+  const [confirmingExposure, setConfirmingExposure] = useState(false);
+
+  function requestExposure(on: boolean) {
+    if (on && !httpsEnabled) {
+      setConfirmingExposure(true);
+      return;
+    }
+    send({ op: "exposed", value: on });
   }
 
   const statusTone = listening ? "var(--text-success, inherit)" : "var(--muted)";
@@ -139,19 +159,53 @@ export default function PanelClient({
             </span>
           </label>
           <label className="flex items-start gap-2 text-sm">
-            <input type="radio" checked={exposed} disabled={busy} onChange={() => send({ op: "exposed", value: true })} />
+            <input type="radio" checked={exposed} disabled={busy} onChange={() => requestExposure(true)} />
             <span>
               <span className="font-medium">Anyone on the network</span>
               <span className="block text-xs" style={{ color: "var(--muted)" }}>
                 For an assistant running on another machine.
+                {!httpsEnabled && " Needs HTTPS — you will be asked to confirm without it."}
               </span>
             </span>
           </label>
+
+          {confirmingExposure && (
+            <div className="card flex flex-col gap-2 p-3" style={{ borderColor: "var(--danger)" }}>
+              <p className="text-sm font-medium" style={{ color: "var(--danger)" }}>
+                HTTPS is off. A key would cross your network in clear text.
+              </p>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                Anyone who can see the traffic — on the same Wi-Fi, on the same switch — can read the
+                key and reuse it, with everything the account behind it is allowed to do. Revoking
+                that key is the only way to take it back.
+              </p>
+              <p className="text-xs" style={{ color: "var(--muted)" }}>
+                Turn on HTTPS under <strong>Admin → Network &amp; HTTPS</strong>, or continue if this
+                is a network you trust.
+              </p>
+              <span className="flex flex-wrap gap-2">
+                <button
+                  className="btn btn-sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmingExposure(false);
+                    send({ op: "exposed", value: true, confirm: true });
+                  }}
+                >
+                  Open it anyway, without HTTPS
+                </button>
+                <button className="btn btn-sm" disabled={busy} onClick={() => setConfirmingExposure(false)}>
+                  Cancel
+                </button>
+              </span>
+            </div>
+          )}
+
           {exposed && (
             <p className="card p-2 text-xs" style={{ color: "var(--text-warning, var(--muted))" }}>
               This is reachable from your network. Anyone who can reach the port can try keys against
-              it. Turn on HTTPS under Network &amp; HTTPS first — without it a key travels in clear
-              text and can be read off the wire.
+              it — twenty failures in a minute from one source earns a temporary block.
+              {!httpsEnabled && " HTTPS is off, so a key travels in clear text and can be read off the wire."}
             </p>
           )}
         </div>

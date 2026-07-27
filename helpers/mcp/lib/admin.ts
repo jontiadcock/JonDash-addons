@@ -94,6 +94,24 @@ export async function bindableAccounts(): Promise<BindableAccount[]> {
  * otherwise an admin reads "switched on", sees no endpoint, and has no way to find out why. The
  * same condition, asked in the same terms, rather than a second rule that could drift from it.
  */
+/**
+ * Is HTTPS configured on this install?
+ *
+ * The settings page needs this to warn *before* an admin opens the endpoint to the network, rather
+ * than refusing afterwards. The refusal in `onSettingsSubmit` is still the real gate — this only
+ * decides whether the page asks first, because a form is a suggestion and the server is the check.
+ */
+export async function httpsEnabled(): Promise<boolean> {
+  try {
+    const { readNetworkConfig } = await import("@/lib/tls/network-config.mjs");
+    return readNetworkConfig().mode !== "off";
+  } catch {
+    // Unreadable config reads as "no HTTPS" — the direction that asks for confirmation rather
+    // than the one that silently opens a clear-text port.
+    return false;
+  }
+}
+
 export async function carrierEnabled(): Promise<boolean> {
   const { dependentsOf } = await import("@/lib/helpers/registry");
   const ids = dependentsOf("mcp").map((d) => d.id);

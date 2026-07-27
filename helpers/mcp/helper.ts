@@ -56,7 +56,7 @@ const helper: HelperDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-  version: "0.0.1-beta.2",
+  version: "0.0.1-beta.3",
   // Service accounts arrived in 1.7.3-beta.1 (SEC-07) — without them this helper has nothing to
   // bind a key to, so an older core is not a degraded experience, it is an unusable one.
   //
@@ -124,6 +124,34 @@ const helper: HelperDefinition = {
 
       case "exposed": {
         const on = payload.value === true;
+
+        /**
+         * **Opening this to the network without HTTPS is refused, not warned about.**
+         * (Pentest finding F2, 2026-07-27.)
+         *
+         * This previously returned the sentence "Turn on HTTPS if you have not" and opened the port
+         * anyway, while HELPER.md claimed the warning was "blocking, not advisory". During the
+         * penetration test the bearer key crossed the LAN in clear text — precisely the outcome
+         * that sentence was written to prevent, and the doc said it could not happen.
+         *
+         * A sniffed key is a *working* key, carrying whatever the bound account holds. So the
+         * default is refusal. The owner's call (2026-07-27) was to allow a deliberate override
+         * rather than an absolute bar — plain HTTP on a LAN you trust is a legitimate choice, and
+         * one confirmation is the difference between choosing it and stumbling into it.
+         */
+        if (on && !payload.confirm) {
+          const { readNetworkConfig } = await import("@/lib/tls/network-config.mjs");
+          if (readNetworkConfig().mode === "off") {
+            return {
+              ok: false,
+              error:
+                "HTTPS is off, so a key would cross your network in clear text — anyone who can " +
+                "see the traffic could reuse it, with everything the account behind it can do. " +
+                "Turn on HTTPS under Admin → Network & HTTPS, or confirm on this page to open it anyway.",
+            };
+          }
+        }
+
         await setNetworkExposed(on);
         // Rebind, because the address is fixed when the socket opens.
         await stopListener();
@@ -131,7 +159,7 @@ const helper: HelperDefinition = {
         return {
           ok: true,
           message: on
-            ? "Now reachable from your network. Turn on HTTPS if you have not — a key travels in clear text without it."
+            ? "Now reachable from your network."
             : "Back to this machine only.",
         };
       }
