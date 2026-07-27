@@ -183,6 +183,32 @@ equivalent of JonDash's own beta channel, but chosen per module.
 
 ## Publishing workflow (for the maintainer)
 
+### Before every push, run both gates
+
+```bash
+node scripts/check-manifest.mjs   # versions, tags, notes cap, channel, skipped releases
+node scripts/check-docs.mjs       # do the docs still describe what the code does?
+```
+
+**`check-docs.mjs` exists because a reminder was not enough.** `mcp 0.0.2` reached **stable** with
+six new tools and a new key level while `CONNECTING.md` — the guide written so somebody could use
+it — still described the eight tools of `0.0.1`, on both channels. It also still named a permission
+that does not exist. So the check is mechanical: every registered tool must appear in its helper's
+own doc *and* in the user-facing guide of any module carrying it, every declared capability must be
+documented, and no doc may name a tool that no longer exists.
+
+**The docs are part of the change, not a follow-up.** A push that alters what the software can do
+and leaves the guide describing the old surface has shipped something misleading.
+
+### A documentation-only change gets NO version and NO tag
+
+Owner's rule, 2026-07-27. Commit the prose to the branch and stop. The version people read is the
+one on GitHub, and cutting a release for wording spends a version number, a tag and a promotion
+cycle — and under *Never skip a main release* above, opens a line that then has to reach `main`.
+
+This **overrules** the earlier `filesystem` 0.0.4 precedent, which was cut purely so installed
+copies would stop carrying wrong text.
+
 **New stable version of add-on X (A.B.C):**
 1. On `main`: update `addons/X/` + set `version` in `MODULE.md`, `module.ts`, and X's `addons.json` entry
    (with `"tag": "X/vA.B.C"`).
