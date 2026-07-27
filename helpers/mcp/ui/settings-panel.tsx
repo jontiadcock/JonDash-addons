@@ -1,6 +1,6 @@
 import type { HelperSettingsContext } from "@/lib/helpers/types";
 import { bindableAccounts, carrierEnabled, httpsEnabled, keyRows, recentRefusals, explainRefusal } from "../lib/admin";
-import { ALLOWED_PORTS, getPort, isEnabled, isNetworkExposed } from "../lib/keys";
+import { ALLOWED_PORTS, getPort, isEnabled, isNetworkExposed, isShutdownAllowed } from "../lib/keys";
 import { isListening } from "../lib/transport";
 import PanelClient from "./panel-client";
 
@@ -15,7 +15,7 @@ import PanelClient from "./panel-client";
  * switching the listener on. A module holding `mcp:read` sees status and nothing else.
  */
 export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext }) {
-  const [keys, accounts, refusals, enabled, exposed, port, carrier, https] = await Promise.all([
+  const [keys, accounts, refusals, enabled, exposed, port, carrier, https, shutdownAllowed] = await Promise.all([
     keyRows(),
     bindableAccounts(),
     recentRefusals(),
@@ -24,6 +24,7 @@ export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext 
     getPort(),
     carrierEnabled(),
     httpsEnabled(),
+    isShutdownAllowed(),
   ]);
 
   return (
@@ -40,6 +41,7 @@ export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext 
       // So the page can ask before opening a clear-text port, rather than refusing after. The
       // server still refuses either way — this only decides whether the admin is asked first.
       httpsEnabled={https}
+      shutdownAllowed={shutdownAllowed}
       exposed={exposed}
       port={port}
       ports={[...ALLOWED_PORTS]}

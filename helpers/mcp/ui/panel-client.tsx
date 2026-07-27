@@ -16,7 +16,7 @@ export type KeyRow = {
   hint: string;
   label: string;
   accountName: string;
-  mode: "read" | "act";
+  mode: "read" | "act" | "admin";
   lastUsedAt: string | null;
   orphaned: boolean;
 };
@@ -29,6 +29,7 @@ export default function PanelClient({
   listening,
   carrierEnabled,
   httpsEnabled,
+  shutdownAllowed,
   exposed,
   port,
   ports,
@@ -41,6 +42,7 @@ export default function PanelClient({
   listening: boolean;
   carrierEnabled: boolean;
   httpsEnabled: boolean;
+  shutdownAllowed: boolean;
   exposed: boolean;
   port: number;
   ports: number[];
@@ -53,7 +55,7 @@ export default function PanelClient({
   const [minted, setMinted] = useState<string | null>(null);
   const [label, setLabel] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
-  const [mode, setMode] = useState<"read" | "act">("read");
+  const [mode, setMode] = useState<"read" | "act" | "admin">("read");
 
   function send(payload: Record<string, unknown>, onKey?: (k: string) => void) {
     setNotice(null);
@@ -143,6 +145,32 @@ export default function PanelClient({
             </select>
           </label>
         </span>
+      </section>
+
+      {/* --------------------------------------------------- the unrecoverable one */}
+      <section className="flex flex-col gap-2">
+        <h3 className="font-medium">What an assistant may do to the server</h3>
+        <div className="card flex flex-col gap-2 p-3">
+          <p className="text-sm" style={{ color: "var(--muted)" }}>
+            A key set to <strong>Read, act and manage the server</strong> can restart JonDash, apply
+            updates, switch release channel and write a backup. All of those come back on their own.
+          </p>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={shutdownAllowed}
+              disabled={busy}
+              onChange={(e) => send({ op: "shutdown-allowed", value: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Also allow an assistant to shut the server down</span>
+              <span className="block text-xs" style={{ color: shutdownAllowed ? "var(--danger)" : "var(--muted)" }}>
+                Off by default. A shutdown does <strong>not</strong> restart by itself — someone has to
+                run the launcher on this machine. Nothing remote can undo it.
+              </span>
+            </span>
+          </label>
+        </div>
       </section>
 
       {/* ------------------------------------------------------ where it listens */}
@@ -259,6 +287,7 @@ export default function PanelClient({
                 >
                   <option value="read">Read only</option>
                   <option value="act">Read and act</option>
+                  <option value="admin">Read, act and manage the server</option>
                 </select>
                 <button className="btn btn-sm" disabled={busy} onClick={() => send({ op: "revoke", id: k.id })}>
                   Revoke
@@ -292,10 +321,22 @@ export default function PanelClient({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span>Can it change things?</span>
-              <select className="input" value={mode} onChange={(e) => setMode(e.target.value as "read" | "act")}>
+              <select
+                className="input"
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "read" | "act" | "admin")}
+              >
                 <option value="read">Read only</option>
                 <option value="act">Read and act</option>
+                <option value="admin">Read, act and manage the server</option>
               </select>
+              <span className="text-xs" style={{ color: "var(--muted)" }}>
+                {mode === "admin"
+                  ? "Can also restart this server, apply JonDash updates, switch release channel and write backups."
+                  : mode === "act"
+                    ? "Can change things inside JonDash. Cannot restart or update the server."
+                    : "Can look, and change nothing."}
+              </span>
             </label>
             <button
               className="btn btn-sm"

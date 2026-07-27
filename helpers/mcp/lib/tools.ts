@@ -1,4 +1,5 @@
 import type { Permission } from "@/lib/auth/permissions";
+import { decide, type ToolKind } from "./decide";
 import type { Identity } from "./authorize";
 
 /**
@@ -17,7 +18,7 @@ export type ToolDef = {
   name: string;
   /** Shown to the model. It only ever sees this, the description and the schema — write for it. */
   description: string;
-  kind: "read" | "act";
+  kind: ToolKind;
   /** The permission the BOUND ACCOUNT must hold. `null` = any valid key. */
   permission: Permission | null;
   /** JSON Schema for the arguments. Keep it tight; a loose schema is a prompt-injection surface. */
@@ -47,11 +48,19 @@ export function getTool(name: string): ToolDef | undefined {
  * the tool list cannot be used to fingerprint an install.
  */
 export function listFor(identity: Identity): ToolDef[] {
-  return [...registry.values()].filter((t) => {
-    if (t.kind === "act" && identity.mode !== "act") return false;
-    if (t.permission && !identity.permissions.has(t.permission)) return false;
-    return true;
-  });
+  // Calls `decide()` rather than repeating the rules. It used to carry its own copy — two ifs that
+  // happened to agree with the gate — which is the same duplication `decide.ts` exists to prevent
+  // and would have drifted the moment a third mode was added. It was: adding `admin` would have
+  // left every admin tool listed to an `act` key while `authorize()` correctly refused it.
+  return [...registry.values()].filter(
+    (t) =>
+      decide({
+        mode: identity.mode,
+        toolKind: t.kind,
+        accountHasPermission: t.permission ? identity.permissions.has(t.permission) : true,
+        permissionRequired: t.permission !== null,
+      }) === "allow",
+  );
 }
 
 /** The wire shape a client sees. `run` and the internal fields never cross. */

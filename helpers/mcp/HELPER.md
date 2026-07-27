@@ -1,17 +1,18 @@
 # MCP helper
 
-**Status: BUILT — 0.0.1-beta.1, live-tested, awaiting the owner's pentest.**
+**Status: BUILT. `0.0.1` passed a penetration test and shipped to stable; `0.0.2-beta.1` adds
+server lifecycle and is on beta, awaiting a re-test.**
 
 Lets an AI agent read and manage this JonDash install, over the Model Context Protocol, **as a
 service account you choose**. The agent gets exactly that account's reach and nothing more.
 
 - **Helper id:** `mcp`
-- **Version:** `0.0.1-beta.1`
+- **Version:** `0.0.2-beta.1`
 - **`minAppVersion`:** `1.7.3-beta.2` — service accounts (beta.1) plus the helper id that
   `resolveBindableAccount` takes (beta.2). The **pre-release**, not a bare `1.7.3`: semver ranks a
   pre-release below its release, so `"1.7.3"` would be refused on exactly the builds beta users run.
 - **First consumer:** `mcp-server` — a thin module carrying this helper, with a status widget and page.
-- **Grants:** two capabilities, `mcp:read` and `mcp:act`.
+- **Grants:** three capabilities — `mcp:read`, `mcp:act` and `mcp:admin`.
 - **Needs from core:** the *transport and auth* need nothing — that is the point of the design. The
   one dependency is service accounts, since a key may bind to nothing else. See *Keys* below.
 
@@ -50,16 +51,19 @@ only has to own key issuance rather than a whole authorization system.
 
 Every call is checked twice:
 
-1. **The key's mode** — *read only* or *read and act*, chosen when the key is minted.
-2. **The bound user's RBAC** — read from core's own tables, at call time, for that tool.
+1. **The key's mode** — *read only*, *read and act*, or *read, act and manage the server*, chosen
+   when the key is minted. Three rungs of a ladder: a key reaches its own and everything below.
+2. **The bound account's RBAC** — read from core's own tables, at call time, for that tool.
 
 The mode can only ever **narrow**. It never grants what the user lacks:
 
-| Bound user | Key mode | `list_sessions` | `revoke_session` |
-| ---------- | -------- | --------------- | ---------------- |
-| `sec-review` (sessions.manage) | read only | yes | **no** |
-| `sec-review` | read and act | yes | yes |
-| `bot-readonly` (no session perms) | read and act | **no** | **no** |
+| Bound account | Key mode | `list_sessions` | `revoke_session` | `restart_server` |
+| ------------- | -------- | --------------- | ---------------- | ----------------- |
+| `sec-review` (sessions.manage) | read only | yes | **no** | **no** |
+| `sec-review` | read and act | yes | yes | **no** |
+| `sec-review` | admin | yes | yes | **no** — no `settings.manage` |
+| `ops-bot` (settings.manage) | admin | **no** | **no** | yes |
+| `bot-readonly` (no permissions) | admin | **no** | **no** | **no** |
 
 The last row is the one to test: promoting a key to "act" must never become a privilege-escalation
 path.
@@ -96,7 +100,7 @@ path.
 
 - Minted on the helper's settings page. **Only a hash is stored**; the key is shown once.
 - **Each key binds to a SERVICE ACCOUNT, and only a service account.** Never a person's account.
-- Each key carries a mode (read / read+act) alongside its bound account.
+- Each key carries a mode (read / read+act / admin) alongside its bound account.
 
 > **Shipped by core in 1.7.3-beta.1 (SEC-07), which is why this helper's floor is that release.**
 > Service accounts are identities that hold permissions but can never be logged into.
@@ -186,7 +190,8 @@ Uninstalling remains the last resort, not the only one.
 | Capability | Shown to the admin as |
 | ---------- | --------------------- |
 | `mcp:read` | See what an AI agent can read from this install |
-| `mcp:act` | Let an AI agent change things, within its user's permissions |
+| `mcp:act` | Allow assistants to make changes |
+| `mcp:admin` | Allow assistants to restart and update this server |
 
 Two rather than one, per HELPERS-DESIGN rule 9: a capability with a looking-at-it form and a
 doing-something-to-it form declares both, so nobody grants the destructive half to obtain the
@@ -218,7 +223,7 @@ Inherited from the MCP session's catalogue, which survives the change of transpo
 | `list_services` | — | title, url, source |
 | `list_modules` | modules.manage | id, name, version, enabled, channel |
 | `list_sessions` | sessions.manage | user, ip, last seen |
-| `query_audit_log` | audit.read | filtered, paginated, hard cap 100 rows |
+| `query_audit_log` | audit.view | filtered, paginated, hard cap 100 rows |
 | `list_users` | users.manage | display name (email only as a fallback), role, status, whether 2FA is on, whether it is a service account |
 
 **A tool's `description` is read by the model, so it is part of the contract, not a comment.**
@@ -249,8 +254,50 @@ knowable from here, but *any* administrator who is not a service account. A rule
 one that fails on the day it matters. An agent that can lock the owner out of their own install is
 the one outcome the owner has named as never acceptable.
 
-**Deliberately absent, permanently:** anything that runs a command, reads a file, changes a user's
-credentials or MFA, applies an update, or deletes data.
+**Admin (6 tools) — `admin` mode only, added in 0.0.2**
+
+| Tool | Account must hold | Notes |
+| ---- | ----------------- | ----- |
+| `check_for_updates` | settings.manage | *read* — names the target version, type, criticality and summary |
+| `list_module_updates` | modules.manage | *read* — reporting only; an assistant cannot install or update an add-on |
+| `apply_update` | settings.manage | must pass the exact version from `check_for_updates`, or it refuses |
+| `set_update_channel` | settings.manage | stable ↔ beta |
+| `create_backup` | **backups.manage** | never returns the archive |
+| `restart_server` | settings.manage | comes back on its own, sessions kept |
+| `shutdown_server` | settings.manage | **off unless separately enabled** — see below |
+
+> **`applies an update` used to be in the permanent-exclusion list below. The owner reversed that on
+> 2026-07-27**, and the reversal is recorded rather than quietly edited out: shipping a doc that says
+> "never" and code that does it is worse than either alone.
+
+**The line between `act` and `admin` is not "more dangerous" — it is who has to be present to undo
+it.** Everything under `act` can be reversed by a person at the dashboard. Everything under `admin`
+takes the dashboard away while it happens.
+
+`shutdown_server` is the exception even to that: core's supervisor treats a shutdown as a clean stop
+and the launcher window closes, so *"restarting then requires running the launcher on the host"*.
+Nothing remote can undo it. So it needs **all four** of: an `admin` key, `settings.manage`, an
+administrator having switched it on for this install, and the literal string `"shut down"` as an
+argument — a typed phrase rather than a boolean, because `true` is what a model passes when it is
+guessing at a schema.
+
+**Deliberately absent, and these genuinely are permanent** — the rule is that **an agent must never
+be able to widen its own reach, or erase the record of what it did**:
+
+- **Granting a role or a permission.** An agent that can grant a role can grant one to its own
+  service account, and every gate here becomes decoration. The single most important exclusion.
+- **Installing or updating an add-on.** The documented route from "trusted admin" to code running
+  in this process — the residual risk the penetration test named. It also answers a consent question
+  nobody asked it, since core deliberately never auto-applies an update that adds a permission.
+- **Credentials and MFA** — creating users, resetting access, disabling or deleting an account.
+- **Restoring a backup** — the one operation that writes old data over current data.
+- **Clearing the audit log** — anti-forensics is not a feature.
+- **Network and HTTPS settings** — can sever remote access to the machine it runs on.
+- Running a command, or reading a file.
+
+**Two capabilities core exposes that this could reach but cannot:** managing dashboard tiles and
+managing users are server actions guarded by `assertSameOrigin()`, so a helper has no route to them
+at all. Not a decision — a fact about the surface.
 
 **Module-contributed tools** are designed for and not in v1. The MCP session's requirement stands: it
 must be discovery-based, never a hardcoded per-module list.
@@ -290,6 +337,7 @@ repo. The endpoint is deliberately off on install, and the owner's pentest is th
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.2-beta.1` | **Server lifecycle, on the owner's instruction.** A third key mode, `admin`, above `read` and `act`, and six tools on it: check and apply a JonDash update (naming the exact target version, and refusing if it moved between checking and applying), switch release channel, write a backup, restart, and shut down. **Shutdown is off by default behind its own switch** because nothing remote can undo it. `apply_update` reverses a "permanently absent" line in this document — deliberately, and left on the record rather than edited out. Also fixed `listFor`, which carried its own copy of the authorization rules and would have listed every admin tool to an `act` key. |
 | `0.0.1-beta.3` | **Penetration tested; two documented controls turned out not to exist, and now do.** F1: per-source backoff and temporary block, via core's `rateLimit()` — the claim, the `blocked` reason and its UI label had all shipped without the code. F2: opening to the network without HTTPS is now refused in `onSettingsSubmit` unless explicitly confirmed, instead of a warning that opened the port anyway. F4: `query_audit_log`'s `contains` is a literal, case-insensitive substring rather than a SQL `LIKE` pattern. Everything security-critical held under attack — no bypass, no escalation, no lockout, no secret disclosure, no injection, no crash under 400k requests. |
 | `0.0.1-beta.2` | Text only, no behaviour change: `api.ts` pointed at the wrong admin screen. The controls live under **Admin → Addons → Shared capabilities**. Republished rather than edited on the branch, because tags are immutable and an already-installed copy would otherwise keep the wrong text. |
 | `0.0.1-beta.1` | First release. Streamable HTTP on 2025-11-25, 6 read tools + 2 acting tools, keys bound to service accounts only, two-gate authorization. Not yet promoted to stable — awaiting the owner's pentest. |
