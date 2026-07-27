@@ -8,6 +8,7 @@ import {
   setKeyMode,
   setNetworkExposed,
   setPort,
+  setShutdownAllowed,
 } from "./lib/keys";
 import { isBindableAccount } from "./lib/authorize";
 import { dispatch } from "./lib/dispatch";
@@ -18,6 +19,7 @@ import SettingsPanel from "./ui/settings-panel";
 // before anything calls the registry. Nothing is exported from them.
 import "./lib/tools-read";
 import "./lib/tools-act";
+import "./lib/tools-admin";
 
 /**
  * MCP helper — lets an AI assistant read and manage this install, as an account you choose.
@@ -56,7 +58,7 @@ const helper: HelperDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-  version: "0.0.1",
+  version: "0.0.2-beta.1",
   // Service accounts arrived in 1.7.3-beta.1 (SEC-07) — without them this helper has nothing to
   // bind a key to, so an older core is not a degraded experience, it is an unusable one.
   //
@@ -93,6 +95,21 @@ const helper: HelperDefinition = {
       // watching and doing.
       risk: "high",
     },
+    {
+      permission: "mcp:admin",
+      describe: () => "Let an AI assistant restart this server, apply JonDash updates and write backups",
+      label: "Allow assistants to restart and update this server",
+      /**
+       * **Its own capability, because the consent screen has to say the true thing.**
+       *
+       * Rolled into `mcp:act`, this would have read "make changes" — which describes disabling a
+       * module and restarting the machine identically. They are not the same decision: everything
+       * under `act` can be undone by a person at the dashboard, and everything under `admin` takes
+       * the dashboard away while it happens. Shutting down is excluded even from this, and needs a
+       * separate switch on the settings page.
+       */
+      risk: "high",
+    },
   ],
 
   migrations: "./migrations",
@@ -120,6 +137,19 @@ const helper: HelperDefinition = {
         if (on) await startListener(dispatch);
         else await stopListener();
         return { ok: true, message: on ? "Switched on." : "Switched off — the port is closed." };
+      }
+
+      case "shutdown-allowed": {
+        // The only tool an administrator has to switch on by hand. Everything else an `admin` key
+        // can do comes back on its own; this one needs somebody at the machine.
+        const on = payload.value === true;
+        await setShutdownAllowed(on);
+        return {
+          ok: true,
+          message: on
+            ? "An assistant can now shut this server down. Nothing remote can start it again — someone has to run the launcher on this machine."
+            : "Switched off. An assistant can restart the server but not shut it down.",
+        };
       }
 
       case "exposed": {
@@ -178,7 +208,9 @@ const helper: HelperDefinition = {
         if (!(await isBindableAccount(accountId))) {
           return { ok: false, error: "That is not a service account. A key can never act as a person." };
         }
-        const mode = payload.mode === "act" ? "act" : "read";
+        // Unrecognised reads as the LEAST privileged mode. A malformed form must never mint
+        // something more powerful than was asked for.
+        const mode = payload.mode === "admin" ? "admin" : payload.mode === "act" ? "act" : "read";
         const { key } = await mintKey({
           label: String(payload.label ?? "").trim(),
           accountId,
@@ -192,7 +224,8 @@ const helper: HelperDefinition = {
       }
 
       case "mode": {
-        await setKeyMode(String(payload.id ?? ""), payload.value === "act" ? "act" : "read");
+        const next = payload.value === "admin" ? "admin" : payload.value === "act" ? "act" : "read";
+        await setKeyMode(String(payload.id ?? ""), next);
         return { ok: true, message: "Changed." };
       }
 

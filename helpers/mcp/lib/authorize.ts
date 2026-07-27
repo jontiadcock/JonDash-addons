@@ -5,7 +5,7 @@ import {
   type BindableAccount,
 } from "@/lib/auth/service-accounts";
 import { touchKey, verifyKey, type KeyMode, type RefusalReason } from "./keys";
-import { decide } from "./decide";
+import { decide, modeAllows, type ToolKind } from "./decide";
 
 /**
  * The two gates. **This is the file that decides whether this helper is safe.**
@@ -27,8 +27,8 @@ import { decide } from "./decide";
 
 /** What a tool needs in order to run. */
 export type ToolRequirement = {
-  /** `act` tools are refused outright to a read-only key, before RBAC is even consulted. */
-  kind: "read" | "act";
+  /** Refused outright to a key below this rung, before RBAC is even consulted. */
+  kind: ToolKind;
   /** The core permission the bound account must hold. `null` = available to any valid key. */
   permission: Permission | null;
 };
@@ -67,7 +67,7 @@ export async function authorize(
   // cause a user lookup — it tells an attacker nothing, and it costs nothing to refuse early.
   // `permissionRequired: false` here because gate 2 has not run yet; this call can only refuse
   // on the mode, never allow past the permission check below.
-  if (decide({ mode: key.mode, toolKind: need.kind, accountHasPermission: true, permissionRequired: false }) === "refuse") {
+  if (!modeAllows(key.mode, need.kind)) {
     return { ok: false, reason: "mode" };
   }
 
@@ -112,7 +112,7 @@ export async function authorize(
     permissionRequired: need.permission !== null,
   });
   if (verdict === "refuse") {
-    return { ok: false, reason: need.kind === "act" && key.mode !== "act" ? "mode" : "permission" };
+    return { ok: false, reason: !modeAllows(key.mode, need.kind) ? "mode" : "permission" };
   }
 
   await touchKey(key.keyId, ip);

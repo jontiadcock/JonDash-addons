@@ -25,7 +25,14 @@ const T = {
 const KEY_BYTES = 32;
 const PREFIX = "jd_mcp_";
 
-export type KeyMode = "read" | "act";
+/**
+ * What a key is allowed to reach. Ordered: each mode includes everything below it.
+ *
+ * `admin` was added in 0.0.2 for tools that act on the SERVER — restart, shut down, update. The
+ * line between `act` and `admin` is who has to be present to undo it: an `act` tool can be
+ * reversed from the dashboard, an `admin` tool can take the dashboard away.
+ */
+export type KeyMode = "read" | "act" | "admin";
 
 export type StoredKey = {
   id: string;
@@ -155,7 +162,9 @@ export async function verifyKey(
   return {
     keyId: row.id,
     accountId: row.accountId,
-    mode: row.mode === "act" ? "act" : "read",
+    // Anything unrecognised reads as the LEAST privileged mode, never the most. A corrupt or
+    // hand-edited row must fail closed.
+    mode: row.mode === "admin" ? "admin" : row.mode === "act" ? "act" : "read",
   };
 }
 
@@ -200,6 +209,21 @@ export const setEnabled = (on: boolean) => set("enabled", on ? "1" : "0");
 /** Absent means loopback. A missing row must never read as "exposed to the network". */
 export const isNetworkExposed = async () => (await get("exposed")) === "1";
 export const setNetworkExposed = (on: boolean) => set("exposed", on ? "1" : "0");
+
+/**
+ * May an assistant shut the whole server down? **Absent means NO** (owner's call, 2026-07-27).
+ *
+ * Every other admin tool is recoverable — a restart returns by itself, a bad update rolls back, a
+ * channel switch reverses in one call. This one leaves the dashboard down until somebody is
+ * physically at the machine, because core's supervisor treats a shutdown as a clean stop and the
+ * launcher window closes.
+ *
+ * So it is not enough to hold an `admin` key on an account with `settings.manage`: an administrator
+ * has to have switched this specific tool on, having read what it does. That makes the unrecoverable
+ * action the only one in the helper that cannot be reached by an assistant misreading a request.
+ */
+export const isShutdownAllowed = async () => (await get("shutdown-allowed")) === "1";
+export const setShutdownAllowed = (on: boolean) => set("shutdown-allowed", on ? "1" : "0");
 
 export const ALLOWED_PORTS = [3030, 3031, 3032, 3040, 3050] as const;
 
