@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "channel": "beta",
+  "channel": "stable",
   "name": "JonDash official addons",
-  "description": "Official add-on modules and helpers for JonDash. In JonDash, add this repo as a module source (Admin -> Modules -> Manage sources) to browse and install. Modules update independently of the JonDash base app. Channels: the main branch = stable; this manifest (beta branch) = beta. See VERSIONING.md.",
+  "description": "Official add-on modules and helpers for JonDash. In JonDash, add this repo as a module source (Admin -> Modules -> Manage sources) to browse and install. Modules update independently of the JonDash base app. Channels: this manifest (main branch) = stable; the beta branch = beta. See VERSIONING.md.",
   "modules": [
     {
       "id": "health-monitor",
@@ -249,7 +249,7 @@
       "id": "mcp",
       "name": "AI assistant access",
       "description": "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-      "version": "0.0.3-beta.1",
+      "version": "0.0.3",
       "minAppVersion": "1.7.3-beta.2",
       "provides": [
         {
@@ -266,7 +266,7 @@
         }
       ],
       "path": "helpers/mcp",
-      "tag": "mcp/v0.0.3-beta.1",
+      "tag": "mcp/v0.0.3",
       "notes": "Fixes a bug where changing the port opened the new one and left the old one still listening, until the next restart. If you moved the port to get off one you did not want exposed, the old one stayed reachable. Nothing else changes."
     }
   ]

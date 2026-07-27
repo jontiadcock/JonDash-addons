@@ -20,7 +20,7 @@ share a list, because a bug list you have to filter is one nobody reads.
 
 ## Fixed
 
-### AB-01 — changing the MCP port left the old port listening ✅ fixed in `mcp 0.0.3-beta.1`
+### AB-01 — changing the MCP port left the old port listening ✅ fixed in `mcp 0.0.3`
 
 **Reported by the owner, 2026-07-27. Reproduced before fixing.**
 

@@ -7,7 +7,7 @@ Lets an AI agent read and manage this JonDash install, over the Model Context Pr
 service account you choose**. The agent gets exactly that account's reach and nothing more.
 
 - **Helper id:** `mcp`
-- **Version:** `0.0.3-beta.1`
+- **Version:** `0.0.3`
 - **`minAppVersion`:** `1.7.3-beta.2` — service accounts (beta.1) plus the helper id that
   `resolveBindableAccount` takes (beta.2). The **pre-release**, not a bare `1.7.3`: semver ranks a
   pre-release below its release, so `"1.7.3"` would be refused on exactly the builds beta users run.
