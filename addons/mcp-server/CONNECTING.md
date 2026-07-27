@@ -84,7 +84,11 @@ connections. The module's own page is display-only and cannot change any of it.
 1. **Switch on.** The status will read *"Switched on, but not listening — no keys exist yet"*.
 2. Choose a **port** and **who can reach it**.
 3. Under **Keys**: give it a name, pick the **service account** it acts as, and choose
-   **Read only** or **Read and act**.
+   **Read only**, **Read and act**, or **Read, act and manage the server**.
+
+   The third level is what allows updates, restarts and backups. A key reaches its own level and
+   everything below it, never above — and the level can only ever *narrow* what the bound account
+   is already allowed to do. Choosing it on an account without `settings.manage` grants nothing.
 4. **Create key.**
 
 The key is shown **once**:
@@ -192,15 +196,31 @@ offer stdio itself, for the reason in §1.
 | `list_services` | — | the service tiles that account can see |
 | `list_modules` | `modules.manage` | id, name, version, enabled, channel |
 | `list_sessions` | `sessions.manage` | account, IP, rough location, last seen |
-| `query_audit_log` | `audit.read` | filtered and paginated, hard cap 100 rows |
+| `query_audit_log` | `audit.view` | filtered and paginated, hard cap 100 rows |
 | `list_users` | `users.manage` | name, role, status, whether 2FA is on |
+| `check_for_updates` | `settings.manage` | current version, the version it would move to, release type and summary |
+| `list_module_updates` | `modules.manage` | which add-ons have a newer version. Reporting only |
 
-### Act — `act` keys only
+### Act — `act` and `admin` keys
 
 | Tool | Account must hold | Refuses even so |
 | --- | --- | --- |
 | `revoke_session` | `sessions.manage` | a **human administrator's** session |
 | `set_module_enabled` | `modules.manage` | its own carrier, `mcp-server` |
+
+### Manage the server — `admin` keys only
+
+Added in `0.0.2`. The line between these and the ones above is **who has to be present to undo
+it**: everything under *act* can be reversed by a person at the dashboard, everything here takes
+the dashboard away while it happens.
+
+| Tool | Account must hold | Notes |
+| --- | --- | --- |
+| `apply_update` | `settings.manage` | **You must pass the exact version `check_for_updates` reported.** If the release moved in between, it refuses rather than installing something else. A failed update rolls back on its own |
+| `set_update_channel` | `settings.manage` | stable ↔ beta. Changes what is offered; applies nothing |
+| `create_backup` | `backups.manage` | Writes a backup and reports its size. **Never returns the archive** — download it from Admin → Backup |
+| `restart_server` | `settings.manage` | Back within about a minute; everyone stays signed in |
+| `shutdown_server` | `settings.manage` | **Off unless an administrator switches it on**, and needs `confirm: "shut down"` exactly. Nothing remote can start JonDash again |
 
 ### Errors
 
@@ -219,7 +239,12 @@ unsupported protocol version.
 
 ---
 
-## 6. What an assistant cannot do
+## 6. What an assistant can and cannot do
+
+**With an `admin` key it can look after the server** — check and apply a JonDash update, switch
+release channel, write a backup, restart, and (only if you switch it on) shut down. That is new in
+`0.0.2`; before it, an assistant could not touch the server at all.
+
 
 **Never, regardless of key or account:**
 
@@ -230,9 +255,20 @@ unsupported protocol version.
   not knowable from inside a tool, but *any* administrator who is not a service account. A rule that
   has to guess is one that fails on the day it matters.
 - Disable the add-on it runs through — that would sever its own connection mid-conversation.
-- Run a command, read or write a file, install or update anything, or delete data.
-- **Exceed the account its key acts as.** Choosing "read and act" never grants anything the account
-  does not already have. Promoting a key is not an escalation path.
+- Run a command, read or write a file, or delete data.
+- **Install, update or remove an add-on.** Permanent, and the reason is worth knowing: installing a
+  module is the documented route to running code inside JonDash, and it would also answer a
+  permissions question on your behalf. `list_module_updates` reports what is available so you can
+  apply it yourself from Admin → Addons. *(Applying a **JonDash** update is different, and an
+  `admin` key can do it — see above.)*
+- **Grant a role or a permission**, to itself or anyone. This is the exclusion everything else rests
+  on: an assistant that could grant a role could grant one to its own service account, and every
+  other limit here would be decoration.
+- **Restore a backup** — the one operation that writes old data over current data — or clear the
+  audit log.
+- Change anyone's password, two-factor setup, or account status.
+- **Exceed the account its key acts as.** Choosing a higher key level never grants anything the
+  account does not already have. Promoting a key is not an escalation path.
 
 **Permissions are re-read on every single call**, never cached. Strip a role and the agent loses that
 power on its next request, not at the next restart. Likewise the bound account is re-resolved every
@@ -282,6 +318,15 @@ Any of these closes the port immediately:
 - **Disable the add-on** under Admin → Addons. Re-enabling brings it back.
 - **Uninstall the add-on.** The helper's files go when nothing depends on them; its data is kept
   deliberately, so an uninstall cannot destroy your key history.
+
+**To keep the endpoint but narrow it**, change a key's level on the settings page — dropping a key
+from *manage the server* to *read and act* takes updates, restarts and backups away from it
+immediately, on its very next call. Revoking is not the only lever.
+
+**Shutting down deserves its own line.** An assistant cannot shut the server down unless you tick
+*"Also allow an assistant to shut the server down"* on the settings page. It is off by default and
+worth leaving off unless you have a reason: a shutdown does not restart by itself, so somebody has
+to run the launcher on that machine before the dashboard comes back.
 
 ---
 
