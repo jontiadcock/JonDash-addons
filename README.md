@@ -76,7 +76,8 @@ addons/<module-id>/    one folder per module
   tests/*.test.ts      optional Vitest tests — these ship, and are scanned like any other file
   migrations/          optional NNN_name.sql for the module's own mod_<id>_* tables
 helpers/<helper-id>/   first-party helpers (see helpers/README.md)
-scripts/               publish-time checks — run these before tagging a release
+scripts/               publish-time gates — run check-manifest.mjs AND check-docs.mjs
+                       before every push, not just before tagging
 ```
 
 ## Channels, versions and tags
