@@ -7,7 +7,7 @@ Lets an AI agent read and manage this JonDash install, over the Model Context Pr
 service account you choose**. The agent gets exactly that account's reach and nothing more.
 
 - **Helper id:** `mcp`
-- **Version:** `0.0.2-beta.1`
+- **Version:** `0.0.3-beta.1`
 - **`minAppVersion`:** `1.7.3-beta.2` — service accounts (beta.1) plus the helper id that
   `resolveBindableAccount` takes (beta.2). The **pre-release**, not a bare `1.7.3`: semver ranks a
   pre-release below its release, so `"1.7.3"` would be refused on exactly the builds beta users run.
@@ -337,6 +337,7 @@ repo. The endpoint is deliberately off on install, and the owner's pentest is th
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.3-beta.1` | **AB-01: changing the port left the old one listening.** The listener lived in a module-level variable and Next loads the module more than once, so the settings action was looking at a different instance than the one holding the socket — `stopListener()` found nothing to close and the old port kept serving. It is now held on `globalThis`, so there is one handle and one answer to "is there a listener?". `isListening()` was unreliable for the same reason. |
 | `0.0.2-beta.1` | **Server lifecycle, on the owner's instruction.** A third key mode, `admin`, above `read` and `act`, and six tools on it: check and apply a JonDash update (naming the exact target version, and refusing if it moved between checking and applying), switch release channel, write a backup, restart, and shut down. **Shutdown is off by default behind its own switch** because nothing remote can undo it. `apply_update` reverses a "permanently absent" line in this document — deliberately, and left on the record rather than edited out. Also fixed `listFor`, which carried its own copy of the authorization rules and would have listed every admin tool to an `act` key. |
 | `0.0.1-beta.3` | **Penetration tested; two documented controls turned out not to exist, and now do.** F1: per-source backoff and temporary block, via core's `rateLimit()` — the claim, the `blocked` reason and its UI label had all shipped without the code. F2: opening to the network without HTTPS is now refused in `onSettingsSubmit` unless explicitly confirmed, instead of a warning that opened the port anyway. F4: `query_audit_log`'s `contains` is a literal, case-insensitive substring rather than a SQL `LIKE` pattern. Everything security-critical held under attack — no bypass, no escalation, no lockout, no secret disclosure, no injection, no crash under 400k requests. |
 | `0.0.1-beta.2` | Text only, no behaviour change: `api.ts` pointed at the wrong admin screen. The controls live under **Admin → Addons → Shared capabilities**. Republished rather than edited on the branch, because tags are immutable and an already-installed copy would otherwise keep the wrong text. |
