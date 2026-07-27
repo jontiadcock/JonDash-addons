@@ -15,7 +15,11 @@ add-on that needs a newer build than yours is shown but not installable.
 | ---------- | ---------- |
 | **[JonDash](https://github.com/jontiadcock/JonDash)** | The dashboard itself — the app you install and run. |
 | **[JonDash-addons](https://github.com/jontiadcock/JonDash-addons)** *(you are here)* | The official source of add-on **modules** and **helpers**, installed from inside JonDash. |
-| **[JonDash-mcp](https://github.com/jontiadcock/JonDash-mcp)** | An [MCP](https://modelcontextprotocol.io) server so an AI assistant can read and manage your instance. |
+
+Two repositories, not three. Letting an AI assistant manage your instance over
+[MCP](https://modelcontextprotocol.io) was once a separate server; it is now the **AI assistant
+access** add-on in this repo, installed like any other. See
+[`addons/mcp-server/CONNECTING.md`](addons/mcp-server/CONNECTING.md).
 
 ---
 
@@ -31,21 +35,33 @@ never updated automatically.
 
 ## What's here
 
-| Module | What it does | Needs |
-| ------ | ------------ | ----- |
-| `health-monitor` | Watches your services with HTTP, TCP, ping, DNS and certificate checks; records uptime and response times; alerts by email or webhook when something goes down. | JonDash 1.5.0 |
-| `backup-manager` | Copies folders you choose to another location — a network share, an external drive — on a schedule, keeps dated copies, tidies old ones away, and tells you when a backup stops being healthy. | JonDash 1.5.2 |
-| `host-vitals` | Shows how the server itself is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page. | JonDash 1.5.2 |
-| `template` | **For developers** — a working module to copy when building your own. Installs to `modules/template`; read `MODULE.md` in that folder for the guide, and `AI-PROMPT.md` to have an AI build one for you. Safe to install and uninstall. | JonDash 1.4.1 |
+**Versions and the JonDash build each one needs are in [`addons.json`](addons.json)**, not repeated here
+— this branch's copy is this channel's answer. That is deliberate: a version written into prose is a
+sentence that becomes false without anyone touching it, and this table said "JonDash 1.5.2" for three
+releases after it stopped being true.
 
-| Helper | What it gives a module | Needs |
-| ------ | ---------------------- | ----- |
-| `scheduler` | Recurring background work that runs from **server start**, declared rather than started. | JonDash 1.5.0 |
-| `filesystem` | Copying and archiving folders to another location, confined to folders an admin approved. Exposes no way to read a file's contents, and never copies JonDash's own secrets. | JonDash 1.5.2 |
-| `system-metrics` | Reading how the server itself is doing — CPU, memory, disk usage, uptime and temperatures. Read-only: it reports numbers and changes nothing. | JonDash 1.5.2 |
+| Module | What it does |
+| ------ | ------------ |
+| `health-monitor` | Watches your services with HTTP, TCP, ping, DNS and certificate checks; records uptime and response times; alerts by email or webhook when something goes down. |
+| `backup-manager` | Copies folders you choose to another location — a network share, an external drive — on a schedule, keeps dated copies, tidies old ones away, and tells you when a backup stops being healthy. |
+| `host-vitals` | Shows how the server itself is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page. |
+| `service-control` | Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal. |
+| `docker-manager` | See the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes. |
+| `mcp-server` | **AI assistant access.** Lets an assistant read and manage this server over MCP, using a key you create and can revoke. Installing it opens no port. |
+| `template` | **For developers** — a working module to copy when building your own. Installs to `modules/template`; read `MODULE.md` in that folder for the guide, and `AI-PROMPT.md` to have an AI build one for you. Safe to install and uninstall. |
 
-Current versions per channel are in [`addons.json`](addons.json) on this branch — `main` is stable, `beta`
-is pre-release. Each entry's `notes` field is what JonDash shows on the update card.
+| Helper | What it gives a module |
+| ------ | ---------------------- |
+| `scheduler` | Recurring background work that runs from **server start**, declared rather than started. |
+| `filesystem` | Copying and archiving folders to another location, confined to folders an admin approved. Exposes no way to read a file's contents, and never copies JonDash's own secrets. |
+| `system-metrics` | Reading how the server itself is doing — CPU, memory, disk usage, uptime and temperatures. Read-only: it reports numbers and changes nothing. |
+| `host-services` | Seeing and controlling the services an admin approved — a Windows service, a systemd unit. Only those services, and only start, stop and restart. |
+| `docker` | Seeing containers and starting, stopping, pausing and restarting them. Never the Docker socket, never `exec`. |
+| `host-install` | Installing and removing software through the OS package manager, approved one package at a time. |
+| `mcp` | Letting an AI assistant read and manage this install over MCP, as a service account an admin picks. The only helper here that holds a resource of its own — a listening socket. |
+
+Each `addons.json` entry's `notes` field is what JonDash shows on the update card. `main` is stable,
+`beta` is pre-release.
 
 ## Repository layout
 

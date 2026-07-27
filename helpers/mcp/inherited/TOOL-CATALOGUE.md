@@ -1,3 +1,23 @@
+> # ⚠ HISTORICAL — do not follow the instructions in this file
+>
+> This is the README of the **deleted `JonDash-mcp` repository**, kept verbatim for its design
+> thinking. Everything operational in it is wrong now:
+>
+> - **The repo it tells you to clone no longer exists** and returns 404.
+> - **There is no stdio transport and there cannot be one** — MCP is a helper running inside
+>   JonDash, and a web server cannot be spawned as a subprocess by a client.
+> - The env-var configuration and the `dist/index.js` client config below describe a program that
+>   was never finished and no longer exists.
+> - Its relative links (`docs/API-CONTRACT.md`, `LICENSE`) pointed at the old repo root and are
+>   left unrepaired deliberately, because repairing them would imply this file is current.
+>
+> **To actually connect an assistant, read
+> [`addons/mcp-server/CONNECTING.md`](../../../addons/mcp-server/CONNECTING.md).**
+>
+> What survives here and is still true: **the tool names, their scope mapping, and the error
+> conventions** — the helper reuses them unchanged. That is the only reason this file was kept.
+> See [`../HELPER.md`](../HELPER.md) for what was built from it.
+
 # JonDash MCP
 
 An [MCP](https://modelcontextprotocol.io) server that lets an AI assistant — Claude Desktop, Claude Code,
