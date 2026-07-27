@@ -47,7 +47,7 @@ releases after it stopped being true.
 | `host-vitals` | Shows how the server itself is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page. |
 | `service-control` | Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal. |
 | `docker-manager` | See the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes. |
-| `mcp-server` | **AI assistant access.** Lets an assistant read and manage this server over MCP, using a key you create and can revoke. Installing it opens no port. |
+| `mcp-server` | **AI assistant access.** Lets an assistant read and manage this server over MCP — including checking and applying JonDash updates and restarting it, if you give the key that level. Installing it opens no port. |
 | `template` | **For developers** — a working module to copy when building your own. Installs to `modules/template`; read `MODULE.md` in that folder for the guide, and `AI-PROMPT.md` to have an AI build one for you. Safe to install and uninstall. |
 
 | Helper | What it gives a module |
@@ -58,7 +58,7 @@ releases after it stopped being true.
 | `host-services` | Seeing and controlling the services an admin approved — a Windows service, a systemd unit. Only those services, and only start, stop and restart. |
 | `docker` | Seeing containers and starting, stopping, pausing and restarting them. Never the Docker socket, never `exec`. |
 | `host-install` | Installing and removing software through the OS package manager, approved one package at a time. |
-| `mcp` | Letting an AI assistant read and manage this install over MCP, as a service account an admin picks. The only helper here that holds a resource of its own — a listening socket. |
+| `mcp` | Letting an AI assistant read this install, act on it, and look after the server — check and apply JonDash updates, restart, write a backup — as a service account an admin picks. The only helper here that holds a resource of its own: a listening socket. |
 
 Each `addons.json` entry's `notes` field is what JonDash shows on the update card. `main` is stable,
 `beta` is pre-release.

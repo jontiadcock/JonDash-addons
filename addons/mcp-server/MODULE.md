@@ -6,7 +6,7 @@ create and can revoke at any time.
 - **Module id:** `mcp-server`
 - **Version:** `0.0.1-beta.2`
 - **Requires:** JonDash `1.7.3-beta.2` or newer, and the `mcp` helper (installed automatically).
-- **Permissions:** `mcp:read` — and deliberately **not** `mcp:act`. See below.
+- **Permissions:** `mcp:read` only — deliberately **not** `mcp:act` or `mcp:admin`. See below.
 
 > **Connecting an assistant: [CONNECTING.md](./CONNECTING.md)** — the technical guide. Endpoint,
 > headers, the handshake, every tool, the refusal shape, security notes and troubleshooting.
@@ -29,20 +29,22 @@ being able to change any of it.
 
 ## Why it cannot let an assistant do anything
 
-This module declares `mcp:read` and never `mcp:act`.
+This module declares `mcp:read` and never `mcp:act` or `mcp:admin`.
 
 That is HELPERS-DESIGN rule 8: **a module-facing API carries read and request, never add, remove or
 approve.** Minting a credential is the sharpest possible case of that rule, so `api.ts` on the helper
 side exposes status and has no mutator at all — there is no call this module could make to create a
 key, change what an assistant is allowed to do, or switch the endpoint on, whatever it asked for.
 
-Declaring `mcp:act` would be this module claiming the power to let an assistant change things. That
+Declaring `mcp:act` would be this module claiming the power to let an assistant change things, and
+`mcp:admin` the power to let one restart or update the server. That
 is the exact shape that had to be removed from `host-services` and `filesystem`, and it does not come
 back here.
 
 **Consent shows both capabilities anyway, and that is correct.** A module earns its import by
 declaring the *helper*, not the permission, so installing this discloses everything the helper can
-lend — including `mcp:act`, which this module does not use. The disclosure is deliberately the
+lend — including `mcp:act` and `mcp:admin`, which this module does not use. The disclosure is
+deliberately the
 helper's whole capability set rather than the subset one module happens to touch.
 
 ---
