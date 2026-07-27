@@ -30,6 +30,26 @@ you would expect: nothing checks a sentence, so both docs that carried a version
 2026-07-26 (`backup-manager` said 0.1.1 when it was 0.2.2), while the seven docs that never restated
 it could not go wrong. Link to `addons.json` instead.
 
+### Never skip a main release
+
+> **A pre-release line must reach `main` before the next one opens.** `0.0.5-beta.1` →
+> `0.0.5-beta.2` → **`0.0.5` on `main`** → *then* `0.0.6-beta.1`. Never beta1, beta2, then a new
+> line with the old one unreleased.
+>
+> **Why this needs a rule and a check:** pushing to `beta` needs no approval, so nothing naturally
+> forces a promotion, and stable rots quietly while beta keeps moving. That is not hypothetical —
+> **eleven version lines across eleven add-ons never reached `main`** before this was written
+> (2026-07-27), and stable spent that time missing two security fixes. The freedom to publish betas
+> is exactly what makes this easy, so this is its counterweight.
+>
+> `check-manifest.mjs` reads the **tags**, not the manifest, because the manifest only shows the
+> present: a line skipped three cycles ago looks identical to one never started. The eleven
+> pre-rule lines are listed in `SKIPPED_BEFORE_RULE` and never reported — unchangeable history that
+> would otherwise be permanent noise. Anything skipped *after* the rule warns.
+>
+> A promotion still needs the owner's approval **and** testing, every time. Recommending one is
+> fine; doing one unasked is not.
+
 ### Keeping beta ahead of stable — the step that closes a promotion
 
 > **After promoting `X-beta.N` to `X` on `main`, advance the beta manifest past it.** A promotion is
