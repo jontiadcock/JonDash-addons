@@ -249,7 +249,7 @@
       "id": "mcp",
       "name": "AI assistant access",
       "description": "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-      "version": "0.0.2",
+      "version": "0.0.3-beta.1",
       "minAppVersion": "1.7.3-beta.2",
       "provides": [
         {
@@ -266,8 +266,8 @@
         }
       ],
       "path": "helpers/mcp",
-      "tag": "mcp/v0.0.2",
-      "notes": "Adds a third key level so an assistant can look after the server: check and apply JonDash updates, switch release channel, write a backup and restart. It names the exact version before updating. Shutting the server down is off unless you switch it on, because nothing remote can start it again."
+      "tag": "mcp/v0.0.3-beta.1",
+      "notes": "Fixes a bug where changing the port opened the new one and left the old one still listening, until the next restart. If you moved the port to get off one you did not want exposed, the old one stayed reachable. Nothing else changes."
     }
   ]
 }

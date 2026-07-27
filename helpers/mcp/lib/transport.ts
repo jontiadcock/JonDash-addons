@@ -49,7 +49,25 @@ const SUPPORTED_VERSIONS = new Set([PROTOCOL_VERSION, "2025-06-18", "2025-03-26"
 const MCP_PATH = "/mcp";
 const MAX_BODY_BYTES = 256 * 1024;
 
-let server: Server | null = null;
+/**
+ * **The listener is held on `globalThis`, not in a module variable. (AB-01.)**
+ *
+ * A plain `let server` is per *module instance*, and Next.js loads this file more than once — the
+ * copy `instrumentation.ts` uses at boot is not the copy a server action gets. So the boot instance
+ * held the socket while `onSettingsSubmit` ran against a second instance whose `server` was still
+ * `null`: `stopListener()` saw nothing to close and returned immediately, `startListener()` bound
+ * the new port, and the machine ended up with **two live listeners neither instance knew about**.
+ *
+ * That is why changing the port left the old one serving, and why it survived a fix aimed at
+ * keep-alive connections — the close was never reached at all. The same duplication would also make
+ * `isListening()` lie to the settings page.
+ *
+ * A `globalThis` singleton is the standard answer to this in Next (it is what the Prisma client
+ * does here) and the only one that makes "is there a listener?" a question with one answer.
+ */
+const HANDLE = Symbol.for("jondash.helper.mcp.listener");
+type Holder = { server: Server | null };
+const holder: Holder = ((globalThis as Record<symbol, unknown>)[HANDLE] ??= { server: null }) as Holder;
 
 /** Recorded for the admin's tripwire. Never returned to the caller. */
 async function recordRefusal(ip: string, reason: RefusalReason): Promise<void> {
@@ -192,7 +210,10 @@ export type Dispatch = (
  * surface with nothing to protect but every reason to be probed.
  */
 export async function startListener(dispatch: Dispatch): Promise<{ started: boolean; port?: number }> {
-  if (server) return { started: true, port: server.address() && typeof server.address() === "object" ? (server.address() as { port: number }).port : undefined };
+  if (holder.server) {
+    const a = holder.server.address();
+    return { started: true, port: a && typeof a === "object" ? a.port : undefined };
+  }
 
   if (!(await isEnabled())) return { started: false };
 
@@ -234,23 +255,53 @@ export async function startListener(dispatch: Dispatch): Promise<{ started: bool
   const exposed = await isNetworkExposed();
   const bind = exposed ? "0.0.0.0" : "127.0.0.1";
 
-  server = createServer((req, res) => void handle(req, res, dispatch, exposed, port));
+  const created = createServer((req, res) => void handle(req, res, dispatch, exposed, port));
+  holder.server = created;
 
   await new Promise<void>((resolve, reject_) => {
-    server!.once("error", reject_);
-    server!.listen(port, bind, () => resolve());
+    created.once("error", reject_);
+    created.listen(port, bind, () => resolve());
   });
 
   return { started: true, port };
 }
 
+/**
+ * Stop listening, and **actually release the port**. (AB-01.)
+ *
+ * `server.close()` alone is not enough, and the way it fails is quiet. It stops *accepting* new
+ * connections and resolves only once every existing one has ended — so a single held keep-alive
+ * socket keeps the old port bound indefinitely. Changing the port then opened the new one and left
+ * the old one listening, on the same process, until the next restart.
+ *
+ * **That is the ordinary state of a connected MCP client, not an edge case.** Which is why every
+ * earlier port test passed: they changed the port with nothing connected, the socket closed
+ * instantly, and the bug could not appear.
+ *
+ * So: end the connections rather than wait for them, and bound the close so a stuck socket can
+ * never leave this function hanging — an admin switching the port off a exposed interface must not
+ * depend on a client behaving well. The reference is dropped either way, because a `server` that
+ * cannot be closed must still never be reused.
+ */
+const CLOSE_TIMEOUT_MS = 3_000;
+
 export async function stopListener(): Promise<void> {
-  if (!server) return;
-  await new Promise<void>((resolve) => server!.close(() => resolve()));
-  server = null;
+  if (!holder.server) return;
+  const s = holder.server;
+  // Dropped FIRST: `startListener` returns early when this is set, so if the close below is slow
+  // the rebind would otherwise be skipped and the endpoint would end up on neither port.
+  holder.server = null;
+
+  // Node 18.2+. Ends held keep-alive sockets instead of waiting for them — the actual fix.
+  s.closeAllConnections?.();
+
+  await Promise.race([
+    new Promise<void>((resolve) => s.close(() => resolve())),
+    new Promise<void>((resolve) => setTimeout(resolve, CLOSE_TIMEOUT_MS)),
+  ]);
 }
 
-export const isListening = () => server !== null;
+export const isListening = () => holder.server !== null;
 
 async function handle(
   req: IncomingMessage,
