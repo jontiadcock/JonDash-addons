@@ -58,7 +58,7 @@ const helper: HelperDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-  version: "0.0.2-beta.1",
+  version: "0.0.2",
   // Service accounts arrived in 1.7.3-beta.1 (SEC-07) — without them this helper has nothing to
   // bind a key to, so an older core is not a degraded experience, it is an unusable one.
   //
