@@ -19,7 +19,7 @@ import { cloneJobAction, setAllEnabledAction, setConcurrencyAction, setDigestAct
 import { getConcurrency, getDigestEmail } from "../lib/store";
 
 /**
- * Everything that changes a backup lives here, in Admin → Modules → Backup Manager. The
+ * Everything that changes a backup lives here, in Admin → Addons → Backup Manager. The
  * module's own page stays display-only.
  *
  * A server component with plain forms: no client JavaScript, so there is no state to get
@@ -126,7 +126,7 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
         )}
 
         <p className="text-xs" style={muted}>
-          Folders are approved on Admin &rarr; Helpers &rarr; Files and folders. This module can
+          Folders are approved on Admin &rarr; Permissions. This module can
           ask for one, but cannot approve or remove it &mdash; otherwise the limit it works
           within would be one it sets for itself.
         </p>
@@ -330,7 +330,7 @@ export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelPr
             {logRetention.keepRuns || "unlimited"} run{logRetention.keepRuns === 1 ? "" : "s"}.
           </p>
           <p className="text-xs" style={muted}>
-            Changed on Admin &rarr; Helpers &rarr; Files and folders. The setting is shared by
+            Changed on Admin &rarr; Addons &rarr; Shared capabilities &rarr; Files and folders. The setting is shared by
             every module using that helper, so one module changing it would prune another&rsquo;s
             logs &mdash; including the record of what it had just done.
           </p>

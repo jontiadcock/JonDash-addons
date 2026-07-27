@@ -107,7 +107,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.4",
+  version: "0.0.5",
   /**
    * 1.7.1-beta.**9**, the first build carrying `SettingsPanel` / `onSettingsSubmit` — checked
    * tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this

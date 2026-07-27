@@ -5,7 +5,7 @@ keeps dated copies if you want them, tidies old ones away, and tells you when a 
 healthy.
 
 - **Module id:** `backup-manager`
-- **Version:** `0.1.1` on both channels
+- **Version:** see [`addons.json`](../../addons.json) on this branch — stable on `main`, beta on `beta`. Deliberately not restated here: it drifts the moment a version is published, and both docs that carried it were stale.
 - **Minimum JonDash version:** `1.5.2-beta.1` — the **pre-release**, deliberately. Semver ranks
   `1.5.2-beta.1` *below* `1.5.2`, so a bare `"1.5.2"` would be refused on every 1.5.2 beta, which is
   exactly what beta-channel users run. 1.5.2 is the release that added `ctx.can()` enforcement, which
@@ -89,7 +89,7 @@ describe what a module **can** do, not what it happens to be configured to do to
 
 ## Settings and data
 
-There is no flat settings list; everything is managed in **Admin → Modules → Backup Manager**, and
+There is no flat settings list; everything is managed in **Admin → Addons → Backup Manager**, and
 each backup has its own page at `/m/backup-manager/job/<id>`.
 
 Module-wide settings live in `mod_backup_manager_settings`: how many backups may run at once (a

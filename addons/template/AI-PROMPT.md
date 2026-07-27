@@ -92,7 +92,7 @@ THE ModuleDefinition (module.ts):
                                    //   saying which module it is. This builds and typechecks happily,
                                    //   so ONLY looking at the dashboard catches it.
     Page?: Component;              // props: { ctx, path: string[] }, served at /m/<id>
-    SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Modules -> your module,
+    SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Addons -> your module,
                                    //   BELOW the auto-generated settings fields (not instead of
                                    //   them), and only once the module is enabled. Put anything
                                    //   richer than a flat settings list here.
@@ -289,7 +289,7 @@ somebody depends on, and never the default port if something is already using it
    Enter it, save the recovery codes, and you are in.
 
 8. Now actually exercise the module:
-   - Admin -> Modules: your module is listed. Read the permission warnings — they should match what
+   - Admin -> Addons: your module is listed. Read the permission warnings — they should match what
      you declared and nothing more. Enable it.
    - OPEN THE DASHBOARD ITSELF and look at your widget, both with data and with none. It must look
      like the other tiles — its own card, its own title. This is the one screen easy to skip, because
@@ -319,7 +319,7 @@ NOW BUILD THIS MODULE:
 
 1. Read the `permissions` it declared. If you can't explain why each one is needed, ask it to justify
    or remove them.
-2. Put the folder in `modules/<id>/`, or zip it and use **Admin → Modules → Import your own module**.
+2. Put the folder in `modules/<id>/`, or zip it and use **Admin → Addons → Import your own module**.
 3. Try it on a scratch install first, not the one you depend on.
 4. Publishing it for others: put it in a public GitHub repository with an `addons.json` manifest, tag
    the release `<id>/v<version>`, and share the repository URL — anyone can add it as a source. The

@@ -57,7 +57,7 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.2.2",
+  version: "0.2.3",
   // Follows the filesystem helper's floor, which has now moved three times: 0.0.6 put the
   // folder editor on the helper's own settings page, 0.0.7 declared CORE-10 `scope`, and 0.0.8
   // declares `unbounded.option` — the "exclude JonDash's own data" switch — which arrived in
@@ -108,7 +108,7 @@ const backupManager: ModuleDefinition = {
   // Pinned to 0.0.8-beta.1: 0.0.6 removed addRoot/removeRoot/setRetention and added
   // suggestRoot (an older helper has no suggestRoot to call), and 0.0.8 is the build this
   // module's app floor now assumes.
-  helpers: [{ id: "filesystem", minVersion: "0.0.8" }, "scheduler"],
+  helpers: [{ id: "filesystem", minVersion: "0.0.8-beta.1" }, "scheduler"],
 
   /** Backups are infrastructure: the paths alone tell you how the machine is laid out. */
   adminOnly: true,

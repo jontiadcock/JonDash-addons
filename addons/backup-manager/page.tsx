@@ -16,7 +16,7 @@ import LiveRefresh from "./ui/live";
 
 /**
  * What happened — display only. Everything that CHANGES a backup lives in
- * Admin → Modules → Backup Manager, so this page can be read without any risk of altering
+ * Admin → Addons → Backup Manager, so this page can be read without any risk of altering
  * anything. The one thing it does is fetch a run's log, which is a read.
  */
 
@@ -71,7 +71,7 @@ export default async function BackupPage({ ctx, path }: ModulePageProps) {
         <h1 className="mb-1 text-2xl font-semibold">Backup Manager</h1>
         <p className="text-sm" style={muted}>
           Keeps folders copied somewhere else on a schedule. Set backups up in{" "}
-          <a href={ADMIN_PATH} className="underline">Admin → Modules → Backup Manager</a>.
+          <a href={ADMIN_PATH} className="underline">Admin → Addons → Backup Manager</a>.
         </p>
       </section>
 

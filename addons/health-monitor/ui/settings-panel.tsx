@@ -19,7 +19,7 @@ import {
 
 /**
  * Everything that changes the monitoring, rendered by JonDash inside
- * Admin → Modules → Health monitoring, below the module's own settings fields.
+ * Admin → Addons → Health monitoring, below the module's own settings fields.
  *
  * This is where configuration belongs: the module's pages and its dashboard widget stay
  * read-only, so a dashboard can be left open without a stray click reconfiguring
