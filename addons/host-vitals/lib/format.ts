@@ -78,3 +78,18 @@ export const TONE: Record<Level, string> = {
   warn: "var(--warning, #b45309)",
   bad: "var(--danger)",
 };
+
+/**
+ * The same three levels, for a **filled bar** rather than for text.
+ *
+ * `TONE.ok` is `--muted` because healthy text should not shout — but a *meter* painted in the muted
+ * colour reads as broken rather than calm: the fill is the same grey as the track's own label, so a
+ * disk at 64% looks like a rendering glitch instead of a measurement. A healthy bar takes the app's
+ * accent, which is the colour JonDash already uses for "this is the normal, working state", and the
+ * warning and danger levels stay as they are because at those levels shouting is the point.
+ */
+export const METER: Record<Level, string> = {
+  ok: "var(--primary)",
+  warn: "var(--warning, #b45309)",
+  bad: "var(--danger)",
+};

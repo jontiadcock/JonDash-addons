@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import type { ModuleWidgetProps } from "@/lib/modules/types";
 import systemMetrics, { type Snapshot } from "@/helpers/system-metrics/api";
-import { bytes, pct, rate, uptime, levelFor, TONE, type Level } from "../lib/format";
+import { bytes, pct, rate, uptime, levelFor, METER, TONE, type Level } from "../lib/format";
 import { collectFor } from "../lib/groups";
 
 /**
@@ -84,9 +84,22 @@ const FILL_GRID = {
   gridAutoColumns: "minmax(11rem, 1fr)",
   columnGap: "1.25rem",
   overflow: "hidden",
-  // Grows a little with the tile so a large card is not full of tiny text, but stops well
-  // before a very wide short tile turns 12px labels into headlines.
-  fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
+  /*
+   * The type has to scale with the tile, and this took a second pass to get right. `1fr` rows
+   * share the whole height between however many readings there are, so six readings in a tall
+   * card get a row each of well over 100px — and 12px text stranded in a 117px row does not look
+   * generous, it looks stretched, like a table someone dragged the corner of. The row height is
+   * doing the filling; the type has to keep up with it or the card reads as broken.
+   *
+   * `4.5cqw` ties it to the card's width, and `min(…, 5cqh)` to its height — which is the term
+   * that matters, because row height comes from height, and because a very wide, very short tile
+   * would otherwise compute a headline-sized font for a row 16px tall. Both units mean the card
+   * only because the root declares size containment.
+   */
+  // The outer max() is a floor and is NOT optional: min(..., 5cqh) alone has nothing holding it
+  // up, so a one-unit-high tile computed a 3.45px font — technically unclipped and completely
+  // unreadable. A cap needs a floor underneath it or it is just a smaller bug.
+  fontSize: "max(0.6875rem, min(clamp(0.75rem, 4.5cqw, 2rem), 5cqh))",
 } as const;
 
 /**
@@ -139,20 +152,26 @@ function totalNet(m: Snapshot): { rx: number; tx: number } | null {
 }
 
 /**
- * One label/value line, optionally with a usage level shown as a fill BEHIND the text.
+ * One reading: a muted label, the figure in the card's own text colour, and — where the reading
+ * is a proportion — a slim meter along the bottom edge of the row.
  *
- * The fill used to be a separate 6px bar under the row, and that turned out to be the thing
- * that broke short widgets: it made a disk row 26px tall and the memory row 46px, so in a
- * 6×1 widget — where the whole list gets about 19px — those rows spilled straight out of the
- * card while the plain one-line rows fitted. Behind the text instead, **every row is exactly
- * one line tall**, which makes the column flow below predictable at any shape and costs no
- * information: width still reads as "how full", colour still reads as "how worried".
+ * **The meter has been through three shapes and the middle one was genuinely ugly.** It began as a
+ * 6px bar on its own line, which doubled the row height and pushed rows out of short tiles. So it
+ * moved to a translucent fill *behind* the text, which fixed the height and looked bad: a partial
+ * block at 18% opacity starting under the label reads as a stray selection highlight, not as a
+ * measurement, and on a wide row it is a grey smudge with a hard edge in the middle of nowhere.
  *
- * `min(3px, var(--radius-control))` rather than a hardcoded 3: the radius token runs from
- * 999px on Crystal to 0px on Terminal, Brutalist and Paper, which are square-cornered on
- * purpose. A fixed 3px left rounded fills sitting inside hard-edged cards on exactly the
- * styles whose whole point is that nothing is rounded. `min` keeps it proportional on round
- * styles while collapsing to square where the style says square.
+ * It is now a **track and fill pinned to the bottom of the row** — the shape everyone already
+ * recognises as a meter. It is absolutely positioned, so like the background fill it still costs no
+ * height and short tiles stay correct; but it has a visible track, so the empty part reads as
+ * "space remaining" rather than as an edge, and the label sits on plain card background where it
+ * belongs.
+ *
+ * `min(1.5px, var(--radius-control))` rather than a hardcoded radius: the token runs from 999px on
+ * Crystal to 0px on Terminal, Brutalist and Paper, which are square-cornered on purpose. A fixed
+ * radius leaves rounded bars inside hard-edged cards on exactly the styles whose whole point is
+ * that nothing is rounded. `min` keeps it proportional where the style is round and collapses it to
+ * square where the style says square.
  */
 function Row({
   label,
@@ -163,26 +182,43 @@ function Row({
   usedPct?: number;
   children: ReactNode;
 }) {
+  const metered = usedPct !== undefined;
   return (
-    <div className="relative flex min-w-0 items-center justify-between gap-3">
-      {usedPct !== undefined && (
+    <div
+      className="relative flex min-w-0 items-center justify-between gap-3"
+      style={metered ? { paddingBottom: "0.35em" } : undefined}
+    >
+      <dt className="min-w-0 truncate" style={{ color: "var(--muted)" }}>
+        {label}
+      </dt>
+      <dd className="shrink-0 truncate font-medium tabular-nums" style={{ color: "var(--foreground)" }}>
+        {children}
+      </dd>
+      {metered && (
         <span
           aria-hidden
           style={{
             position: "absolute",
-            insetBlock: 0,
-            insetInlineStart: 0,
-            width: `${Math.min(100, Math.max(0, usedPct))}%`,
-            background: TONE[levelFor(usedPct)],
-            // Low enough that body text stays readable on every palette, high enough to read
-            // as a level at a glance. The colour is doing the talking, not the saturation.
-            opacity: 0.18,
-            borderRadius: "min(3px, var(--radius-control))",
+            insetInline: 0,
+            bottom: 0,
+            height: "0.2em",
+            minHeight: 2,
+            background: "var(--border)",
+            borderRadius: "min(1.5px, var(--radius-control))",
+            overflow: "hidden",
           }}
-        />
+        >
+          <span
+            style={{
+              display: "block",
+              height: "100%",
+              width: `${Math.min(100, Math.max(0, usedPct))}%`,
+              background: METER[levelFor(usedPct)],
+              borderRadius: "inherit",
+            }}
+          />
+        </span>
       )}
-      <dt className="relative truncate">{label}</dt>
-      <dd className="relative shrink-0 truncate tabular-nums">{children}</dd>
     </div>
   );
 }
@@ -210,7 +246,15 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
   const disks = [...m.disks].sort((a, b) => b.usedPct - a.usedPct);
 
   return (
-    <div className="card flex h-full min-w-0 flex-col overflow-hidden p-2 @[8rem]:p-4">
+    // `containerType: size` makes THIS TILE the container the `cqh` units below resolve against.
+    // Core keeps the dashboard frame on `inline-size` on purpose, so without this a height unit
+    // would quietly measure the browser window instead of the card. Declaring it on our own root
+    // confines the risk to this one widget: the root is `h-full` inside a sized grid cell, so its
+    // height is definite, and if that ever stopped being true only this tile would suffer.
+    <div
+      className="card flex h-full min-w-0 flex-col overflow-hidden p-2 @[8rem]:p-4"
+      style={{ containerType: "size" }}
+    >
       {/* Below 6rem the name costs a whole line and the verdict is the point — so it waits. */}
       <div className="hidden items-center justify-between gap-2 @[6rem]:flex">
         <p className="truncate text-xs font-medium @[8rem]:text-sm">Host vitals</p>
@@ -223,10 +267,17 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
         </Link>
       </div>
 
-      {/* The verdict is the one thing that survives at every size, down to 1×1. */}
+      {/*
+        The verdict is the one thing that survives at every size, down to 1×1 — and on a big card
+        it is the headline, so it scales with the tile instead of staying a 14px line above a wall
+        of readings. Capped against the height too, since a wide short tile has none to spare.
+      */}
       <p
-        className="truncate font-medium @[6rem]:mt-1"
-        style={{ color: TONE[v.level], fontSize: "clamp(0.75rem, 8cqw, 0.875rem)" }}
+        className="truncate font-semibold leading-tight @[6rem]:mt-0.5"
+        style={{
+          color: TONE[v.level],
+          fontSize: "max(0.8125rem, min(clamp(0.8125rem, 5cqw, 1.75rem), 22cqh))",
+        }}
       >
         <span className="@[6rem]:hidden">{v.short}</span>
         <span className="hidden @[6rem]:inline">{v.text}</span>
@@ -245,8 +296,18 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
           {showLoad ? ` · ${m.cpu.load1!.toFixed(2)}` : ""}
         </Row>
 
+        {/*
+          A percentage, like every other metered reading — a row that read "14.5 GB / 31.8 GB"
+          while the disks beside it read "64%" made the column look like two different tables. The
+          absolute figures are still worth having, so they follow in muted text once the tile is
+          wide enough to hold both without either being truncated.
+        */}
         <Row label="Memory" usedPct={m.memory.usedPct}>
-          {bytes(m.memory.usedBytes)} / {bytes(m.memory.totalBytes)}
+          {pct(m.memory.usedPct)}
+          <span className="hidden font-normal @[22rem]:inline" style={{ color: "var(--muted)" }}>
+            {" "}
+            · {bytes(m.memory.usedBytes)} / {bytes(m.memory.totalBytes)}
+          </span>
         </Row>
 
         {disks.map((d) => (
