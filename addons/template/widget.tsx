@@ -47,8 +47,8 @@ import { MODULE_PATH } from "./lib/constants";
  *
  * Installed modules live in a gitignored folder, so Tailwind never scans them; core mirrors the
  * class names it finds into an allowlist instead. That mirror **drops any token containing
- * parentheses**, so in a module `text-[clamp(1rem,22cqw,2rem)]`, `w-[calc(100%-2rem)]` and
- * `bg-(--brand)` all produce **no CSS at all** — the class is on the element, nothing styles it,
+ * parentheses**, so in a module ‘text-[clamp(...)]’, ‘w-[calc(...)]’ and
+ * ‘bg-(--brand)’ all produce **no CSS at all** — the class is on the element, nothing styles it,
  * and nothing warns you. Verified on 1.8.1-beta.1; reported to core.
  *
  * Everything else works, so this only bites the CSS *functions* — which is unlucky, because
@@ -65,6 +65,21 @@ import { MODULE_PATH } from "./lib/constants";
  * Styling: reuse JonDash's own tokens (`card`, `var(--muted)`, `var(--primary)`) so the module
  * looks native and follows light and dark mode for free.
  */
+/**
+ * Makes THIS WIDGET its own size container, which is what lets the figure below be capped against
+ * the card height as well as its width.
+ *
+ * Core deliberately leaves the dashboard frame on `container-type: inline-size`, so `cqh` there
+ * would silently resolve against the viewport. Declaring size containment on the widget root fixes
+ * that for our own subtree only: the root is `h-full` inside a sized grid cell, so its height is
+ * definite, and if the assumption were ever wrong the damage is confined to this one tile rather
+ * than the whole dashboard — which is exactly why core would not make the same change globally.
+ *
+ * `@[6rem]:` classes on children now resolve against this element instead of the frame. Same
+ * width, so nothing changes.
+ */
+const SIZE_CONTAINER = { containerType: "size" } as const;
+
 export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
   const heading = String((await ctx.settings.get("heading")) ?? "Items");
   const count = ctx.db ? await countItems(ctx.db) : 0;
@@ -79,7 +94,10 @@ export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
      * `min-w-0` looks pointless and is not: without it a long word inside a flex child refuses to
      * shrink below its own width and pushes the card wider than its cell.
      */
-    <div className="card flex h-full min-w-0 flex-col justify-center overflow-hidden p-2 @[8rem]:p-5">
+    <div
+      className="card flex h-full min-w-0 flex-col justify-center overflow-hidden p-2 @[8rem]:p-5"
+      style={SIZE_CONTAINER}
+    >
       {/*
         The heading is the first thing to go. Below 6rem there is no room for a word AND a number,
         and the number is the thing somebody glances at — so the label steps aside rather than both
@@ -93,12 +111,22 @@ export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
         so this tracks the card rather than the window. `tabular-nums` stops the width jittering as
         the number changes, which is very visible in a small card.
 
-        Inline rather than `text-[clamp(...)]` — see the note above; as a class it would silently
+        Inline rather than ‘text-[clamp(...)]’ — see the note above; as a class it would silently
         produce nothing.
+      */}
+      {/*
+        A tile with a LIST fills a big card by showing more rows. A tile with a single figure has
+        nothing more to show, so the only honest way to use the space is to make the figure bigger.
+
+        Two caps, because a tile can be extreme in either direction: 22cqw grows it with the WIDTH,
+        and the min() against 34cqh stops it exceeding about a third of the HEIGHT — without which
+        a very wide, very short tile computes a huge size from its width and shoves the other three
+        lines straight out of the card. cqh only means anything because the root declares size
+        containment; on core's frame alone it would quietly measure the viewport instead.
       */}
       <p
         className="truncate font-semibold tabular-nums leading-none"
-        style={{ fontSize: "clamp(1rem, 22cqw, 2.25rem)" }}
+        style={{ fontSize: "min(clamp(1rem, 22cqw, 6rem), 34cqh)" }}
       >
         {count}
       </p>

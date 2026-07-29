@@ -19,12 +19,11 @@ import { HealthStyles, InlineStatusStrip, StatusDot } from "./ui/parts";
  * scrolls**. Three rules, all learned the hard way on `host-vitals`:
  *
  * 1. **Core's two thresholds** (`@[6rem]`, `@[8rem]`) decide what *kind* of content appears.
- * 2. **Every row is exactly one line**, and the list is CSS multi-column (`columns-[11rem]`) —
- *    rows fill downward, then continue in a new column. A container query reports width and never
- *    height, and multi-column is how you adapt to the axis you cannot ask about. It must be
- *    `columns`, NOT `flex-wrap`: flex column-wrap starts a new column when it runs out of height
- *    with no regard for remaining width, so columns ran off the side of the card and text was
- *    half-cut at the edge. `columns` derives the count from the width, so they always fit.
+ * 2. **Every row is exactly one line**, and the list is the `FILL_GRID` below — `1fr` rows that
+ *    stretch to use the tile's height, flowing into a new column only once the height is spent.
+ *    A container query reports width and never height, so the grid is how you adapt to the axis
+ *    you cannot ask about — and, unlike the two mechanisms tried before it, it fills the card
+ *    rather than leaving most of it empty.
  * 3. **Priority order**, because whatever doesn't fit is clipped: anything broken comes first,
  *    so a failing monitor is never the thing that disappears.
  *
@@ -34,6 +33,29 @@ import { HealthStyles, InlineStatusStrip, StatusDot } from "./ui/parts";
 
 /** See `service-control` for the reasoning: a guard against an unbounded list, not a layout size. */
 const TILE_CAP = 24;
+
+/**
+ * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
+ * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
+ * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * so a few rows spread one-per-column across the top and left the rest of the card empty).
+ *
+ * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
+ * sideways, so a tall tile is one long list and a wide short one flows into columns.
+ *
+ * Inline rather than Tailwind because `minmax()` and `repeat()` contain parentheses, and on the
+ * versions this module supports such a class generates no CSS at all.
+ */
+const FILL_GRID = {
+  display: "grid",
+  gridAutoFlow: "column",
+  gridTemplateRows: "repeat(auto-fit, minmax(1rem, 1fr))",
+  gridAutoColumns: "minmax(11rem, 1fr)",
+  columnGap: "1.25rem",
+  overflow: "hidden",
+  fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
+} as const;
+
 export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
   const db = ctx.db;
   const monitors: MonitorRow[] = db ? await listMonitors(db) : [];
@@ -112,16 +134,14 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
             {openIncidents > 0 ? ` · ${openIncidents} ongoing` : ""}
           </p>
 
-          {/*
-            `min-h-0` is what bounds this list, and without it the flex child grows to its
-            content and the column-wrap never happens. `content-start` keeps the columns packed
-            to the left instead of spreading across a wide tile.
-          */}
-          <ul className="mt-2 hidden min-h-0 flex-1 columns-[11rem] gap-x-5 gap-y-1.5 overflow-hidden @[8rem]:block">
+          {/* `min-h-0` is what bounds the list; without it the flex child grows to its content
+              and the grid has no height to divide into rows. */}
+          <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
+            <ul className="h-full" style={FILL_GRID}>
             {shown.map((m) => (
               <li
                 key={m.id}
-                className="relative flex min-w-0 break-inside-avoid items-center justify-between gap-3 pb-1 text-xs"
+                className="relative flex min-w-0 items-center justify-between gap-3 pb-1"
               >
                 <span className="flex min-w-0 items-center gap-2">
                   <StatusDot state={m.status} size={8} />
@@ -139,6 +159,7 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
               </li>
             ))}
           </ul>
+          </div>
 
           {problems.length > 0 ? (
             <p

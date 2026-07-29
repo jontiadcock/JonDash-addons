@@ -23,19 +23,12 @@ import { collectFor } from "../lib/groups";
  *
  * 1. **Core's two container thresholds** (`@[6rem]`, `@[8rem]`) decide how much *kind* of
  *    content appears — verdict alone, then the header, then the detail list.
- * 2. **CSS multi-column (`columns-[11rem]`) on the detail list.** The frame is
- *    `container-type: inline-size`, so a container query can ask how WIDE this widget is but
- *    never how TALL — and a 12×1 widget is both very wide and very short. Multi-column needs no
- *    query: rows fill downward until they run out of height, then continue in a new column.
- *    Tall and narrow gives one column; short and wide gives several.
- *
- *    **It has to be `columns`, not `flex-wrap`, and that took a wrong turn to learn.** Flex
- *    column-wrap looks like the same thing and is not: it starts a new column whenever it runs
- *    out of *height*, with no regard for whether there is *width* left — so a narrow tile with a
- *    few too many rows grew columns straight off the side of the card, half-cutting text at the
- *    edge. `columns` derives the column count *from* the width, so the columns always fit and
- *    anything that doesn't is cleanly out of sight rather than sliced in half. `break-inside-avoid`
- *    on each row stops a row being split across a column boundary.
+ * 2. **The `FILL_GRID` below.** The frame is `container-type: inline-size`, so a container query
+ *    can ask how WIDE this widget is but never how TALL — and a 12×1 widget is both very wide and
+ *    very short. The grid needs no query: `1fr` rows stretch to use whatever height there is, and
+ *    flow into another column only once that height is spent. Tall and narrow gives one long
+ *    list; short and wide gives several columns. See its own comment for the two mechanisms that
+ *    were tried first and why each was wrong.
  * 3. **Priority order.** Whatever still doesn't fit is clipped, so the order is the design:
  *    verdict, CPU, memory, then disks **fullest first** — not mount order, because the disk
  *    that matters is the full one. Uptime is last because it is the least urgent thing here.
@@ -57,6 +50,44 @@ import { collectFor } from "../lib/groups";
  */
 
 const MODULE_PATH = "/m/host-vitals";
+
+/**
+ * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
+ *
+ * Two earlier attempts were both wrong, and for opposite reasons:
+ *
+ * - **Flex `flex-wrap`** starts a new column whenever it runs out of HEIGHT, without caring
+ *   whether any WIDTH is left — so columns ran off the side of the card and text was sliced.
+ * - **CSS `columns`** fixed the slicing but *balances* by default, so five rows in a large tile
+ *   spread themselves one-per-column across the top and left the other 90% of the card empty.
+ *   It never occurred to me to check that, because I was measuring for overflow and an empty
+ *   card overflows nothing. The screenshot was the thing that showed it.
+ *
+ * A grid does both jobs at once:
+ *
+ * - `gridTemplateRows: repeat(auto-fit, minmax(1.5rem, 1fr))` — as many rows as the tile's height
+ *   can hold at a readable minimum, each taking an equal share of it. **`1fr` is what fills the
+ *   card**: rows stretch to use the height rather than stacking at 16px and stopping.
+ * - `gridAutoFlow: column` — fill downward first, then start another column. So a tall tile is
+ *   one long list, and a wide short one flows sideways.
+ * - `gridAutoColumns: minmax(11rem, 1fr)` — columns share the width, never narrower than legible.
+ *
+ * It has to be an inline style: `minmax()` and `repeat()` contain parentheses, and on the
+ * versions this module supports a Tailwind class containing `(` generates no CSS at all. (Fixed
+ * in JonDash 1.8.2 — but the floor here is 1.8.0-beta.14, so the class form would silently do
+ * nothing for most of the people who install this.)
+ */
+const FILL_GRID = {
+  display: "grid",
+  gridAutoFlow: "column",
+  gridTemplateRows: "repeat(auto-fit, minmax(1rem, 1fr))",
+  gridAutoColumns: "minmax(11rem, 1fr)",
+  columnGap: "1.25rem",
+  overflow: "hidden",
+  // Grows a little with the tile so a large card is not full of tiny text, but stops well
+  // before a very wide short tile turns 12px labels into headlines.
+  fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
+} as const;
 
 /**
  * The worst thing currently true about the host, or "healthy" if nothing is wrong.
@@ -133,7 +164,7 @@ function Row({
   children: ReactNode;
 }) {
   return (
-    <div className="relative flex min-w-0 break-inside-avoid items-center justify-between gap-3">
+    <div className="relative flex min-w-0 items-center justify-between gap-3">
       {usedPct !== undefined && (
         <span
           aria-hidden
@@ -202,17 +233,13 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
       </p>
 
       {/*
-CSS multi-column with a bounded height is what makes this fit without a height query:
-        rows stack downward, and when they run out of room they continue in a new column.
-        `min-h-0` is what bounds it — without that the flex child grows to its content and no
-        column break ever happens. `columns-[11rem]` sets a column WIDTH, so the browser fits as
-        many columns as the card can actually hold; `flex-wrap` would have made as many as the
-        rows demanded and let them run off the edge.
+        The wrapper owns the conditional display, the grid owns the layout. They have to be two
+        elements: the grid needs `minmax()`/`repeat()`, which only an inline style can express on
+        the versions this module supports, and an inline `display:grid` would override the
+        `@[8rem]:block` that hides the list on a tiny tile.
       */}
-      <dl
-        className="mt-2 hidden min-h-0 flex-1 columns-[11rem] gap-x-5 gap-y-1.5 overflow-hidden text-xs @[8rem]:block"
-        style={{ color: "var(--muted)" }}
-      >
+      <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
+        <dl className="h-full" style={{ ...FILL_GRID, color: "var(--muted)" }}>
         <Row label="CPU">
           {pct(m.cpu.usedPct)}
           {showLoad ? ` · ${m.cpu.load1!.toFixed(2)}` : ""}
@@ -243,7 +270,8 @@ CSS multi-column with a bounded height is what makes this fit without a height q
         )}
 
         <Row label="Uptime">{uptime(m.host.uptimeSec)}</Row>
-      </dl>
+        </dl>
+      </div>
     </div>
   );
 }

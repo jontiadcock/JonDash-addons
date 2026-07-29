@@ -24,7 +24,7 @@ const template: ModuleDefinition = {
     "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
 
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
-  version: "0.0.8-beta.1",
+  version: "0.0.8-beta.2",
 
   /**
    * The oldest JonDash this module works on. Declare the oldest that genuinely works,

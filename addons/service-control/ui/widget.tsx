@@ -18,8 +18,8 @@ import { requestAction } from "../actions";
  *
  * The user can size this from 1×1 upward and the frame **clips rather than scrolls**, so:
  * core's two thresholds decide what kind of content appears, every row is exactly one line so
- * the list is CSS multi-column (`columns-[11rem]`, never `flex-wrap` — see host-vitals), and rows
- * are in priority order —
+ * the list is the `FILL_GRID` below (see host-vitals for why not `columns` or `flex-wrap`), and
+ * rows are in priority order —
  * stopped services first, because if anything is clipped it must not be the broken one.
  *
  * `.slice(0, 6)` is gone: a constant row count was picked for one box size and was wrong at
@@ -43,6 +43,29 @@ import { requestAction } from "../actions";
  * container. A tile is a summary; the page is the list.
  */
 const TILE_CAP = 24;
+
+/**
+ * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
+ * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
+ * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * so a few rows spread one-per-column across the top and left the rest of the card empty).
+ *
+ * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
+ * sideways, so a tall tile is one long list and a wide short one flows into columns.
+ *
+ * Inline rather than Tailwind because `minmax()` and `repeat()` contain parentheses, and on the
+ * versions this module supports such a class generates no CSS at all.
+ */
+const FILL_GRID = {
+  display: "grid",
+  gridAutoFlow: "column",
+  gridTemplateRows: "repeat(auto-fit, minmax(1rem, 1fr))",
+  gridAutoColumns: "minmax(11rem, 1fr)",
+  columnGap: "1.25rem",
+  overflow: "hidden",
+  fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
+} as const;
+
 export default async function ServiceControlWidget({ ctx }: ModuleWidgetProps) {
   const api = hostServices(ctx);
   const [services, support] = await Promise.all([api.list(), api.capability()]);
@@ -86,14 +109,15 @@ export default async function ServiceControlWidget({ ctx }: ModuleWidgetProps) {
             {stopped.length > 0 ? `${running} up · ${stopped.length} stopped` : `All ${running} up`}
           </p>
 
-          <ul className="mt-2 hidden min-h-0 flex-1 columns-[11rem] gap-x-5 overflow-hidden @[8rem]:block">
+          <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
+            <ul className="h-full" style={FILL_GRID}>
             {ordered.map((s) => {
               const state = s.state as ServiceState;
               return (
-                <li key={s.id} className="flex min-h-6 min-w-0 break-inside-avoid items-center justify-between gap-2">
+                <li key={s.id} className="flex min-w-0 items-center justify-between gap-2">
                   <span className="flex min-w-0 items-baseline gap-2">
-                    <span className="truncate text-xs">{s.label}</span>
-                    <span className="shrink-0 text-xs" style={{ color: STATE_TONE[state] }}>
+                    <span className="truncate">{s.label}</span>
+                    <span className="shrink-0" style={{ color: STATE_TONE[state] }}>
                       {STATE_LABEL[state]}
                     </span>
                   </span>
@@ -120,6 +144,7 @@ export default async function ServiceControlWidget({ ctx }: ModuleWidgetProps) {
               );
             })}
           </ul>
+          </div>
         </>
       )}
 

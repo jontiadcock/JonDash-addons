@@ -26,6 +26,21 @@ import mcp from "@/helpers/mcp/api";
  * `LAN`, in the danger colour.
  */
 
+/**
+ * Makes THIS WIDGET its own size container, which is what lets the figure below be capped against
+ * the card height as well as its width.
+ *
+ * Core deliberately leaves the dashboard frame on `container-type: inline-size`, so `cqh` there
+ * would silently resolve against the viewport. Declaring size containment on the widget root fixes
+ * that for our own subtree only: the root is `h-full` inside a sized grid cell, so its height is
+ * definite, and if the assumption were ever wrong the damage is confined to this one tile rather
+ * than the whole dashboard — which is exactly why core would not make the same change globally.
+ *
+ * `@[6rem]:` classes on children now resolve against this element instead of the frame. Same
+ * width, so nothing changes.
+ */
+const SIZE_CONTAINER = { containerType: "size" } as const;
+
 const MODULE_PATH = "/m/mcp-server";
 export default async function McpWidget({ ctx }: ModuleWidgetProps) {
   const s = await mcp(ctx).status();
@@ -48,7 +63,10 @@ export default async function McpWidget({ ctx }: ModuleWidgetProps) {
       : "var(--text-success, inherit)";
 
   return (
-    <div className="card flex h-full min-w-0 flex-col overflow-hidden p-2 @[8rem]:p-4">
+    <div
+      className="card flex h-full min-w-0 flex-col justify-center overflow-hidden p-2 @[8rem]:p-4"
+      style={SIZE_CONTAINER}
+    >
       <div className="hidden items-center justify-between gap-2 @[6rem]:flex">
         <p className="truncate text-xs font-medium @[8rem]:text-sm">AI assistant access</p>
         <Link
@@ -63,9 +81,12 @@ export default async function McpWidget({ ctx }: ModuleWidgetProps) {
       <p className="truncate font-medium @[6rem]:hidden" style={{ color: tone }}>
         {short}
       </p>
+      {/* Scales with the tile so a large card leads with the state rather than a 14px line.
+          Capped against the HEIGHT as well, so a wide short tile does not push the lines below it
+          out of the card. cqh works here only because the root declares size containment. */}
       <p
-        className="mt-1 hidden truncate text-xs font-medium @[6rem]:block @[8rem]:text-sm"
-        style={{ color: tone }}
+        className="mt-1 hidden truncate font-medium @[6rem]:block"
+        style={{ color: tone, fontSize: "min(clamp(0.75rem, 4cqw, 2.5rem), 18cqh)" }}
       >
         {verdict}
       </p>

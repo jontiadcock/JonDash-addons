@@ -26,6 +26,29 @@ import { MODULE_PATH, STATE_TONE, type ContainerState } from "../lib/constants";
 /** See `service-control`: a guard against an unbounded list, not a layout size. */
 const TILE_CAP = 24;
 
+/**
+ * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
+ * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
+ * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * so a few rows spread one-per-column across the top and left the rest of the card empty).
+ *
+ * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
+ * sideways, so a tall tile is one long list and a wide short one flows into columns.
+ *
+ * Inline rather than Tailwind because `minmax()` and `repeat()` contain parentheses, and on the
+ * versions this module supports such a class generates no CSS at all.
+ */
+const FILL_GRID = {
+  display: "grid",
+  gridAutoFlow: "column",
+  gridTemplateRows: "repeat(auto-fit, minmax(1rem, 1fr))",
+  gridAutoColumns: "minmax(11rem, 1fr)",
+  columnGap: "1.25rem",
+  overflow: "hidden",
+  fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
+} as const;
+
+
 export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
   const api = docker(ctx);
   const status = await api.status();
@@ -90,7 +113,7 @@ export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
         </Link>
       </div>
 
-      <p className="truncate font-medium" style={{ color: tone }}>
+      <p className="truncate font-medium" style={{ color: tone, fontSize: "clamp(0.875rem, 4cqw, 1.75rem)" }}>
         {/* The 1×1 form: a number in the colour of the worst thing that is true. */}
         <span className="@[6rem]:hidden">
           {unhealthy.length > 0
@@ -99,7 +122,7 @@ export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
               ? `${stopped.length}`
               : running.length}
         </span>
-        <span className="hidden text-xs @[6rem]:inline @[8rem]:text-sm">
+        <span className="hidden @[6rem]:inline">
           {unhealthy.length > 0
             ? `${unhealthy.length} unhealthy`
             : stopped.length > 0
@@ -110,9 +133,10 @@ export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
         </span>
       </p>
 
-      <ul className="mt-2 hidden min-h-0 flex-1 columns-[11rem] gap-x-5 gap-y-1 overflow-hidden text-xs @[8rem]:block">
+      <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
+            <ul className="h-full" style={FILL_GRID}>
         {ordered.map((c) => (
-          <li key={c.id} className="flex min-w-0 break-inside-avoid items-center justify-between gap-2">
+          <li key={c.id} className="flex min-w-0 items-center justify-between gap-2">
             <span className="truncate">{c.name}</span>
             <span
               className="shrink-0"
@@ -123,6 +147,7 @@ export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
           </li>
         ))}
       </ul>
+          </div>
     </div>
   );
 }

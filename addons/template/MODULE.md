@@ -7,7 +7,8 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.8-beta.1
+- **Version:** see [`addons.json`](../../addons.json) on this branch — stable on `main`, beta on `beta`.
+  Deliberately not restated here: it drifts the moment a version is published.
 - **Minimum JonDash version:** `1.8.0-beta.14` — the oldest build that genuinely works, not the newest
   available. Declared as the **pre-release** on purpose: semver ranks `1.8.0-beta.14` *below* `1.8.0`,
   so naming the pre-release is what lets it install on that series' betas too. Copy this habit — and
@@ -83,17 +84,25 @@ you. It needs no other context.
 > **If your widget shows a list, do not write `items.slice(0, 6)`.** A constant row count was picked
 > for one box size and is wrong at every other — clipped when small, half-empty when large.
 
-> ### Trap: a Tailwind class containing `(` silently does nothing
+> ### Before JonDash 1.8.2, a Tailwind class containing `(` silently did nothing
 >
 > Installed modules live in a gitignored folder that Tailwind never scans, so core mirrors your class
-> names into an allowlist instead — and that mirror **drops every token containing parentheses**. In a
-> module, `text-[clamp(1rem,22cqw,2rem)]`, `w-[calc(100%-2rem)]` and `bg-(--brand)` therefore produce
-> **no CSS at all**: the class sits on the element, nothing styles it, and neither the build nor the
-> verifier says a word.
+> names into an allowlist instead. **Up to and including 1.8.1 that mirror dropped every token
+> containing parentheses**, so a class holding any CSS function — a `clamp()` font size, a `calc()`
+> width, the `bg-(--var)` shorthand — produced **no CSS at all**: the class sat on the element,
+> nothing styled it, and neither the build nor the verifier said a word.
 >
-> Only CSS *functions* are affected — `@[6rem]:block`, `w-[46%]` and the rest are fine. Put fluid
-> sizing in an inline `style={{ fontSize: "clamp(...)" }}` instead; inline styles are never scanned, so
-> they are immune. Verified on 1.8.1-beta.1 and reported to core.
+> **Fixed in 1.8.2**, so if your module requires 1.8.2 or newer you can write those classes normally.
+>
+> **This module still targets 1.8.0-beta.14**, so its fluid sizing lives in an inline
+> `style={{ fontSize: … }}`. That is the safe choice whenever your floor is below 1.8.2 — inline styles
+> are never scanned, so they work on every version — and you would already be reaching for one to use a
+> theme token like `var(--muted)`. Raise your floor to 1.8.2 first, or keep the inline form.
+>
+> The general lesson outlives the bug: **anything that reads your source with a regex reads your
+> comments too.** Keep literal class syntax out of `.ts` comments — the mirror picks tokens out of
+> backtick spans as readily as out of real `className` strings, and an invalid one can take the CSS
+> build down rather than merely doing nothing.
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
@@ -216,6 +225,7 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.8-beta.2 | **Fills the card instead of huddling in its top-left corner.** The previous beta was measured only for overflow, and an empty card overflows nothing — so a large tile showed a few rows across the top and left most of itself blank. Two mechanisms were wrong before this one: flex `flex-wrap` ran columns off the side of the card, and CSS `columns` fixed that but *balances*, spreading a handful of rows one-per-column across the top. It is now a grid whose rows are `1fr`, so they stretch to use the height, flowing into another column only once the height is spent. Measured fill went from about 10% to 86–96% of the card on large tiles, with nothing cut at any normal size. The figure also scales with the tile and is capped against its height as well as its width — the widget root now declares its own size containment, which is what makes `cqh` mean the card rather than the browser window. |
 | 0.0.8-beta.1 | **The widget is now the reference implementation for sizing (JonDash 1.8.0 B5/B6).** The dashboard became a grid of square units a user can size from 1×1 upward, and the frame clips rather than scrolls — so the widget now adapts to its *container* (`@[6rem]:`, `@[8rem]:` — core's own two thresholds) instead of the viewport, with the count scaling between a floor and a ceiling. Verified at every width from 40px to 993px with nothing clipped. Also documents a trap found while building it: a Tailwind class containing parentheses produces **no CSS** in a module, so fluid sizing goes in an inline `style`. `minAppVersion` rises to `1.8.0-beta.14` (the exact build that made the frame a container) — this is a real floor, not caution: on older builds the frame is not a CSS container, so the labels would be permanently hidden. |
 | 0.0.6 | **The template depends on nothing again.** The `scheduler` helper and the six-hourly `tidy` schedule added in 0.0.4-beta.1 are gone: a starter module should not drag a dependency in with it, and copying this now gives you something that installs entirely on its own. Helpers and `schedules` are still documented — as an option, with the syntax, in `module.ts` and in `AI-PROMPT.md` — just not used. `minAppVersion` drops back to `1.4.1-beta.1`, the genuine floor (migration 002), so the template works on far more installs. First version published to **both** channels since 0.0.1. |
 | 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module could actually be installed — 0.0.4-beta.1 was refused on every build that existed. No code change. |
