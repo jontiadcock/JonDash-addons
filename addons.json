@@ -27,13 +27,13 @@
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.7",
-      "minAppVersion": "1.4.1-beta.1",
+      "version": "0.0.8-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "audit:write"
       ],
       "path": "addons/template",
-      "tag": "template/v0.0.7",
+      "tag": "template/v0.0.8-beta.1",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {

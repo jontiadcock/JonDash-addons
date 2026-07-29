@@ -7,10 +7,14 @@ parts working together, then copy the folder and make it yours.
 page and nothing else; uninstalling removes it completely. Ordinary users can ignore it.
 
 - **Module id:** `template`
-- **Version:** 0.0.6
-- **Minimum JonDash version:** `1.4.1-beta.1` — the oldest build that genuinely works, not the newest
-  available. Declared as the **pre-release** on purpose: semver ranks `1.4.1-beta.1` *below* `1.4.1`,
-  so naming the pre-release is what lets it install on that series' betas too. Copy this habit.
+- **Version:** 0.0.8-beta.1
+- **Minimum JonDash version:** `1.8.0-beta.14` — the oldest build that genuinely works, not the newest
+  available. Declared as the **pre-release** on purpose: semver ranks `1.8.0-beta.14` *below* `1.8.0`,
+  so naming the pre-release is what lets it install on that series' betas too. Copy this habit — and
+  copy how the number was arrived at: `beta.14` is the exact build in which the dashboard frame became
+  a CSS container, found by checking the tags rather than guessing a round number. Too low and the
+  widget installs somewhere its labels can never appear; too high and it is refused by builds that
+  would have run it perfectly.
 - **Permissions requested:** `audit:write` — see [Permissions](#what-you-get-without-asking-for-anything)
 - **Depends on:** nothing. No helpers, no background work — copy this and you get a module that
   installs entirely on its own. Helpers are covered below as an option, not used here.
@@ -63,6 +67,33 @@ you. It needs no other context.
 > module it belongs to. It builds and typechecks perfectly either way, so the **only** thing that
 > catches it is opening the dashboard and looking — or a test that renders the component and asserts
 > the markup.
+
+> ### Your widget must fit any box, from 1×1 up (JonDash 1.8.0+)
+>
+> The dashboard is a grid of square units, the user can size your widget anywhere from **1×1 to full
+> width**, and **the frame clips — it does not scroll.** Anything that doesn't fit is simply invisible,
+> and nobody is told.
+>
+> Size against the **container**, never the viewport: the frame is a CSS `@container`, so use
+> `@[6rem]:` and `@[8rem]:`, not `sm:`/`md:`/`lg:`. A 1×1 widget on a 4K monitor is still tiny, and
+> `lg:` would hand it the roomy layout. Core's own service tiles change shape at those two widths —
+> match them and a mixed dashboard reflows as one system instead of raggedly. `widget.tsx` in this
+> module is the worked example; copy its structure.
+>
+> **If your widget shows a list, do not write `items.slice(0, 6)`.** A constant row count was picked
+> for one box size and is wrong at every other — clipped when small, half-empty when large.
+
+> ### Trap: a Tailwind class containing `(` silently does nothing
+>
+> Installed modules live in a gitignored folder that Tailwind never scans, so core mirrors your class
+> names into an allowlist instead — and that mirror **drops every token containing parentheses**. In a
+> module, `text-[clamp(1rem,22cqw,2rem)]`, `w-[calc(100%-2rem)]` and `bg-(--brand)` therefore produce
+> **no CSS at all**: the class sits on the element, nothing styles it, and neither the build nor the
+> verifier says a word.
+>
+> Only CSS *functions* are affected — `@[6rem]:block`, `w-[46%]` and the rest are fine. Put fluid
+> sizing in an inline `style={{ fontSize: "clamp(...)" }}` instead; inline styles are never scanned, so
+> they are immune. Verified on 1.8.1-beta.1 and reported to core.
 
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
@@ -185,6 +216,7 @@ Use a scratch install, not the one you rely on.
 
 | Version | Notes |
 | ------- | ----- |
+| 0.0.8-beta.1 | **The widget is now the reference implementation for sizing (JonDash 1.8.0 B5/B6).** The dashboard became a grid of square units a user can size from 1×1 upward, and the frame clips rather than scrolls — so the widget now adapts to its *container* (`@[6rem]:`, `@[8rem]:` — core's own two thresholds) instead of the viewport, with the count scaling between a floor and a ceiling. Verified at every width from 40px to 993px with nothing clipped. Also documents a trap found while building it: a Tailwind class containing parentheses produces **no CSS** in a module, so fluid sizing goes in an inline `style`. `minAppVersion` rises to `1.8.0-beta.14` (the exact build that made the frame a container) — this is a real floor, not caution: on older builds the frame is not a CSS container, so the labels would be permanently hidden. |
 | 0.0.6 | **The template depends on nothing again.** The `scheduler` helper and the six-hourly `tidy` schedule added in 0.0.4-beta.1 are gone: a starter module should not drag a dependency in with it, and copying this now gives you something that installs entirely on its own. Helpers and `schedules` are still documented — as an option, with the syntax, in `module.ts` and in `AI-PROMPT.md` — just not used. `minAppVersion` drops back to `1.4.1-beta.1`, the genuine floor (migration 002), so the template works on far more installs. First version published to **both** channels since 0.0.1. |
 | 0.0.5-beta.1 | `minAppVersion` corrected from `1.5.0` to `1.5.0-beta.1`, so the module could actually be installed — 0.0.4-beta.1 was refused on every build that existed. No code change. |
 | 0.0.4-beta.1 | **Uninstallable — never use.** Declared the `scheduler` helper and a `schedules` entry (a six-hourly tidy of finished items). Removed again in 0.0.6. Required JonDash 1.5.0. |

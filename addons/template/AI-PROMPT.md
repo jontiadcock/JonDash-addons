@@ -91,6 +91,18 @@ THE ModuleDefinition (module.ts):
                                    //   the page background next to properly framed ones, with nothing
                                    //   saying which module it is. This builds and typechecks happily,
                                    //   so ONLY looking at the dashboard catches it.
+                                   //   SIZE AGAINST THE CONTAINER, NOT THE VIEWPORT (1.8.0+). The
+                                   //   grid is square units, the user picks anything from 1x1 to full
+                                   //   width, and THE FRAME CLIPS RATHER THAN SCROLLS. The frame is a
+                                   //   CSS @container, so use @[6rem]: and @[8rem]: — core's own two
+                                   //   thresholds — never sm:/md:/lg:, which measure the window and
+                                   //   would give a 1x1 widget on a 4K screen the roomy layout.
+                                   //   Under 6rem: essential value only. 6rem+: labels, text-xs.
+                                   //   8rem+: full spacing (gap-3 p-5 text-sm). Scale with a
+                                   //   proportion + floor + ceiling, as core does with
+                                   //   w-[46%] min-w-7 max-w-16. NEVER items.slice(0, 6): a constant
+                                   //   row count is wrong at every size but the one it was picked for.
+                                   //   See widget.tsx here for the worked example.
     Page?: Component;              // props: { ctx, path: string[] }, served at /m/<id>
     SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Addons -> your module,
                                    //   BELOW the auto-generated settings fields (not instead of
@@ -209,6 +221,14 @@ added column a DEFAULT, and treat migrations as forward-only.
 LOOKING NATIVE: reuse the app's own classes (card, btn, btn-primary, btn-danger, input) and CSS
 variables (var(--muted), var(--primary), var(--danger), var(--border)) so the module matches light and
 dark mode without any styling of its own.
+
+A TAILWIND TRAP THAT FAILS SILENTLY: a class containing PARENTHESES produces no CSS in a module.
+Installed modules live in a gitignored folder Tailwind never scans, so the app mirrors your class names
+into an allowlist — and that mirror drops every token with a "(" in it. So text-[clamp(1rem,22cqw,2rem)],
+w-[calc(100%-2rem)] and bg-(--brand) all render UNSTYLED: the class is on the element, nothing defines
+it, and neither the build, the linter nor the verifier warns you. Only CSS functions are affected —
+@[6rem]:block and w-[46%] are fine. Put fluid sizing in an inline style={{ fontSize: "clamp(...)" }};
+inline styles are never scanned, so they always work. (Verified on 1.8.1-beta.1.)
 
 ONE MORE TRAP, because it produces a confusing error: a "use client" component must not import
 anything that itself imports "server-only" — directly or further down the chain. The build fails with
