@@ -62,8 +62,8 @@
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.5",
-      "minAppVersion": "1.7.2-beta.1",
+      "version": "0.0.6-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "system-metrics:read"
       ],
@@ -71,7 +71,7 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.5",
+      "tag": "host-vitals/v0.0.6-beta.1",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
