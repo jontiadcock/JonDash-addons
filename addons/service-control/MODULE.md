@@ -69,3 +69,9 @@ everything outside the approved list comes back marked uncontrollable.
 By default an action raises a request an administrator approves. Per service, they may instead allow
 it to run **without asking** — automation is the point (a health check restarting a hung service at
 3am cannot wait for a person) but it is never a default, and never something this module can set.
+
+## Version history
+
+| Version | Notes |
+| ------- | ----- |
+| 0.0.6-beta.1 | **The tile now fits any size the user gives it (JonDash 1.8.0 B5/B6).** The dashboard became a grid of square units you can size from 1×1 upward, and the frame clips rather than scrolls, so the tile now shows only what genuinely fits: at 1×1 a single figure, from ~6rem the name and summary, from ~8rem the detail list. Rows are one line each and flow into extra columns when the tile is wide and short, and they are in priority order so anything clipped is always the least urgent thing. `minAppVersion` rises to `1.8.0-beta.14` — the exact build where the dashboard frame became a CSS `@container`; on anything older the container queries never match and the labels could never appear. **`.slice(0, 6)` is gone.** Stopped services now sort first. The start/stop buttons appear from ~14rem and every row has a fixed minimum height, so rows stay even whether or not a service can be controlled — uneven rows made the column flow ragged. A 24-row cap remains as a guard against an allowlist with hundreds of entries; how many you see still follows the tile. |

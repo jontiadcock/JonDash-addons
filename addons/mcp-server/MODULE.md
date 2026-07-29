@@ -4,8 +4,8 @@ Lets an AI assistant read and manage this server through the Model Context Proto
 create and can revoke at any time.
 
 - **Module id:** `mcp-server`
-- **Version:** `0.0.1-beta.2`
-- **Requires:** JonDash `1.7.3-beta.2` or newer, and the `mcp` helper (installed automatically).
+- **Version:** see [`addons.json`](../../addons.json) on this branch — stable on `main`, beta on `beta`. Deliberately not restated here: it drifts the moment a version is published.
+- **Requires:** JonDash `1.8.0-beta.14` or newer, and the `mcp` helper (installed automatically). That floor is the exact build in which the dashboard frame became a CSS `@container` — the tile sizes itself against it, and on anything older its labels could never appear. (The older floor of `1.7.3-beta.2`, which the `mcp` helper needs, is still met.)
 - **Permissions:** `mcp:read` only — deliberately **not** `mcp:act` or `mcp:admin`. See below.
 
 > **Connecting an assistant: [CONNECTING.md](./CONNECTING.md)** — the technical guide. Endpoint,
@@ -79,5 +79,6 @@ settings that control it.
 
 | Version | What changed |
 | ------- | ------------ |
+| `0.0.2-beta.1` | **The tile now fits any size the user gives it (JonDash 1.8.0 B5/B6).** The dashboard became a grid of square units you can size from 1×1 upward, and the frame clips rather than scrolls, so the tile now shows only what genuinely fits: at 1×1 a single figure, from ~6rem the name and summary, from ~8rem the detail list. Rows are one line each and flow into extra columns when the tile is wide and short, and they are in priority order so anything clipped is always the least urgent thing. `minAppVersion` rises to `1.8.0-beta.14` — the exact build where the dashboard frame became a CSS `@container`; on anything older the container queries never match and the labels could never appear. Four short lines, so this one mostly survived already — but **“open to your network” must stay legible at every size**, so the 1×1 form is the word `LAN` in the danger colour rather than a neutral “on”. A security state the user shrank into invisibility is the worst possible failure for this tile. |
 | `0.0.1-beta.2` | The dashboard tile drew no card, so it rendered as loose text — a nameless box reading "Off", with no way to click through. Also corrected the menu this points you at: the controls are under **Admin → Addons → Shared capabilities**, not Permissions. Both found by loading the dashboard after a real install; the build was green throughout. |
 | `0.0.1-beta.1` | First release, alongside `mcp` helper `0.0.1-beta.1`. |

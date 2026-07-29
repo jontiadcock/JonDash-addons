@@ -23,11 +23,19 @@ import { collectFor } from "../lib/groups";
  *
  * 1. **Core's two container thresholds** (`@[6rem]`, `@[8rem]`) decide how much *kind* of
  *    content appears — verdict alone, then the header, then the detail list.
- * 2. **`flex-col flex-wrap` on the detail list.** The frame is `container-type: inline-size`,
- *    so a container query can ask how WIDE this widget is but never how TALL — and a 12×1
- *    widget is both very wide and very short. Column-wrap needs no query: rows fill downward
- *    until they run out of height, then start a new column. Tall and narrow gives one column;
- *    short and wide gives several. It adapts to the dimension CSS won't let us ask about.
+ * 2. **CSS multi-column (`columns-[11rem]`) on the detail list.** The frame is
+ *    `container-type: inline-size`, so a container query can ask how WIDE this widget is but
+ *    never how TALL — and a 12×1 widget is both very wide and very short. Multi-column needs no
+ *    query: rows fill downward until they run out of height, then continue in a new column.
+ *    Tall and narrow gives one column; short and wide gives several.
+ *
+ *    **It has to be `columns`, not `flex-wrap`, and that took a wrong turn to learn.** Flex
+ *    column-wrap looks like the same thing and is not: it starts a new column whenever it runs
+ *    out of *height*, with no regard for whether there is *width* left — so a narrow tile with a
+ *    few too many rows grew columns straight off the side of the card, half-cutting text at the
+ *    edge. `columns` derives the column count *from* the width, so the columns always fit and
+ *    anything that doesn't is cleanly out of sight rather than sliced in half. `break-inside-avoid`
+ *    on each row stops a row being split across a column boundary.
  * 3. **Priority order.** Whatever still doesn't fit is clipped, so the order is the design:
  *    verdict, CPU, memory, then disks **fullest first** — not mount order, because the disk
  *    that matters is the full one. Uptime is last because it is the least urgent thing here.
@@ -106,7 +114,7 @@ function totalNet(m: Snapshot): { rx: number; tx: number } | null {
  * that broke short widgets: it made a disk row 26px tall and the memory row 46px, so in a
  * 6×1 widget — where the whole list gets about 19px — those rows spilled straight out of the
  * card while the plain one-line rows fitted. Behind the text instead, **every row is exactly
- * one line tall**, which makes the column-wrap below predictable at any shape and costs no
+ * one line tall**, which makes the column flow below predictable at any shape and costs no
  * information: width still reads as "how full", colour still reads as "how worried".
  *
  * `min(3px, var(--radius-control))` rather than a hardcoded 3: the radius token runs from
@@ -125,7 +133,7 @@ function Row({
   children: ReactNode;
 }) {
   return (
-    <div className="relative flex min-w-0 items-center justify-between gap-3">
+    <div className="relative flex min-w-0 break-inside-avoid items-center justify-between gap-3">
       {usedPct !== undefined && (
         <span
           aria-hidden
@@ -194,13 +202,15 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
       </p>
 
       {/*
-        `flex-col flex-wrap` with a bounded height is what makes this fit without a height
-        query: rows stack downward, and when they run out of room they start a new column
-        instead of being clipped. `min-h-0` is what bounds it — without that the flex child
-        grows to its content and the wrap never happens.
+CSS multi-column with a bounded height is what makes this fit without a height query:
+        rows stack downward, and when they run out of room they continue in a new column.
+        `min-h-0` is what bounds it — without that the flex child grows to its content and no
+        column break ever happens. `columns-[11rem]` sets a column WIDTH, so the browser fits as
+        many columns as the card can actually hold; `flex-wrap` would have made as many as the
+        rows demanded and let them run off the edge.
       */}
       <dl
-        className="mt-2 hidden min-h-0 flex-1 flex-col flex-wrap content-start gap-x-5 gap-y-1.5 overflow-hidden text-xs @[8rem]:flex"
+        className="mt-2 hidden min-h-0 flex-1 columns-[11rem] gap-x-5 gap-y-1.5 overflow-hidden text-xs @[8rem]:block"
         style={{ color: "var(--muted)" }}
       >
         <Row label="CPU">

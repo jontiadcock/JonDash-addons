@@ -13,6 +13,8 @@ etc.) — different repo, different concern. `VERSIONING.md` here is how anythin
 Stable IDs that never change and are never reused, so a reference always resolves:
 - **`AM-##`** — an add-on **module** (a product installed from Browse).
 - **`AH-##`** — a **helper** (first-party privileged capability a module depends on).
+- **`AT-##`** — **tooling** for add-on authors. Not a product; the things that make a third party's
+  module correct before it reaches anyone.
 
 Status: ⏳ Planned · ▶️ In progress · 🔨 Built (unpublished) · ✅ Shipped · 🧊 Backlog · 🌅 Someday.
 When an item ships it leaves the build queue; its catalog entry records the version and stays for
@@ -57,6 +59,10 @@ A helper is built with or just before its first consumer.
 6. ⏳ **AH-05 `host-install`** — same elevation model as AH-04, so it follows it.
 7. ⏳ **AH-03 `wireguard` helper** → **AM-03 VPN access manager** — highest value, heaviest, and the
    most dangerous consent. Its Tailscale slice needs no helper and could come earlier if wanted.
+8. ⏳ **AT-01 Add-on conformance kit** — added 2026-07-29 at the owner's request. Not a product, so it
+   never competes with a module for attention — but it is the only item here that improves *every*
+   third-party module, including ones nobody has written yet. Slottable anywhere; the earlier it
+   lands, the fewer broken modules exist to fix.
 
 ---
 
@@ -217,6 +223,59 @@ path, the consent roll-up and the prune all run through a consuming module.
   out and the helper's `admin.*` API was deleted outright. Modules now have no mutator at all, which
   is HELPERS-DESIGN rule 8.
 - **Promoted to stable 2026-07-26**, once JonDash 1.7.2 reached the stable channel.
+
+### AT — Author tooling
+
+#### AT-01 — Add-on conformance kit: one command a third party can run, and a CI action ⏳
+
+**The problem.** Today an author who wants to know *"will my module actually install, and does it meet
+the guidelines?"* has to: stand up a whole JonDash from a release tag, `npm install` it, copy their
+folder into `modules/`, regenerate the registry, hand-write a `verify.mts` from a snippet pasted in
+`AI-PROMPT.md`, and run four separate checks — three of which only exist in **this private-ish repo**
+(`check-manifest.mjs`, `check-module-files.mjs`, `check-docs.mjs`) and are not published anywhere an
+outsider can get them. Nobody outside this project is going to do that, so in practice **third-party
+modules will be published untested.**
+
+The costs are already demonstrated, not hypothetical:
+- `backup-manager@0.1.1-beta.1` shipped **uninstallable** — a test file imported core internals, and
+  every check an author normally runs (tsc, eslint, build, Vitest) passed.
+- A Tailwind class containing `(` produces **no CSS** in a module and nothing warns
+  ([[tailwind-parens-dropped-in-modules]]).
+- Widgets that clip at 1×1 build perfectly and only fail visually.
+
+**The shape.** Two deliverables from one core:
+
+1. **`npx jondash-verify`** — a runnable checker an author points at their module folder. Downloads
+   the pinned JonDash release itself, so the author needs no instance. Reports pass/fail per rule with
+   the rule's *reason*, not just its name.
+2. **A reusable GitHub Action** (`jontiadcock/jondash-verify-action`) so a module repo gets the same
+   check on every push, and a manifest tag can be gated on it.
+
+**What it must check** — everything currently spread across four scripts plus the traps that have
+actually bitten:
+
+| Check | Why it exists |
+| ----- | ------------- |
+| The **real** `verifyModuleFiles` from the pinned release | the only check that matches the installer |
+| Whole folder scanned, **tests included** | tests ship, and a test importing `@/lib/db` makes the module uninstallable |
+| `permissions` in `addons.json` **exactly** match `module.ts` | a mismatch is refused at install, not warned |
+| Tag exists; `path`, `tag`, `version`, `minAppVersion` agree | a missing tag is a 404 for every user |
+| Pre-release named on beta (`1.8.0-beta.14`, not `1.8.0`) | a bare release version is refused on that series' betas |
+| Table prefix is `mod_<id>_`, dashes → underscores | silent data collisions otherwise |
+| Migrations forward-only; no edit to a shipped file | it has already run elsewhere and will not run again |
+| **No Tailwind class containing `(`** | generates no CSS in a module; nothing else warns |
+| Widget renders without clipping at 1×1 | the frame clips rather than scrolls (B5/B6) |
+| `MODULE.md` exists and documents every permission | the consent screen is only as honest as this |
+
+**Open question for the owner:** the verifier's source of truth lives in core (`lib/modules/verify`),
+so publishing a checker means either vendoring that file per release, or core exporting it. Vendoring
+is simpler and can start today; asking core to publish it is cleaner and is a cross-session decision.
+
+**Why it is worth doing before the catalogue grows.** Every guideline that is only written down is a
+guideline that will be broken, and each broken one costs the *user* an install that fails or a widget
+that looks wrong. This is the item that turns the authoring docs from advice into something with
+teeth — and it is the difference between "third parties can write modules" and "third parties can
+write modules that work."
 
 ### AH — Helpers
 

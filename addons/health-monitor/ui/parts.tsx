@@ -37,6 +37,28 @@ export function StatusDot({ state, size = 10 }: { state: MonitorState; size?: nu
   );
 }
 
+/**
+ * The 24-hour strip drawn INSIDE a row rather than under it — absolutely positioned into the
+ * row's bottom padding, so it costs no height.
+ *
+ * That sounds like a detail and is the whole reason the widget survives being resized. A strip
+ * on its own line made every monitor row about 34px tall; a widget one grid unit high gives its
+ * list roughly 19px, so those rows spilled straight out of the card while one-line rows fitted.
+ * Anything that grows a row vertically has to be paid for at the smallest size the user can
+ * choose — and since a container query can only report WIDTH, a wide-and-short widget will
+ * happily tell you there is room when there is none. So: never add height, overlay instead.
+ */
+export function InlineStatusStrip({ buckets }: { buckets: HourBucket[] }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ position: "absolute", insetInline: 0, bottom: 0, height: 3, opacity: 0.85 }}
+    >
+      <StatusStrip buckets={buckets} height={3} />
+    </span>
+  );
+}
+
 /** Which state an hour of checks represents. No checks = no data, not "healthy". */
 function bucketState(b: HourBucket): MonitorState {
   if (b.checks === 0) return "unknown";

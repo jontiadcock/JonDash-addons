@@ -8,8 +8,8 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.7",
-      "minAppVersion": "1.5.0-beta.1",
+      "version": "0.0.8-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "network:outbound",
         "crypto:use",
@@ -20,7 +20,7 @@
         "scheduler"
       ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.7",
+      "tag": "health-monitor/v0.0.8-beta.1",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
@@ -40,8 +40,8 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.2.3",
-      "minAppVersion": "1.7.2-beta.2",
+      "version": "0.2.4-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "filesystem:read",
         "filesystem:write",
@@ -55,14 +55,14 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.2.3",
+      "tag": "backup-manager/v0.2.4-beta.1",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.6-beta.1",
+      "version": "0.0.6-beta.2",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "system-metrics:read"
@@ -71,15 +71,15 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.6-beta.1",
+      "tag": "host-vitals/v0.0.6-beta.2",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.5",
-      "minAppVersion": "1.7.2-beta.1",
+      "version": "0.0.6-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "host-services:read",
         "host-services:control"
@@ -88,15 +88,15 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.5",
+      "tag": "service-control/v0.0.6-beta.1",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
     },
     {
       "id": "docker-manager",
       "name": "Docker manager",
       "description": "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
-      "version": "0.0.4",
-      "minAppVersion": "1.7.2-beta.1",
+      "version": "0.0.5-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "docker:read",
         "docker:logs",
@@ -109,15 +109,15 @@
         "host-install"
       ],
       "path": "addons/docker-manager",
-      "tag": "docker-manager/v0.0.4",
+      "tag": "docker-manager/v0.0.5-beta.1",
       "notes": "Same as the 0.0.3 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
     },
     {
       "id": "mcp-server",
       "name": "AI assistant access",
       "description": "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
-      "version": "0.0.1",
-      "minAppVersion": "1.7.3-beta.2",
+      "version": "0.0.2-beta.1",
+      "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "mcp:read"
       ],
@@ -125,7 +125,7 @@
         "mcp"
       ],
       "path": "addons/mcp-server",
-      "tag": "mcp-server/v0.0.1",
+      "tag": "mcp-server/v0.0.2-beta.1",
       "notes": "Penetration tested. Two controls this claimed but never implemented now exist: a per-source block after repeated bad keys, and network exposure is refused without HTTPS unless you confirm. Audit-log search now matches literal text. Nothing security-critical was breakable."
     }
   ],

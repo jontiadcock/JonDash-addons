@@ -6,10 +6,7 @@ healthy.
 
 - **Module id:** `backup-manager`
 - **Version:** see [`addons.json`](../../addons.json) on this branch — stable on `main`, beta on `beta`. Deliberately not restated here: it drifts the moment a version is published, and both docs that carried it were stale.
-- **Minimum JonDash version:** `1.5.2-beta.1` — the **pre-release**, deliberately. Semver ranks
-  `1.5.2-beta.1` *below* `1.5.2`, so a bare `"1.5.2"` would be refused on every 1.5.2 beta, which is
-  exactly what beta-channel users run. 1.5.2 is the release that added `ctx.can()` enforcement, which
-  the filesystem helper needs.
+- **Minimum JonDash version:** `1.8.0-beta.14` — the **pre-release**, deliberately. Semver ranks it *below* `1.8.0`, so a bare `"1.8.0"` would be refused on every 1.8.0 beta, which is what beta-channel users run. `beta.14` is the exact build in which the dashboard frame became a CSS `@container`; on anything older the tile’s container queries never match and its labels could never appear. (The older floor of 1.5.2 — the release that added `ctx.can()` enforcement, which the filesystem helper needs — is still met, just no longer binding.)
 - **Permissions requested:** `filesystem:read`, `filesystem:write`, `filesystem:delete`, `email:send`,
   `network:outbound`, `audit:write`
 - **Helpers required:** `filesystem` (pinned to at least `0.0.3-beta.1`) and `scheduler` — both
@@ -118,6 +115,7 @@ backup's own `nextRunAt`. That is what makes "every night at 2am" possible witho
 
 | Version | Notes |
 | ------- | ----- |
+| 0.2.4-beta.1 | **The tile now fits any size the user gives it (JonDash 1.8.0 B5/B6).** The dashboard became a grid of square units you can size from 1×1 upward, and the frame clips rather than scrolls, so the tile now shows only what genuinely fits: at 1×1 a single figure, from ~6rem the name and summary, from ~8rem the detail list. Rows are one line each and flow into extra columns when the tile is wide and short, and they are in priority order so anything clipped is always the least urgent thing. `minAppVersion` rises to `1.8.0-beta.14` — the exact build where the dashboard frame became a CSS `@container`; on anything older the container queries never match and the labels could never appear. **`.slice(0, 4)` is gone.** Jobs were already sorted worst-first, so the frame clipping the tail now always clips the healthiest job — the old fixed count did the opposite badly, hiding failing backups on a large tile and overflowing a small one. |
 | 0.1.1 | Fixes the dashboard tile, which drew no card of its own. `WidgetFrame` supplies a grid cell and nothing else, so the tile had been rendering as loose text on the dashboard background next to properly framed ones, with nothing naming which module it was. It now draws its own card, titled, with a link into the module. It typechecked and built cleanly throughout, so the regression test asserts the rendered markup rather than the code compiling. *(`beta.1` of this version was refused by the installer — it shipped a test needing core internals, and a module's tests ship and are scanned. Fixed in `beta.2` by moving that test out of the module.)* |
 | 0.1.0 | A dashboard tile, a page per backup with history and an activity chart, and a warning when a run copies far less than usual. Day-of-week schedules ("2am on weekdays"), retry with backoff, a concurrency cap, cancel, clone, a destination reachability check before starting, and an optional weekly summary. Adds migration `002`. |
 | 0.0.1 | First release. Scheduled `sync` and `snapshot` copies, grandfather-father-son retention with a preview, per-run logs, and failure/stale alerts by email or webhook. |
