@@ -252,6 +252,22 @@ anything that itself imports "server-only" — directly or further down the chai
 a misleading message about the Pages Router. Keep constants and types a client component needs in a
 plain file with no server imports.
 
+SCREENSHOTS (optional, but they are the only look anyone gets before installing). Put the image files
+IN the module folder and declare them on your manifest entry:
+  "screenshots": [{ "file": "widget.png", "caption": "The dashboard tile, at a glance" }]
+Max 4. png/jpg/jpeg/webp. 1MB each. Caption optional, plain text, 80 chars. Aim for 16:10 and at least
+1280px wide; below that they render soft in the browse gallery.
+THREE TRAPS. (1) A screenshot JonDash dislikes is SKIPPED IN SILENCE -- the module still installs, the
+manifest still validates, the image simply never appears, and nothing is logged. A filename typo stays
+invisible until a user mentions it. (2) A FOLDER PATH like screenshots/widget.png works only on JonDash
+1.8.1+ and is silently dropped on 1.8.0, so if your minAppVersion is below 1.8.1 use a FLAT filename.
+(3) Images are fetched from the TAG your manifest pins, not from your branch -- so the images and the
+version bump must ship in the same release, or nothing changes for anyone.
+CONTENT: use INVENTED data. Made-up hostnames, made-up services, never your own machine -- these live in
+a public repository inside a tag that never changes. Mix the states: something healthy, something
+degraded, something failed. An all-green tile says nothing about what your module does when things go
+wrong, which is exactly what someone is trying to judge.
+
 DELIVERABLES
 1. modules/<id>/module.ts
 2. modules/<id>/MODULE.md

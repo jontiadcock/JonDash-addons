@@ -75,9 +75,11 @@ addons/<module-id>/    one folder per module
   lib/*.ts             optional; keep pure logic here so it can be unit-tested
   tests/*.test.ts      optional Vitest tests — these ship, and are scanned like any other file
   migrations/          optional NNN_name.sql for the module's own mod_<id>_* tables
+  widget.png etc.      optional screenshots, declared in addons.json — FLAT filenames,
+                       max 4, 1 MB each; see VERSIONING.md before adding any
 helpers/<helper-id>/   first-party helpers (see helpers/README.md)
-scripts/               publish-time gates — run check-manifest.mjs AND check-docs.mjs
-                       before every push, not just before tagging
+scripts/               publish-time gates — run check-manifest.mjs, check-docs.mjs AND
+                       check-screenshots.mjs before every push, not just before tagging
 ```
 
 ## Channels, versions and tags
