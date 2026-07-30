@@ -102,6 +102,17 @@ THE ModuleDefinition (module.ts):
                                    //   proportion + floor + ceiling, as core does with
                                    //   w-[46%] min-w-7 max-w-16. NEVER items.slice(0, 6): a constant
                                    //   row count is wrong at every size but the one it was picked for.
+                                   //   THE 1x1 FORM -- use ONE convention across every widget,
+                                   //   or a dashboard holding five of them shrinks into five
+                                   //   different languages. A NUMBER when the state is countable
+                                   //   or a proportion (7, 64%); a short WORD only when there is
+                                   //   genuinely no number (a category like LAN or Off); always in
+                                   //   the tone colour so colour carries severity; and ONE suffix
+                                   //   only, "!" for needs-attention. Do not invent a second --
+                                   //   a set of !, ? and ... reads as noise. Say the most alarming
+                                   //   TRUE thing, not a total: "3!" beats "12".
+                                   //   Keep every row ONE LINE: a row that can wrap to two makes
+                                   //   the visible count wrong at every size.
                                    //   See widget.tsx here for the worked example.
     Page?: Component;              // props: { ctx, path: string[] }, served at /m/<id>
     SettingsPanel?: Component;     // props: { ctx }. Rendered in Admin -> Addons -> your module,
