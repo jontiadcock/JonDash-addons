@@ -8,7 +8,7 @@
       "id": "health-monitor",
       "name": "Health monitoring",
       "description": "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-      "version": "0.0.8",
+      "version": "0.0.9-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "network:outbound",
@@ -20,27 +20,37 @@
         "scheduler"
       ],
       "path": "addons/health-monitor",
-      "tag": "health-monitor/v0.0.8",
-      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
+      "tag": "health-monitor/v0.0.9-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "Problems first: what needs attention, with 24 hours of history per check" },
+        { "file": "page.png", "caption": "Every check with its uptime strip, response time and open incidents" },
+        { "file": "settings.png", "caption": "Add checks, set thresholds, and choose where alerts are sent" }
+      ]
     },
     {
       "id": "template",
       "name": "Module template (for developers)",
       "description": "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
-      "version": "0.0.8",
+      "version": "0.0.9-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "audit:write"
       ],
       "path": "addons/template",
-      "tag": "template/v0.0.8",
-      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
+      "tag": "template/v0.0.9-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "A worked example of a widget that fits any size it is given" },
+        { "file": "page.png", "caption": "The module's own page, with forms wired through a Server Action" },
+        { "file": "settings.png", "caption": "One declared setting, stored and read through the module context" }
+      ]
     },
     {
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.2.4",
+      "version": "0.2.5-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "filesystem:read",
@@ -55,14 +65,19 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.2.4",
-      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
+      "tag": "backup-manager/v0.2.5-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "Worst first — a failing job is never the one that scrolls out of sight" },
+        { "file": "page.png", "caption": "Every job with its last run, size copied and next scheduled time" },
+        { "file": "settings.png", "caption": "Source, destination, schedule and how many copies to keep" }
+      ]
     },
     {
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.6",
+      "version": "0.0.7-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "system-metrics:read"
@@ -71,14 +86,19 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.6",
-      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
+      "tag": "host-vitals/v0.0.7-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "The dashboard tile: a verdict first, then CPU, memory and every disk" },
+        { "file": "page.png", "caption": "The full picture — processor, per-core load, memory and disks" },
+        { "file": "settings.png", "caption": "Turn any reading off and it is no longer gathered, not merely hidden" }
+      ]
     },
     {
       "id": "service-control",
       "name": "Service control",
       "description": "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-      "version": "0.0.6",
+      "version": "0.0.7-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "host-services:read",
@@ -88,14 +108,19 @@
         "host-services"
       ],
       "path": "addons/service-control",
-      "tag": "service-control/v0.0.6",
-      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently."
+      "tag": "service-control/v0.0.7-beta.1",
+      "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "Stopped services sort first, with start and stop on the tile" },
+        { "file": "page.png", "caption": "Every approved service and the actions you are allowed to take" },
+        { "file": "settings.png", "caption": "Only services an administrator has approved can appear here" }
+      ]
     },
     {
       "id": "docker-manager",
       "name": "Docker manager",
       "description": "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
-      "version": "0.0.5",
+      "version": "0.0.6-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "docker:read",
@@ -109,14 +134,19 @@
         "host-install"
       ],
       "path": "addons/docker-manager",
-      "tag": "docker-manager/v0.0.5",
-      "notes": "Same as the 0.0.3 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has."
+      "tag": "docker-manager/v0.0.6-beta.1",
+      "notes": "Same as the 0.0.3 stable release. The version moves ahead so the beta channel stays in front of stable — a beta user must never be offered something older than what stable already has.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "Unhealthy containers first, then stopped, then everything running" },
+        { "file": "page.png", "caption": "Containers with their image, state and health at a glance" },
+        { "file": "settings.png", "caption": "How JonDash reaches the Docker engine on this host" }
+      ]
     },
     {
       "id": "mcp-server",
       "name": "AI assistant access",
       "description": "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
-      "version": "0.0.2",
+      "version": "0.0.3-beta.1",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "mcp:read"
@@ -125,8 +155,13 @@
         "mcp"
       ],
       "path": "addons/mcp-server",
-      "tag": "mcp-server/v0.0.2",
-      "notes": "Penetration tested. Two controls this claimed but never implemented now exist: a per-source block after repeated bad keys, and network exposure is refused without HTTPS unless you confirm. Audit-log search now matches literal text. Nothing security-critical was breakable."
+      "tag": "mcp-server/v0.0.3-beta.1",
+      "notes": "Penetration tested. Two controls this claimed but never implemented now exist: a per-source block after repeated bad keys, and network exposure is refused without HTTPS unless you confirm. Audit-log search now matches literal text. Nothing security-critical was breakable.",
+      "screenshots": [
+        { "file": "widget.png", "caption": "Whether an assistant can reach this server, and how many keys exist" },
+        { "file": "page.png", "caption": "Issue and revoke keys, and see exactly which tools each one may use" },
+        { "file": "settings.png", "caption": "Switch access on, choose a port, and set what keys are allowed to do" }
+      ]
     }
   ],
   "helpers": [
