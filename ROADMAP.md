@@ -59,11 +59,6 @@ A helper is built with or just before its first consumer.
 6. ⏳ **AH-05 `host-install`** — same elevation model as AH-04, so it follows it.
 7. ⏳ **AH-03 `wireguard` helper** → **AM-03 VPN access manager** — highest value, heaviest, and the
    most dangerous consent. Its Tailscale slice needs no helper and could come earlier if wanted.
-8. ⏳ **AT-01 Add-on conformance kit** — added 2026-07-29 at the owner's request. Not a product, so it
-   never competes with a module for attention — but it is the only item here that improves *every*
-   third-party module, including ones nobody has written yet. **No longer has an open question and is
-   not blocked on core** (see the entry): the verifier is two dependency-light files already fetchable
-   by tag. Slottable anywhere; the earlier it lands, the fewer broken modules exist to fix.
 
 ---
 
@@ -228,6 +223,9 @@ path, the consent roll-up and the prune all run through a consuming module.
 ### AT — Author tooling
 
 #### AT-01 — Add-on conformance kit: one command a third party can run, and a CI action ⏳
+
+**Unscheduled — deliberately not in the build queue.** The owner approved *adding* this entry, not a
+position for it; priority is theirs to set.
 
 **The problem.** Today an author who wants to know *"will my module actually install, and does it meet
 the guidelines?"* has to: stand up a whole JonDash from a release tag, `npm install` it, copy their
