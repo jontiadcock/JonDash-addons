@@ -82,7 +82,25 @@ you. It needs no other context.
 > module is the worked example; copy its structure.
 >
 > **If your widget shows a list, do not write `items.slice(0, 6)`.** A constant row count was picked
-> for one box size and is wrong at every other — clipped when small, half-empty when large.
+> for one box size and is wrong at every other — clipped when small, half-empty when large. Show the
+> most important rows first and let the count follow the container. Keep **every row exactly one
+> line**: a row that can wrap to two makes the visible count wrong at every size, and a bar or
+> sparkline on its own line is the usual culprit — overlay it instead.
+
+> ### The 1×1 form: one convention, so a mixed dashboard degrades the same way
+>
+> At the smallest size a widget gets roughly one word. Whatever you choose there, every add-on should
+> choose it the same way, or a dashboard holding five of them shrinks into five different languages.
+> The convention:
+>
+> - **A number if the state is countable or a proportion** — `7`, `64%`. Not a word.
+> - **A short word only when there genuinely is no number** — a category, like `LAN` or `Off`.
+> - **Always in the tone colour**, so the colour carries the severity and the glyph does not have to.
+> - **One suffix only: `!` for "needs attention".** Resist inventing a second. A set of `!`, `?` and
+>   `…` looks like three states to the author and like noise to everyone else.
+>
+> Say the *most alarming true thing*, not a total: `3!` when three are failing beats `12` when twelve
+> exist.
 
 > ### Before JonDash 1.8.2, a Tailwind class containing `(` silently did nothing
 >
