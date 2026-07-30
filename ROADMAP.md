@@ -61,8 +61,9 @@ A helper is built with or just before its first consumer.
    most dangerous consent. Its Tailscale slice needs no helper and could come earlier if wanted.
 8. ⏳ **AT-01 Add-on conformance kit** — added 2026-07-29 at the owner's request. Not a product, so it
    never competes with a module for attention — but it is the only item here that improves *every*
-   third-party module, including ones nobody has written yet. Slottable anywhere; the earlier it
-   lands, the fewer broken modules exist to fix.
+   third-party module, including ones nobody has written yet. **No longer has an open question and is
+   not blocked on core** (see the entry): the verifier is two dependency-light files already fetchable
+   by tag. Slottable anywhere; the earlier it lands, the fewer broken modules exist to fix.
 
 ---
 
@@ -267,9 +268,30 @@ actually bitten:
 | Widget renders without clipping at 1×1 | the frame clips rather than scrolls (B5/B6) |
 | `MODULE.md` exists and documents every permission | the consent screen is only as honest as this |
 
-**Open question for the owner:** the verifier's source of truth lives in core (`lib/modules/verify`),
-so publishing a checker means either vendoring that file per release, or core exporting it. Vendoring
-is simpler and can start today; asking core to publish it is cleaner and is a cross-session decision.
+**RESOLVED 2026-07-30 — no decision needed, and nothing is blocked on core.** I had this filed as an
+open question ("vendor core's verifier, or ask core to publish it?") on the assumption that reusing it
+would be awkward. Checked rather than assumed, and it is not:
+
+- `lib/modules/verify.ts` is **387 lines with a single import** — its own neighbour `./types`. No
+  database, no Prisma, no Next.js, no filesystem.
+- `lib/modules/types.ts` is 520 lines and imports only React *types*, so nothing at runtime.
+- **Both are already fetchable by tag from the public repo** (`raw.githubusercontent.com/.../v1.8.2/…`
+  returns 200). Core does not have to do anything for this to work.
+
+So "publishing" was never about access — it was about a promise that the path would not move. **The kit
+fetches both files from the tag the author is targeting.** That is better than vendoring rather than a
+compromise on it: tags are immutable, so the checker agrees with that release's installer *by
+construction*, and there is no local copy that can silently go stale. If core ever restructures those
+files, the kit fails **loudly on the new release only** — every existing tag keeps working — and that is
+the point at which asking core for a stability promise is justified by evidence instead of anticipation.
+
+**An npm package is the option to avoid**, and core independently agreed: it needs a registry account
+and a publish step every release, and it *creates* the "which package version matches JonDash 1.8.2?"
+problem that fetch-by-tag answers for free.
+
+Note also that core's verifier is only **one** of the checks below. The manifest and permission
+cross-checks, the tag-exists check and the doc checks are already scripts in this repo, so even if
+core's file moved tomorrow most of the kit would keep working.
 
 **Why it is worth doing before the catalogue grows.** Every guideline that is only written down is a
 guideline that will be broken, and each broken one costs the *user* an install that fails or a widget
