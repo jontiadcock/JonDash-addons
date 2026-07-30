@@ -43,18 +43,23 @@ import { MODULE_PATH } from "./lib/constants";
  * vanishes, a **ceiling** so it stops growing. Fixed sizes are what made small tiles clip in the
  * first place. Apply the same shape of thinking to anything that scales.
  *
- * ## Trap: a Tailwind class containing `(` silently does nothing in a module
+ * ## Before 1.8.2, a Tailwind class containing `(` silently did nothing in a module
  *
  * Installed modules live in a gitignored folder, so Tailwind never scans them; core mirrors the
- * class names it finds into an allowlist instead. That mirror **drops any token containing
- * parentheses**, so in a module ‘text-[clamp(...)]’, ‘w-[calc(...)]’ and
- * ‘bg-(--brand)’ all produce **no CSS at all** — the class is on the element, nothing styles it,
- * and nothing warns you. Verified on 1.8.1-beta.1; reported to core.
+ * class names it finds into an allowlist instead. **Up to 1.8.1 that mirror dropped every token
+ * containing parentheses**, so `text-[clamp(1rem,22cqw,2rem)]`, `w-[calc(100%-2rem)]` and
+ * `bg-(--brand)` produced **no CSS at all** — the class on the element, nothing styling it, and no
+ * warning from the build, the linter or the verifier. **Fixed in 1.8.2.**
  *
- * Everything else works, so this only bites the CSS *functions* — which is unlucky, because
- * `clamp()` is the obvious tool for fluid sizing. **Put those in an inline `style` instead**, as
- * below. Inline styles are never scanned, so they are immune, and you would already be reaching for
- * one to use a theme token like `var(--muted)`.
+ * **This module still floors at 1.8.0-beta.14**, so its fluid sizing stays in an inline `style`.
+ * That is the right call whenever your floor is below 1.8.2: inline styles are never scanned, so
+ * they work on every version, and you would already be reaching for one to use a theme token like
+ * `var(--muted)`. Raise your floor to 1.8.2 first if you would rather write the class — but not
+ * merely to tidy this paragraph, because that excludes installs the widget works perfectly on.
+ *
+ * (And note the space-less `calc(100%-2rem)` is *correct*, not a typo: a space would end the class
+ * token, so that is the only way to spell it, and Tailwind normalises it to `calc(100% - 2rem)`. I
+ * had this wrong and core tested it.)
  *
  * ## If your widget shows a LIST, this is the bug you will have
  *
@@ -111,8 +116,8 @@ export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
         so this tracks the card rather than the window. `tabular-nums` stops the width jittering as
         the number changes, which is very visible in a small card.
 
-        Inline rather than ‘text-[clamp(...)]’ — see the note above; as a class it would silently
-        produce nothing.
+        Inline rather than a `text-[clamp(...)]` class — see the note above: below 1.8.2 the class
+        form produces nothing at all, and this module supports those releases.
       */}
       {/*
         A tile with a LIST fills a big card by showing more rows. A tile with a single figure has

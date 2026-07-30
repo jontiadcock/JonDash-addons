@@ -222,13 +222,19 @@ LOOKING NATIVE: reuse the app's own classes (card, btn, btn-primary, btn-danger,
 variables (var(--muted), var(--primary), var(--danger), var(--border)) so the module matches light and
 dark mode without any styling of its own.
 
-A TAILWIND TRAP THAT FAILS SILENTLY: a class containing PARENTHESES produces no CSS in a module.
-Installed modules live in a gitignored folder Tailwind never scans, so the app mirrors your class names
-into an allowlist — and that mirror drops every token with a "(" in it. So text-[clamp(1rem,22cqw,2rem)],
-w-[calc(100%-2rem)] and bg-(--brand) all render UNSTYLED: the class is on the element, nothing defines
-it, and neither the build, the linter nor the verifier warns you. Only CSS functions are affected —
-@[6rem]:block and w-[46%] are fine. Put fluid sizing in an inline style={{ fontSize: "clamp(...)" }};
-inline styles are never scanned, so they always work. (Verified on 1.8.1-beta.1.)
+A TAILWIND TRAP, FIXED IN 1.8.2, THAT STILL MATTERS IF YOU SUPPORT OLDER RELEASES: up to 1.8.1, a class
+containing PARENTHESES produced no CSS in a module. Installed modules live in a gitignored folder Tailwind
+never scans, so the app mirrors your class names into an allowlist, and that mirror dropped every token
+with a "(" in it. So text-[clamp(1rem,22cqw,2rem)], w-[calc(100%-2rem)] and bg-(--brand) rendered
+UNSTYLED on those versions: class on the element, nothing defining it, and no warning from the build, the
+linter or the verifier. If your minAppVersion is 1.8.2 or newer, write those classes normally. If it is
+lower, put fluid sizing in an inline style={{ fontSize: "clamp(...)" }} — inline styles are never scanned,
+so they work on every version. Do not raise your floor just to use the class form; that excludes installs
+your module works fine on.
+RELATED, AND THE MORE GENERAL LESSON: the mirror reads your source with a regex, so before 1.8.3 it also
+collected class names out of COMMENTS — a markdown code span in a JSDoc block is backtick-delimited and
+looked exactly like a real class. Fixed by stripping comments first, but the habit is worth keeping: a
+tool that regexes source regexes your comments too.
 
 ONE MORE TRAP, because it produces a confusing error: a "use client" component must not import
 anything that itself imports "server-only" — directly or further down the chain. The build fails with
