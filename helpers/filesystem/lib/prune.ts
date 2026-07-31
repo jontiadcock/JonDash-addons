@@ -5,36 +5,15 @@ import { parseSnapshotName, selectForRetention, type GfsPolicy } from "./snapsho
 import type { RunLog } from "./logfile";
 
 /**
- * Applying snapshot retention — the only code in this helper that destroys anything.
+ * Applying snapshot retention — the only code in this helper that destroys anything. The
+ * pure decision of *what* to remove lives in `snapshots.ts`, tested without touching a disk;
+ * this file is the thin, paranoid layer that carries it out.
  *
- * Everything else here copies. This deletes, so it is written to a different standard: the
- * pure decision of *what* to remove lives in `snapshots.ts` and is exhaustively tested
- * without touching a disk, and this file is the thin, paranoid layer that carries it out.
- *
- * ## The property that matters most
- *
- * **`runPrune` derives its own plan. It never accepts a list of paths to delete.**
- *
- * That is deliberate and it is the difference between a retention feature and a remote
- * delete primitive. A consuming module names a destination and a policy; it cannot name a
- * victim. There is no argument to this file that a module could fill with
- * `C:\Users\me\Documents`, because no such argument exists.
- *
- * ## Layers, each of which alone would be nearly enough
- *
- *  1. The destination passes the WRITE-side rules — deleting is writing, so JonDash's own
- *     folder and the operating system are refused outright.
- *  2. Only direct children of that destination are ever considered. No recursion looking
- *     for snapshots.
- *  3. Only entries whose name is EXACTLY the timestamp format the copy engine generates.
- *     Somebody's own folder sitting in the destination is invisible to this code.
- *  4. Only real directories. Never a symlink — `lstat`, not `stat`, so a link pointing at
- *     someone's home directory is skipped rather than followed into.
- *  5. Containment is re-checked on the resolved path, after the name has been joined.
- *  6. The newest snapshot is never removable (guaranteed by `selectForRetention`, asserted
- *     again here).
- *  7. Every deletion is written to the log BEFORE it happens, so an interrupted prune leaves
- *     evidence of exactly how far it got.
+ * ⚠ `runPrune` derives its own plan and never accepts a list of paths to delete — a module
+ * names a destination and a policy, never a victim, the whole difference between a
+ * retention feature and a remote-delete primitive. Six more layers guard the walk below,
+ * each commented at its own check: write-side rules, no recursion, exact-name match,
+ * `lstat` not `stat`, re-checked containment, newest-snapshot refusal.
  */
 
 export type SnapshotEntry = {
@@ -44,6 +23,7 @@ export type SnapshotEntry = {
   at: Date;
 };
 
+/** REFS helpers/filesystem/api.ts */
 export type PrunePlan = {
   destination: string;
   /** Kept, each with the retention tier that saved it. */
@@ -65,11 +45,11 @@ export type PruneRefusal = { ok: false; reason: string };
 export type PruneOk = { ok: true; plan: PrunePlan };
 
 /**
- * What retention WOULD remove, having removed nothing.
+ * What retention WOULD remove, having removed nothing. This is what an admin sees before
+ * agreeing, and what `runPrune` recomputes for itself — the plan is never passed between
+ * them, so there is no window in which a caller could alter it.
  *
- * This is what an admin sees before agreeing, and what `runPrune` recomputes for itself —
- * the plan is never passed between them, so there is no window in which a caller could
- * alter it.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/prune.test.ts
  */
 export async function planPrune(destination: string, policy: GfsPolicy): Promise<PruneOk | PruneRefusal> {
   // Deleting is writing. The write-side rules refuse JonDash's own folder and the OS.
@@ -79,6 +59,8 @@ export async function planPrune(destination: string, policy: GfsPolicy): Promise
 
   let entries;
   try {
+    // No recursion: only DIRECT children of the destination are ever considered — nothing
+    // here looks deeper for snapshots.
     entries = await fsp.readdir(root, { withFileTypes: true });
   } catch (e) {
     return { ok: false, reason: `Couldn't read that folder (${(e as NodeJS.ErrnoException)?.code ?? "unknown"}).` };
@@ -146,11 +128,11 @@ export async function planPrune(destination: string, policy: GfsPolicy): Promise
 }
 
 /**
- * Apply retention.
+ * Apply retention. Recomputes the plan from the policy rather than taking one — see the
+ * `⚠` at the top of this file. Returns rather than throws for per-folder failures: one
+ * snapshot held open by a backup viewer must not stop the rest being tidied.
  *
- * Recomputes the plan from the policy rather than taking one — see the note at the top of
- * this file. Returns rather than throws for per-folder failures: one snapshot held open by
- * a backup viewer must not stop the rest being tidied.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/prune.test.ts
  */
 export async function runPrune(
   destination: string,

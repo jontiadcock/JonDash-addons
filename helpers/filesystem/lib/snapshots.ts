@@ -1,36 +1,20 @@
 /**
- * Snapshot retention — Grandfather-Father-Son.
+ * Snapshot retention — Grandfather-Father-Son. Pure: no I/O, no dates read from the clock
+ * unless handed one, every input explicit — deliberate, because the cost of a wrong answer
+ * here is somebody's only copy of something.
  *
- * This module decides which backups get destroyed. It is pure: no I/O, no dates read from
- * the clock unless handed one, every input explicit. That is deliberate, because the cost
- * of a wrong answer here is somebody's only copy of something.
+ * ⚠ A folder is only ever a candidate if its name is EXACTLY the timestamp format the copy
+ * engine generates (`2026-07-23-10-15-06`) — not "starts with a date", an exact match on
+ * the full name. That is what stops this deleting a user's own folder that happens to share
+ * the destination: an unparseable name is invisible to this code, never a removal candidate.
+ * See `parseSnapshotName`.
  *
- * ## The rule that matters most
+ * Four tiers, each keeping the most recent snapshot from each of the last N periods — daily,
+ * weekly (ISO week), monthly, yearly. A snapshot kept by any tier is kept; the tiers overlap
+ * heavily near the present and thin out going back, so recent history stays fine-grained and
+ * old history stays cheap. See `selectForRetention`.
  *
- * **A folder is only ever a candidate if its name is EXACTLY the timestamp format the copy
- * engine generates.** `2026-07-23-10-15-06`, and nothing else. Not "starts with a date",
- * not "looks datey" — an exact match on the full name.
- *
- * That is what stops this deleting a user's own folder that happens to live in the same
- * place. If an admin points a snapshot job at a directory that already has their files in
- * it, those files are invisible to this code: unparseable names aren't returned as
- * snapshots, so they can never be selected for removal. The strictness IS the safety.
- *
- * ## How GFS works here
- *
- * Four tiers, each keeping the most recent snapshot from each of the last N periods:
- *
- *   daily    the last N distinct days
- *   weekly   the last N distinct ISO weeks
- *   monthly  the last N distinct calendar months
- *   yearly   the last N distinct years
- *
- * A snapshot kept by any tier is kept. The tiers overlap heavily near the present and thin
- * out going back, which is the whole point: fine detail recently, coarse history for a long
- * time, at a fraction of the disk.
- *
- * Within a period the NEWEST snapshot wins — "the last backup of that month" is the one
- * worth keeping, since it reflects the most of that month's work.
+ * PINS helpers/filesystem/tests/snapshots.test.ts
  */
 
 export type Snapshot = {
@@ -40,6 +24,10 @@ export type Snapshot = {
   at: Date;
 };
 
+/**
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/prune.ts ·
+ *      helpers/filesystem/tests/prune.test.ts · helpers/filesystem/tests/snapshots.test.ts
+ */
 export type GfsPolicy = {
   keepDaily: number;
   keepWeekly: number;
@@ -50,6 +38,9 @@ export type GfsPolicy = {
 /**
  * A week of dailies, a month of weeklies, a year of monthlies. Yearly off by default —
  * it is the tier people most often enable without meaning to keep data for a decade.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/prune.test.ts ·
+ *      helpers/filesystem/tests/snapshots.test.ts
  */
 export const DEFAULT_GFS: GfsPolicy = { keepDaily: 7, keepWeekly: 4, keepMonthly: 12, keepYearly: 0 };
 
@@ -59,8 +50,10 @@ const SNAPSHOT_NAME = /^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/;
 /**
  * A snapshot folder name to the moment it was taken, or null if this isn't one of ours.
  *
- * Null is the safe answer and the common one: anything this cannot parse is someone else's
- * folder, and will never be offered for deletion.
+ * ⚠ Null is the safe answer and the common one: anything this cannot parse is someone
+ * else's folder, and will never be offered for deletion.
+ *
+ * REFS helpers/filesystem/lib/prune.ts · helpers/filesystem/tests/snapshots.test.ts
  */
 export function parseSnapshotName(name: string): Date | null {
   const m = SNAPSHOT_NAME.exec(name);
@@ -85,7 +78,10 @@ export function parseSnapshotName(name: string): Date | null {
   return at;
 }
 
-/** Names that are snapshots, paired with their moment. Everything else is dropped. */
+/**
+ * Names that are snapshots, paired with their moment. Everything else is dropped.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/snapshots.test.ts
+ */
 export function toSnapshots(names: string[]): Snapshot[] {
   const out: Snapshot[] = [];
   for (const name of names) {
@@ -129,11 +125,13 @@ export type RetentionPlan = {
 };
 
 /**
- * Decide what survives.
+ * Decide what survives. `snapshots` need not be sorted.
  *
- * `snapshots` need not be sorted. The newest is ALWAYS kept regardless of policy — a
- * retention setting of all zeros must still leave you with a backup, because a policy that
- * can empty the destination is a policy one typo away from destroying everything.
+ * ⚠ The newest is ALWAYS kept regardless of policy — a retention setting of all zeros must
+ * still leave you with a backup, because a policy that can empty the destination is a
+ * policy one typo away from destroying everything.
+ *
+ * REFS helpers/filesystem/lib/prune.ts · helpers/filesystem/tests/snapshots.test.ts
  */
 export function selectForRetention(snapshots: Snapshot[], policy: GfsPolicy): RetentionPlan {
   const sorted = [...snapshots].sort((a, b) => b.at.getTime() - a.at.getTime()); // newest first
@@ -174,7 +172,10 @@ export function selectForRetention(snapshots: Snapshot[], policy: GfsPolicy): Re
   return { keep, remove };
 }
 
-/** One line an admin can read: "keeping 7 daily, 4 weekly, 12 monthly". */
+/**
+ * One line an admin can read: "keeping 7 daily, 4 weekly, 12 monthly".
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/snapshots.test.ts
+ */
 export function describePolicy(p: GfsPolicy): string {
   const parts = [
     p.keepDaily > 0 ? `${p.keepDaily} daily` : "",

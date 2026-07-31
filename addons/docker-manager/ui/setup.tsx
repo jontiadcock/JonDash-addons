@@ -8,6 +8,7 @@ import { requestDockerAction } from "../actions";
  * This is the part of the module that earns its keep before Docker exists. Each state has a
  * *different fix*, and lumping them into "Docker isn't available" is what leaves people
  * guessing — particularly the third, which is the one nobody diagnoses on their own.
+ * REFS addons/docker-manager/page.tsx
  */
 export function Setup({ status, canInstall }: { status: Extract<EngineStatus, { ok: false }>; canInstall: boolean }) {
   if (status.reason === "no-access") {

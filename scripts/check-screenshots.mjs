@@ -1,12 +1,13 @@
 /**
  * Screenshot gate. Run before every push, beside `check-manifest.mjs`.
  *
- * **Why this exists as a hard failure.** Core parses screenshot entries with a `continue` — an entry
- * it dislikes is skipped in silence. The module still installs, the manifest still validates, and the
- * image simply never appears, with nothing said in any log or any UI. So every rule core applies has
- * to fail loudly *here*, because it will never fail anywhere else.
+ * **Why this exists as a hard failure.** Core parses screenshot entries with a `continue` — an
+ * entry it dislikes is skipped in silence. The module still installs, the manifest still
+ * validates, and the image simply never appears, with nothing said in any log or any UI. So
+ * every rule core applies has to fail loudly *here*, because it will never fail anywhere else.
  *
- * Rules checked, against core 1.8.2 `lib/modules/sources.ts` and `app/api/modules/screenshot/route.ts`:
+ * Rules checked, against core 1.8.2 `lib/modules/sources.ts` and
+ * `app/api/modules/screenshot/route.ts`:
  *
  * | Rule | Where it comes from |
  * | ---- | ------------------- |
@@ -17,13 +18,13 @@
  * | at most 1 MB | `MAX_BYTES` in the serving route |
  * | caption at most 80 characters | core truncates silently past that |
  *
- * **The flat-filename rule is ours, and stricter than core's.** Core allows one subdirectory *from
- * 1.8.1*; 1.8.0 is filename-only. Every add-on here declares `minAppVersion` at or below 1.8.0, so a
- * `screenshots/` folder would show nothing at all on those installs. When the floors rise past 1.8.1,
- * relax `FLAT_ONLY` — not before.
+ * **The flat-filename rule is ours, and stricter than core's.** Core allows one subdirectory
+ * *from 1.8.1*; 1.8.0 is filename-only. Every add-on here declares `minAppVersion` at or below
+ * 1.8.0, so a `screenshots/` folder would show nothing at all on those installs. When the
+ * floors rise past 1.8.1, relax `FLAT_ONLY` — not before.
  *
- * The width check is a warning rather than an error: core enforces nothing about resolution, but a
- * shot under 1280px renders soft in the browse gallery, which was true of the first set captured.
+ * The width check is a warning rather than an error: core enforces nothing about resolution,
+ * but a shot under 1280px renders soft in the browse gallery, true of the first set captured.
  */
 import fs from "node:fs";
 import path from "node:path";

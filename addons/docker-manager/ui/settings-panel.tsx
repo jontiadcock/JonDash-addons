@@ -12,6 +12,7 @@ import { approveInstallAction, declineInstallAction, requestRemoveDockerAction }
  * someone thinks about removing Docker is the moment they remove this module — so it belongs
  * on the uninstall confirmation, which cannot ask questions yet. Core has confirmed the shape
  * (`uninstallQuestions`) but not scheduled it; when it lands this moves there.
+ * REFS addons/docker-manager/module.ts
  */
 export default async function DockerSettings({ ctx }: ModuleSettingsPanelProps) {
   const hi = hostInstall(ctx);

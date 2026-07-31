@@ -4,33 +4,22 @@ import { getUserVisibleLinks } from "@/lib/services";
 import { register } from "./tools";
 
 /**
- * The read tools.
+ * The read tools. Names and scopes match the old external MCP server's catalogue, so an agent
+ * written against it still recognises them. See `inherited/TOOL-CATALOGUE.md`.
+ * Two rules every tool here obeys:
+ *  1. Never checks its own permission — the dispatcher enforces the declared requirement before
+ *     `run` is called; a check inside a handler can be forgotten, and forgetting fails open.
+ *  2. Selects only what it returns — `select` names the columns, so a password hash, TOTP secret
+ *     or session token is never loaded into memory, and a new column cannot silently widen access.
  *
- * Names and scopes are inherited unchanged from the MCP session's catalogue, so an agent written
- * against the old external server still recognises them — the transport changed, the vocabulary
- * did not. See `inherited/TOOL-CATALOGUE.md`.
- *
- * ## Two rules every tool here obeys
- *
- * **1. It never checks its own permission.** The requirement is declared and the dispatcher
- * enforces it before `run` is called. A check inside a handler is one that can be forgotten, and
- * forgetting fails open.
- *
- * **2. It selects only what it returns.** Not "fetch the row and delete the secret fields" —
- * `select` names the columns, so a password hash, a TOTP secret or a session token is never loaded
- * into memory in the first place. There is no filtering step to get wrong, and adding a column to
- * the schema cannot silently widen what an agent can read.
- *
- * The model sees only the name, description and schema, so all three are written for it: say what
- * the tool returns and what it will NOT do, because that is what stops it inventing a follow-up.
+ * ⚠ The model sees only name, description and schema — all three are written to say what a tool
+ * returns and what it will NOT do, since that is what stops it inventing a follow-up.
  */
 
 register({
   name: "get_server_status",
-  // Describes exactly what `run` returns and nothing more. It previously advertised the release
-  // channel and whether an update was available — neither of which this returns — and a tool
-  // description is read by the MODEL, so an overstated one makes an assistant confidently answer a
-  // question from data it never received.
+  // Describes exactly what `run` returns and nothing more — a description is read by the MODEL,
+  // so an overstated one lets an assistant confidently answer from data it never received.
   description:
     "The JonDash server's version, how long it has been running, and when it started. Read-only; changes nothing.",
   kind: "read",
@@ -144,18 +133,14 @@ register({
     const limit = Math.min(100, Math.max(1, Number(args.limit) || 50));
 
     /**
-     * **Substring means substring — `%` and `_` are literal here.**
+     * ⚠ Substring means substring — `%` and `_` are literal here. Prisma's `contains` compiles to
+     * SQL `LIKE` and does not escape wildcards, so an unescaped `%` would silently become a
+     * pattern match. Not an injection (Prisma parameterises) — just a search meaning something
+     * other than what was asked, for a caller that cannot see it went wrong.
      *
-     * Prisma's `contains` compiles to SQL `LIKE` and does not escape the wildcards, so
-     * `contains: "%"` matched every row and `revoke_session` also matched `revokeXsession`. Not an
-     * injection (Prisma parameterises, and `' UNION SELECT …` comes back as literal text) — but a
-     * search that quietly means something other than what was asked is worth being exact about,
-     * especially when the thing asking is a model that cannot see it went wrong.
-     *
-     * Prisma offers no `ESCAPE` clause, so rather than drop to raw SQL — and lose the explicit
-     * column list that is what actually keeps secrets unreachable — the match is done against the
-     * distinct action vocabulary, which is bounded and small (dozens of values, not rows). The
-     * filter is then an exact `in`, and the database still does the ordering and the limit.
+     * Prisma has no `ESCAPE` clause, so rather than drop to raw SQL — losing the explicit column
+     * list that keeps secrets unreachable — the match runs against the distinct action vocabulary
+     * (small, bounded) and the query itself uses an exact `in`.
      */
     let actionFilter: { in: string[] } | undefined;
     if (contains !== undefined) {
@@ -191,9 +176,8 @@ register({
   inputSchema: { type: "object", properties: {} },
   run: async () => {
     const rows = await prisma.user.findMany({
-      // The deny-list approach would be to fetch the user and strip fields. This is the allow-list:
-      // passwordHash, totpSecretEnc and the recovery codes are never selected, so they cannot be
-      // returned by a later edit that forgets to strip them.
+      // Allow-list, not deny-list: passwordHash, totpSecretEnc and the recovery codes are never
+      // selected, so a later edit cannot forget to strip them.
       select: {
         email: true,
         displayName: true,

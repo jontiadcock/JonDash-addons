@@ -66,6 +66,7 @@ const parse = <T,>(raw: unknown): T | null => {
   }
 };
 
+/** REFS addons/backup-manager/module.ts */
 export default async function BackupSettingsPanel({ ctx }: ModuleSettingsPanelProps) {
   const db = ctx.db;
   const fs = filesystem(ctx);

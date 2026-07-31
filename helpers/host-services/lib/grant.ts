@@ -11,22 +11,16 @@ import {
 import type { Verb } from "./names";
 
 /**
- * The bridge to core's grant manager (OPS-18, shipped in JonDash 1.7.1-beta.1).
+ * The bridge to core's grant manager.
  *
- * **Everything privileged goes through `@/lib/elevation`, never the binary directly.** That
- * is HELPERS-DESIGN rule 7, and the reason is auditing: core resolves the path, maps exit
- * codes and logs every call — including the declined and failed ones. A helper that spawns
- * `jondash-grant.exe` itself works perfectly and appears nowhere in the log, which is the
- * worst combination available.
+ * ⚠ Everything privileged goes through `@/lib/elevation`, never the binary directly —
+ * HELPERS-DESIGN rule 7. Core logs every call, including declined and failed ones; a helper
+ * that spawns `jondash-grant.exe` itself works perfectly and appears nowhere in the log.
  *
  * A grant is a Scheduled Task under `\JonDash\` running one fixed command with highest
- * privileges. Creating one prompts for elevation ONCE and the grant then persists, so
- * unattended automation works and a restart of JonDash or the machine changes nothing.
- *
- * The rule the design rests on, from ../ELEVATION.md: **a granted action must be entirely
- * self-contained and must never read what to do from anywhere.** The task stores a fixed
- * service and verb, and `schtasks /run` cannot pass arguments, so what can happen without a
- * prompt is fixed at the instant the admin approved it — enforced by Windows, not by us.
+ * privileges — one elevation prompt, then it persists across restarts. ⚠ Per ../ELEVATION.md
+ * it must be entirely self-contained: the task stores a fixed service and verb, and
+ * `schtasks /run` cannot pass arguments, so what can run unprompted is enforced by Windows.
  */
 
 /** Why elevation is impossible here. Named separately so callers can switch on it. */
@@ -39,6 +33,7 @@ export type ElevationReason = "no-interactive-session" | "grant-manager-missing"
  */
 export type TimedOut = { status: "timed-out" };
 
+/** REFS helpers/host-services/api.ts */
 export type ElevationSupport = { ok: true; platform: "windows" | "linux" } | { ok: false; reason: ElevationReason };
 
 /**
@@ -46,6 +41,7 @@ export type ElevationSupport = { ok: true; platform: "windows" | "linux" } | { o
  * different things to a caller: "not now" invites a retry, "there is no grant" needs an
  * admin to create one, and "it broke" needs the detail. Collapsing them into a boolean is
  * how a module ends up retrying a decision a person already made.
+ * REFS helpers/host-services/lib/allowlist.ts
  */
 export type GrantOutcome =
   | { status: "ok" }
@@ -75,14 +71,11 @@ function toOutcome(reason: GrantFailure, message: string): GrantOutcome {
     case "unsupported-platform":
       return { status: "unavailable", reason: "unsupported-platform" };
     case "not-audited":
-      // Core now refuses to grant what it cannot record. Reported verbatim rather than
-      // softened: "we would not do this because it could not be logged" is the useful
-      // sentence, and hiding it would undo the fix.
+      // Core now refuses to grant what it cannot record. Reported verbatim, unsoftened: "we
+      // would not do this because it could not be logged" is the useful sentence.
       return { status: "failed", detail: message };
-    // Package reasons, added when core grew an install API. They cannot occur on this
-    // helper's calls — it never names a package — but they are listed rather than defaulted,
-    // because the whole value of an exhaustive switch is that the next addition breaks the
-    // build instead of quietly becoming "failed". That is what caught these two.
+    // Package reasons, added when core grew an install API — cannot occur on this helper's calls,
+    // but listed rather than defaulted so the next addition breaks the build, not "failed".
     case "package-not-found":
     case "no-package-manager":
     case "invalid-request":
@@ -100,6 +93,7 @@ function toOutcome(reason: GrantFailure, message: string): GrantOutcome {
  * Note the asymmetry, which is easy to get backwards: CREATING a grant needs an interactive
  * desktop because that is where UAC prompts; USING one does not. A headless install can run
  * grants made earlier but cannot make new ones.
+ * REFS helpers/host-services/api.ts · helpers/host-services/ui/settings-panel.tsx
  */
 export function capability(): ElevationSupport {
   const s = grantSupport();
@@ -116,6 +110,7 @@ export function capability(): ElevationSupport {
  * binary is treated as the authority and its answer is what gets stored. If they ever
  * disagree, the stored name still matches the real task and `schtasks /run` keeps working;
  * without this, a silent divergence would make every action fail with "task not found".
+ * REFS helpers/host-services/lib/allowlist.ts
  */
 export async function resolveTaskBase(desired: string): Promise<string | null> {
   const r = await previewGrantName(desired);
@@ -129,6 +124,7 @@ export async function resolveTaskBase(desired: string): Promise<string | null> {
  * instruction source. Three prompts to add one service would also train the admin to click
  * through them — the habituation ELEVATION.md warns about — and prompts two and three carry
  * no new information, since the decision being made is "may JonDash control this service".
+ * REFS helpers/host-services/lib/allowlist.ts
  */
 export async function createGrants(
   serviceName: string,
@@ -153,6 +149,7 @@ export async function createGrants(
  *
  * Removing an allowlist entry and removing its grants are ONE action, never two — a list
  * entry that disappears while the OS grant survives is exactly the orphan nobody audits.
+ * REFS helpers/host-services/lib/allowlist.ts
  */
 export async function removeGrants(taskBase: string, userId?: string | null): Promise<GrantOutcome> {
   const r = await removeGrant({ id: taskBase, userId: userId ?? null });
@@ -165,6 +162,7 @@ export async function removeGrants(taskBase: string, userId?: string | null): Pr
  *
  * Reads from Windows rather than from our tables, so a grant left by a failed removal is
  * caught too. Needs elevation, and therefore a human at a prompt.
+ * REFS helpers/host-services/helper.ts
  */
 export async function revokeEverything(): Promise<GrantOutcome> {
   const r = await removeAllGrants({ userId: null });
@@ -176,6 +174,7 @@ export async function revokeEverything(): Promise<GrantOutcome> {
  *
  * Worth surfacing to an admin: it cannot drift from reality, so an orphan left by a failed
  * uninstall shows up here even though nothing in our tables mentions it.
+ * REFS helpers/host-services/helper.ts
  */
 export async function readGrants(): Promise<{ name: string; command: string; enabled: boolean }[]> {
   const r = await listGrants();
@@ -183,18 +182,16 @@ export async function readGrants(): Promise<{ name: string; command: string; ena
 }
 
 /**
- * Run an already-granted action. **This does not elevate and does not prompt** — it asks
- * the OS to run a task authorised earlier, which is the whole point of the model.
+ * Run an already-granted action. ⚠ Does not elevate and does not prompt — it asks the OS to
+ * run a task authorised earlier, which is the whole point of the model.
  *
- * Now goes through core (1.7.1-beta.2) rather than spawning `schtasks /run` ourselves.
- * Spawning it directly was never an escalation — running a task cannot create a capability,
- * and without an existing grant it simply fails — but it put *the moment a service actually
- * restarts* outside the audit log built to record privileged actions. Granting was logged and
- * using was not, which is the wrong half.
+ * Routed through core rather than spawning `schtasks /run` directly, for the same audit reason
+ * as the rest of this file: granting was logged and using was not, which was the wrong half.
  *
- * **Returns when the task has been STARTED, not when the service has finished changing
- * state.** A stop can take seconds. Callers that need the real outcome must poll the service;
- * treating this as "the service is now stopped" would be a lie.
+ * ⚠ Returns when the task has been STARTED, not when the service has finished changing state —
+ * a stop can take seconds. A caller needing the real outcome must poll the service; treating
+ * this return as "stopped" would be a lie.
+ * REFS helpers/host-services/lib/requests.ts
  */
 export async function runGrant(taskBase: string, verb: Verb, userId?: string | null): Promise<GrantOutcome> {
   const r = await coreRunGrant({ name: `${taskBase}-${verb}`, userId: userId ?? null });

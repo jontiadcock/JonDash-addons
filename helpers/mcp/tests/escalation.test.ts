@@ -3,18 +3,14 @@ import type { KeyMode } from "../lib/keys";
 import { decide, type ToolKind } from "../lib/decide";
 
 /**
- * **The gate on whether this helper ships.**
+ * ⚠ The gate on whether this helper ships: the key's mode can only ever NARROW what its bound
+ * account can do, never widen it. If promoting a key to `act` grants anything the account lacks,
+ * this is a privilege-escalation path and must not be published.
  *
- * The security property is one sentence: *the key's mode can only ever NARROW what its bound
- * account can do — it can never widen it.* If promoting a key to `act` grants anything the account
- * lacks, the helper is a privilege-escalation path and must not be published.
- *
- * These tests exercise the decision table directly rather than through HTTP, so they can run
- * before the listener exists and cannot be accidentally satisfied by a transport-layer check that
- * a later refactor removes.
- *
- * The real end-to-end assertion — the same table driven over MCP JSON-RPC against a live
- * install — is in the live-test plan in HELPER.md and is not replaced by this file.
+ * Exercises the decision table directly rather than through HTTP, so it can run before the
+ * listener exists and can't be satisfied by a transport-layer check a later refactor removes. The
+ * end-to-end version, over live MCP JSON-RPC, is the live-test plan in HELPER.md — not replaced by
+ * this file.
  */
 
 /**

@@ -25,6 +25,8 @@ import {
  * read-only, so a dashboard can be left open without a stray click reconfiguring
  * anything. Each check expands in place to edit, so nothing here navigates away from the
  * settings screen.
+ *
+ * REFS addons/health-monitor/module.ts
  */
 export default async function HealthSettingsPanel({ ctx }: ModuleSettingsPanelProps) {
   const db = ctx.db;

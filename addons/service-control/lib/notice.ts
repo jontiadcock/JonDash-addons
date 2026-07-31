@@ -14,12 +14,14 @@ const KEY = "lastNotice";
 
 export type Notice = { tone: "ok" | "warn" | "bad"; text: string };
 
+/** REFS addons/service-control/actions.ts */
 export async function writeNotice(ctx: ModuleContext, tone: Notice["tone"], text: string): Promise<void> {
   // The store serialises for us, so an object saves the read side from parsing — and from
   // having to decide what a malformed string means.
   await ctx.store?.set(KEY, { tone, text, at: new Date().toISOString() });
 }
 
+/** REFS addons/service-control/page.tsx · addons/service-control/ui/settings-panel.tsx */
 export async function readNotice(ctx: ModuleContext): Promise<Notice | null> {
   const raw = (await ctx.store?.get(KEY)) as { tone?: unknown; text?: unknown; at?: unknown } | null;
   if (!raw || typeof raw.text !== "string" || typeof raw.at !== "string") return null;
@@ -33,6 +35,7 @@ export async function readNotice(ctx: ModuleContext): Promise<Notice | null> {
   return { tone, text: raw.text };
 }
 
+/** REFS addons/service-control/page.tsx · addons/service-control/ui/settings-panel.tsx */
 export function noticeColour(tone: Notice["tone"]): string {
   if (tone === "bad") return "var(--danger)";
   if (tone === "warn") return "var(--warning, var(--muted))";

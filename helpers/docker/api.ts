@@ -6,25 +6,21 @@ import { toContainer, toLines, toStats, type Container, type ContainerStats } fr
 /**
  * The entire surface a module may reach.
  *
- * **The engine socket is root-equivalent** — anything that can reach it can start a container
- * mounting the host filesystem as root. So this exposes operations, never the socket, and the
- * two rules from HELPER.md hold here:
+ * ⚠ The engine socket is root-equivalent — anything that can reach it can start a container
+ * mounting the host filesystem as root. So this exposes operations, never the socket:
  *
- * 1. **No pass-through.** A module never names an endpoint, a path, a method or a body. It
- *    names a container id and a verb from a fixed list; every request is built inside
- *    `engine.ts`.
- * 2. **No `exec`, ever.** Running a command inside a container is arbitrary code execution,
- *    and in most real setups it is as root on the host. The call does not exist and must not
- *    be added — if a console is ever wanted it is a different capability, declared in red, and
- *    a deliberate decision rather than a convenience.
- *
- * Also absent: creating or removing containers, and every image and volume operation.
+ * 1. No pass-through — a module names a container id and a verb from a fixed list, never an
+ *    endpoint, path, method or body; every request is built inside `lib/engine.ts`.
+ * 2. No `exec`, ever — arbitrary code execution, usually as root. The call does not exist and
+ *    must not be added; a console, if ever wanted, is a separate, deliberately red capability.
+ *    Also absent: creating or removing containers, and every image or volume operation.
  */
 
 export type { Container, ContainerStats, ContainerState } from "./lib/shape";
 export type { Verb } from "./lib/engine";
 export { VERBS };
 
+/** REFS addons/docker-manager/ui/setup.tsx */
 export type EngineStatus =
   | { ok: true; version: string; apiVersion: string; containers: number; socket: string }
   | {
@@ -76,9 +72,8 @@ const api: HelperApiFor<DockerApi> = (ctx: ModuleContext) => ({
   },
 
   async list() {
-    // Empty answer, never data, when the capability is missing — and the same when the engine
-    // is down, so a module renders "nothing here" rather than crashing on a machine without
-    // Docker.
+    // Empty answer, never data, when the capability is missing — same when the engine is down,
+    // so a module renders "nothing here" rather than crashing on a machine without Docker.
     if (!granted(ctx, "docker:read")) return [];
     const r = await containers();
     return r.ok ? r.value.map(toContainer) : [];
@@ -98,9 +93,8 @@ const api: HelperApiFor<DockerApi> = (ctx: ModuleContext) => ({
   },
 
   async logs(id: string, opts?: { tail?: number }) {
-    // Logs are their own capability because of what is IN them: connection strings, tokens,
-    // personal data. Seeing that a container is running is not the same as reading what it
-    // printed, and they should not share a consent line.
+    // Logs are their own capability because of what is IN them — connection strings, tokens,
+    // personal data — and seeing a container run is not the same as reading what it printed.
     if (!granted(ctx, "docker:logs")) return [];
     const tail = Math.min(2000, Math.max(1, Math.trunc(opts?.tail ?? 200)));
     const r = await rawLogs(id, tail);
@@ -122,4 +116,8 @@ const api: HelperApiFor<DockerApi> = (ctx: ModuleContext) => ({
   },
 });
 
+/**
+ * REFS addons/docker-manager/actions.ts · addons/docker-manager/page.tsx ·
+ *      addons/docker-manager/ui/settings-panel.tsx · addons/docker-manager/ui/widget.tsx
+ */
 export default api;

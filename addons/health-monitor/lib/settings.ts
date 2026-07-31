@@ -8,6 +8,7 @@ import type { ModuleSettings } from "./types";
  * nonsense interval would otherwise turn the scheduler into a busy loop.
  */
 
+/** REFS addons/health-monitor/module.ts */
 export const SETTING_FIELDS: ModuleSettingField[] = [
   {
     key: "alertsEnabled",
@@ -93,11 +94,8 @@ export const SETTING_FIELDS: ModuleSettingField[] = [
     default: 2,
     help: "Individual checks older than this become hourly summaries. Uptime figures stay accurate; the minute-by-minute detail goes.",
   },
-  // `pollSeconds` was removed in 0.0.5-beta.1. Scheduled work now runs on the `scheduler`
-  // helper, whose interval is fixed when the module is defined, so a user-tunable value
-  // could no longer take effect. Nothing real is lost: it only controlled how often the
-  // module LOOKED for due work, never how often anything was actually checked, and the
-  // scan is fixed at 15s — shorter than the shortest interval a monitor can be given.
+  // No `pollSeconds` setting: the `scheduler` helper's interval is fixed at 15s (already
+  // shorter than any monitor's own interval), so a user-tunable scan value can't take effect.
   {
     key: "maxConcurrent",
     label: "Checks to run at the same time",
@@ -127,7 +125,10 @@ function list(v: unknown): string[] {
     .filter(Boolean);
 }
 
-/** Read every setting, coerced and clamped to something the engine can safely use. */
+/**
+ * Read every setting, coerced and clamped to something the engine can safely use.
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/scheduler.ts
+ */
 export async function readSettings(ctx: ModuleContext): Promise<ModuleSettings> {
   const s = await ctx.settings.all();
   return {

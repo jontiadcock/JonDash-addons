@@ -17,6 +17,7 @@
 
 export type RiskLevel = "none" | "caution" | "lockout";
 
+/** REFS helpers/host-services/lib/allowlist.ts */
 export type Risk = {
   level: RiskLevel;
   /** Shown to the admin verbatim. Written for a person, not a log. */
@@ -76,6 +77,7 @@ function normalise(serviceName: string): string {
  *
  * Deliberately conservative about `none`: an unrecognised service gets no warning, because
  * crying wolf on everything is how warnings stop being read.
+ * REFS helpers/host-services/lib/allowlist.ts · helpers/host-services/tests/risk.test.ts
  */
 export function assessRisk(serviceName: string): Risk {
   const n = normalise(serviceName);

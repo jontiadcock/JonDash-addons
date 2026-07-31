@@ -33,6 +33,10 @@ export type KindChoice = {
   tlsOptions?: boolean;
 };
 
+/**
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/ui/check-form.tsx ·
+ *      addons/health-monitor/ui/settings-panel.tsx
+ */
 export const KIND_CHOICES: KindChoice[] = [
   {
     value: "http",
@@ -86,7 +90,10 @@ export const KIND_CHOICES: KindChoice[] = [
   },
 ];
 
-/** Intervals worth offering. Seconds under the hood, sentences on screen. */
+/**
+ * Intervals worth offering. Seconds under the hood, sentences on screen.
+ * REFS addons/health-monitor/ui/check-form.tsx
+ */
 export const INTERVAL_CHOICES: { value: number; label: string }[] = [
   { value: 30, label: "Every 30 seconds" },
   { value: 60, label: "Every minute" },
@@ -97,6 +104,7 @@ export const INTERVAL_CHOICES: { value: number; label: string }[] = [
   { value: 86400, label: "Once a day" },
 ];
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export const CHANNEL_CHOICES: { value: ChannelKind; label: string; needs: string }[] = [
   { value: "email", label: "Email", needs: "Uses the email account set up in Admin → Email. Leave the boxes empty to use the module's recipient list." },
   { value: "webhook", label: "Webhook (any service)", needs: "Needs the URL to POST to. The secret is sent as an Authorization header if you set one." },
@@ -113,7 +121,10 @@ const CHANNEL_KINDS = new Set(CHANNEL_CHOICES.map((c) => c.value));
 
 export type FormResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-/** A readable id derived from the name, e.g. "My NAS box" → "my-nas-box". */
+/**
+ * A readable id derived from the name, e.g. "My NAS box" → "my-nas-box".
+ * REFS addons/health-monitor/actions.ts
+ */
 export function slugify(name: string): string {
   const slug = name
     .toLowerCase()
@@ -123,7 +134,10 @@ export function slugify(name: string): string {
   return slug || "monitor";
 }
 
-/** Make a slug unique against ids already in use, by appending -2, -3, … */
+/**
+ * Make a slug unique against ids already in use, by appending -2, -3, …
+ * REFS addons/health-monitor/actions.ts
+ */
 export function uniqueId(base: string, taken: Iterable<string>): string {
   const used = new Set(taken);
   if (!used.has(base)) return base;
@@ -168,6 +182,7 @@ export type MonitorInput = {
  *
  * The messages are the point: they say what to do, not what went wrong internally,
  * because this is the only feedback the person gets.
+ * REFS addons/health-monitor/actions.ts
  */
 export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   const name = text(fd, "name");
@@ -247,7 +262,10 @@ export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   };
 }
 
-/** Build the per-kind `config` blob from the validated form values. */
+/**
+ * Build the per-kind `config` blob from the validated form values.
+ * REFS addons/health-monitor/actions.ts
+ */
 export function monitorConfigFrom(input: MonitorInput): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   if (input.kind === "http") {
@@ -264,6 +282,10 @@ export type ChannelInput = {
   config: Record<string, unknown>;
 };
 
+/**
+ * Same validation shape as `parseMonitorForm` — see its note.
+ * REFS addons/health-monitor/actions.ts
+ */
 export function parseChannelForm(fd: FormData): FormResult<ChannelInput> {
   const name = text(fd, "name");
   if (!name) return { ok: false, error: "Give the channel a name." };

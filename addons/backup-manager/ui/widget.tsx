@@ -38,7 +38,7 @@ const TILE_CAP = 24;
 /**
  * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
  * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
- * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * first: flex wrapping (columns ran off the side of the card) and CSS multi-column (it balances,
  * so a few rows spread one-per-column across the top and left the rest of the card empty).
  *
  * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
@@ -61,19 +61,14 @@ const FILL_GRID = {
 const RANK: Record<Health, number> = { bad: 0, warn: 1, running: 2, ok: 3, idle: 4 };
 
 /**
- * The card, the title and the "open" link.
+ * The card, the title and the "open" link — every widget must draw its own via this, since
+ * `WidgetFrame` only gives a grid cell and the Customise button; without it a widget renders
+ * as loose text on the dashboard background with no clue which module it belongs to.
  *
- * `WidgetFrame` gives a widget a grid cell and the Customise button and nothing else — no
- * card, no padding, no heading. Every widget draws its own, so one that doesn't renders as
- * loose text on the dashboard background with no clue which module it belongs to. Both
- * return paths below go through this for that reason.
- *
- * # Sizing (JonDash 1.8.0 B5/B6)
- *
- * The user can size this from 1×1 upward and the frame **clips rather than scrolls**. Core's
- * two thresholds decide what appears: at 1×1 just `short` — a count in the verdict's colour,
- * because a sentence does not fit and "2!" says more than "2 backups fai…". The title and the
- * headline arrive at `@[6rem]`, the list and full padding at `@[8rem]`.
+ * Sizing: the frame **clips rather than scrolls** as the user resizes from 1×1 upward. Core's
+ * two container breakpoints decide what appears — at 1×1 just `short` (a count in the
+ * verdict's colour, since "2!" says more than "2 backups fai…"); title and headline arrive at
+ * 6rem, the list and full padding at 8rem.
  */
 function Tile({ tone, headline, short, children }: {
   tone?: string;
@@ -108,6 +103,7 @@ function Tile({ tone, headline, short, children }: {
   );
 }
 
+/** REFS addons/backup-manager/module.ts · addons/backup-manager/tests/widget.test.ts */
 export default async function BackupWidget({ ctx }: ModuleWidgetProps) {
   const db = ctx.db;
   if (!db) return null;
@@ -156,7 +152,7 @@ export default async function BackupWidget({ ctx }: ModuleWidgetProps) {
         No `.slice(0, 4)`: the rows are already sorted worst-first by RANK, so the frame
         clipping the tail always clips the healthiest job. A constant count did the opposite
         job badly — it hid failing backups on a large tile and overflowed a small one.
-        `min-h-0` bounds the list so the grid has a height to divide into `1fr` rows.
+        a zero minimum height bounds the list, so the grid has a height to divide into equal rows.
       */}
       <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
             <ul className="h-full" style={FILL_GRID}>

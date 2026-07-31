@@ -118,7 +118,10 @@ function topLevelMembers(body) {
   return names;
 }
 
-/** The exported surface of one `api.ts`: top-level export names, plus each exported type's members. */
+/**
+ * The exported surface of one `api.ts`: top-level export names, plus each exported type's
+ * members.
+ */
 function surfaceOf(rawSrc, label) {
   const src = neutralise(rawSrc);
   const names = new Set();

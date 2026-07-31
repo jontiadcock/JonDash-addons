@@ -22,6 +22,8 @@ import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/part
  *
  * Nothing on a display page changes anything, so a dashboard can be left open without a
  * misplaced click reconfiguring the monitoring.
+ *
+ * REFS addons/health-monitor/module.ts
  */
 export default async function HealthPage({ ctx, path }: ModulePageProps) {
   const db = ctx.db;

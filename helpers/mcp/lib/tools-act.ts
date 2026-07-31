@@ -8,19 +8,13 @@ import type { Identity } from "./authorize";
 /**
  * The acting tools. Everything here changes state.
  *
- * Each needs **both** gates: a key in `act` mode, and a bound account holding the permission. The
- * dispatcher enforces both before `run` is reached — see `decide.ts`. Promoting a key to `act` can
- * never grant what its account lacks.
+ * Each needs BOTH gates: a key in `act` mode, and a bound account holding the permission — see
+ * `decide.ts`. Promoting a key to `act` can never grant what its account lacks.
  *
- * ## Every action is attributed to the service account
- *
- * `audit(action, { userId: identity.accountId })` on every one, which was half the point of asking
- * core for service accounts: before them, an agent's actions were logged against whichever *person*
- * the key was bound to, and the log blamed a human for something they did not do. Now the log names
- * the agent's own identity.
- *
- * The action string is prefixed `mcp.` so an admin can filter the audit log to exactly what came in
- * through an assistant.
+ * Every action is attributed to the service account via `audit(action, { userId:
+ * identity.accountId })`, prefixed `mcp.` so an admin can filter to what came in through an
+ * assistant — before service accounts existed, an agent's actions were logged against whichever
+ * person the key was bound to, blaming a human for something they did not do.
  */
 
 /** Written before AND after anything destructive, so an action cannot happen unrecorded. */

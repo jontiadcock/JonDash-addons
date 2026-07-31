@@ -73,10 +73,10 @@ describe("contains — segment-aware, not string-prefix", () => {
 });
 
 /**
- * 0.0.2 split one rule into two asymmetric ones. Reading is permissive — a source may be
- * a whole drive, because the secrets inside it are excluded by identity rather than the
- * folder being refused. Writing stays strict, because writing into JonDash can replace
- * JonDash. These tests exist to catch the two rules being collapsed back together.
+ * Two asymmetric rules, not one. Reading is permissive — a source may be a whole drive,
+ * because the secrets inside it are excluded by identity rather than the folder being
+ * refused. Writing stays strict, because writing into JonDash can replace JonDash. These
+ * tests exist to catch the two rules being collapsed back together.
  */
 describe("assertUsableAsSource — permissive, since protection moved to the files", () => {
   it("ALLOWS a whole drive: that is the point of the redesign", () => {

@@ -110,6 +110,8 @@ export type SyncOutcome = { applied: boolean; monitors: number; channels: number
  * would quietly delete everything someone had just created. So it now runs only when
  * asked, and it **only adds and updates — it never deletes**. Removing something is
  * done in the interface, where it can be confirmed.
+ *
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/module.ts
  */
 export async function importConfigJson(ctx: ModuleContext): Promise<SyncOutcome> {
   const db = ctx.db;
@@ -183,7 +185,10 @@ export async function importConfigJson(ctx: ModuleContext): Promise<SyncOutcome>
   return { applied: true, monitors: monitors.length, channels: channels.length, removed };
 }
 
-/** The last configuration error, for showing in the UI. */
+/**
+ * The last configuration error, for showing in the UI.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export async function lastConfigError(ctx: ModuleContext): Promise<string | null> {
   const v = await ctx.store.get("configError");
   return typeof v === "string" && v ? v : null;

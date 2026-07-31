@@ -7,7 +7,10 @@
  * could import it safely too.
  */
 
-/** The longest an item's text may be once stored. */
+/**
+ * The longest an item's text may be once stored.
+ * REFS addons/template/page.tsx · addons/template/tests/text.test.ts
+ */
 export const MAX_ITEM_LENGTH = 200;
 
 /**
@@ -16,6 +19,7 @@ export const MAX_ITEM_LENGTH = 200;
  * Anything a user (or a remote service) hands you is untrusted: collapse the
  * whitespace, strip control characters, and cap the length. Returns null when there is
  * nothing left worth storing, so the caller can reject it.
+ * REFS addons/template/actions.ts · addons/template/tests/text.test.ts
  */
 export function normaliseItemText(input: unknown): string | null {
   if (typeof input !== "string") return null;
@@ -30,7 +34,10 @@ export function normaliseItemText(input: unknown): string | null {
   return flat.length > MAX_ITEM_LENGTH ? `${flat.slice(0, MAX_ITEM_LENGTH)}…` : flat;
 }
 
-/** "1 item" / "3 items" — the sort of thing a widget needs constantly. */
+/**
+ * "1 item" / "3 items" — the sort of thing a widget needs constantly.
+ * REFS addons/template/tests/text.test.ts · addons/template/widget.tsx
+ */
 export function pluralise(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }

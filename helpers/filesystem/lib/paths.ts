@@ -2,21 +2,12 @@ import path from "node:path";
 import fs from "node:fs";
 
 /**
- * Path safety. Everything this helper is ever asked to touch passes through here first.
+ * Path safety — everything this helper is asked to touch passes through here first. It
+ * performs no I/O beyond `realpath`, has no dependencies, and is pure enough to test
+ * exhaustively, which is deliberate: this is the only thing standing between a
+ * misconfigured backup job and someone's operating system.
  *
- * This file is deliberately the first thing written and the most heavily tested part of
- * the helper, because it is the only thing standing between a misconfigured backup job
- * and someone's operating system. It performs no I/O beyond `realpath`, has no
- * dependencies, and is pure enough to test exhaustively.
- *
- * Two ideas do all the work:
- *
- *   1. A path is normalised to a single canonical form BEFORE any decision is made about
- *      it. Comparing un-normalised paths is how `..`, symlinks, short names and mixed
- *      separators defeat a deny-list.
- *   2. Containment is tested on path SEGMENTS, never on string prefixes. `C:\Data` does
- *      not contain `C:\DataOld`, and a check that says otherwise will one day refuse a
- *      legitimate backup or — far worse — permit one it shouldn't.
+ * PINS helpers/filesystem/tests/paths.test.ts
  */
 
 /** Windows and macOS compare paths case-insensitively; Linux does not. */
@@ -24,6 +15,7 @@ const CASE_INSENSITIVE = process.platform === "win32" || process.platform === "d
 
 export type PathRefusal = { ok: false; reason: string };
 export type PathOk = { ok: true; path: string };
+/** REFS helpers/filesystem/lib/roots.ts */
 export type PathVerdict = PathOk | PathRefusal;
 
 const refuse = (reason: string): PathRefusal => ({ ok: false, reason });
@@ -35,11 +27,15 @@ function fold(p: string): string {
 
 /**
  * Canonical form: absolute, separators normalised, no trailing separator (except a root),
- * and symlinks resolved where the path already exists.
+ * symlinks resolved where the path already exists. A path is normalised BEFORE any
+ * decision is made about it — comparing un-normalised paths is how `..`, symlinks, short
+ * names and mixed separators defeat a deny-list.
+ * Resolving matters: a root that passes every check can be a link pointing at `C:\Windows`.
+ * Resolve the deepest existing part, then re-append the rest, so a destination that doesn't
+ * exist yet is still judged by where it WOULD live.
  *
- * Resolving symlinks matters: a root that passes every check can be a link pointing at
- * `C:\Windows`. We resolve the deepest part that exists, then re-append the rest, so a
- * destination that doesn't exist yet can still be judged by where it WOULD live.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/paths.test.ts ·
+ *      helpers/filesystem/tests/probe.test.ts
  */
 export function canonicalise(input: string): PathVerdict {
   if (typeof input !== "string" || input.trim() === "") return refuse("No path was given.");
@@ -53,10 +49,8 @@ export function canonicalise(input: string): PathVerdict {
 
   if (raw.includes("\0")) return refuse("That path contains an invalid character.");
 
-  // UNC must be judged on the RAW input, before normalising. `path.normalize` rewrites an
-  // incomplete `\\server` into `\server` — a rooted path on the CURRENT DRIVE — so a
-  // mistyped share name would silently become a real folder somewhere else entirely
-  // rather than an error. Decide it here, while the user's intent is still visible.
+  // Judged on the RAW input: `path.normalize` turns an incomplete `\\server` into `\server`
+  // (a path on the CURRENT DRIVE), so a mistyped share must be caught before normalising.
   if (/^[\\/]{2}/.test(raw)) {
     const parts = raw.slice(2).split(/[\\/]/).filter(Boolean);
     if (parts.length < 2) {
@@ -69,14 +63,8 @@ export function canonicalise(input: string): PathVerdict {
   // `path.normalize` resolves `..` textually. Anything left afterwards escaped the root.
   if (p.split(/[\\/]/).includes("..")) return refuse("That path is not allowed to contain “..”.");
 
-  // Resolve symlinks on the deepest existing ancestor, then re-attach the missing tail.
-  //
-  // LOCAL PATHS ONLY. `realpath` on a UNC path makes Windows try to REACH THE SERVER: the
-  // same check took 187ms or 5s depending on whether the failure was DNS-cached, and gave
-  // a different verdict each time. Validation must be instant and deterministic, so a
-  // network path is canonical from its text alone and reachability is a separate,
-  // explicit question — see `probeLocation`. The escape this resolution defends against (a
-  // symlink pointing at a system directory) is a local one, so nothing is given up.
+  // ⚠ LOCAL PATHS ONLY. `realpath` on a UNC path makes Windows try to reach the server —
+  // slow and inconsistent. A network path is canonical from its text; see `probeLocation`.
   if (!isUnc(p)) {
     const tail: string[] = [];
     let probe = p;
@@ -94,20 +82,21 @@ export function canonicalise(input: string): PathVerdict {
     p = tail.length ? path.join(probe, ...tail) : probe;
   }
 
-  // One canonical form, so `contains()` can compare two paths without special cases.
-  // A drive root keeps its separator (`C:\`); everything else, including a UNC share root
-  // (which `path.normalize` returns as `\\server\share\`), loses it.
+  // One canonical form, so `contains()` never special-cases a trailing separator: a drive
+  // root keeps its own (`C:\`); a UNC share root and everything else loses it.
   const stripped = p.replace(/[\\/]+$/, "");
   if (stripped !== "" && !/^[A-Za-z]:$/.test(stripped)) p = stripped;
   return { ok: true, path: p };
 }
 
 /**
- * True when `child` is `parent` or lives beneath it.
+ * True when `child` is `parent` or lives beneath it. Segment-aware on purpose — a naive
+ * `child.startsWith(parent)` reports that `C:\Data` contains `C:\DataOld`, which would
+ * both refuse valid destinations and, in the source-inside-destination check, miss overlaps.
  *
- * Segment-aware on purpose. A naive `child.startsWith(parent)` reports that `C:\Data`
- * contains `C:\DataOld`, which would both refuse valid destinations and — in the
- * source-inside-destination check — miss real overlaps.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/copy.ts ·
+ *      helpers/filesystem/lib/prune.ts · helpers/filesystem/lib/risk.ts ·
+ *      helpers/filesystem/tests/paths.test.ts
  */
 export function contains(parent: string, child: string): boolean {
   const a = fold(parent);
@@ -123,12 +112,12 @@ function isUnc(p: string): boolean {
 }
 
 /**
- * Is this a bare drive root (`C:\`, `/`) — as opposed to a folder on one?
+ * Is this a bare drive root (`C:\`, `/`) — as opposed to a folder on one? UNC is excluded
+ * deliberately: Node reports `\\server\share` as its own root, so a naive
+ * `path.parse(p).root === p` would refuse a network share, precisely the destination most
+ * people back up to. `\\server` alone (no share) is caught by `isBareUncServer` instead.
  *
- * UNC is excluded deliberately. Node reports `\\server\share` as its own root, so a naive
- * `path.parse(p).root === p` refuses a network share — which is precisely the destination
- * most people back up to. A share root is a location; a drive root is a whole disk.
- * `\\server` alone is caught by `isBareUncServer` instead.
+ * REFS helpers/filesystem/lib/risk.ts
  */
 export function isFilesystemRoot(p: string): boolean {
   if (isUnc(p)) return false;
@@ -146,16 +135,14 @@ function isBareUncServer(p: string): boolean {
 }
 
 /**
- * Directories a backup may never WRITE into, whatever an admin types.
+ * Directories a backup may never WRITE into, whatever an admin types. Reading is governed
+ * separately, by the secret registry (`lib/secrets.ts`), which excludes secrets by file
+ * identity — so a SOURCE may be as broad as `C:\` and JonDash's key still never leaves.
  *
- * Write-side only, since 0.0.2. Reading is now governed by the secret registry
- * (`secrets.ts`), which excludes the actual secrets by identity — so a source may be as
- * broad as `C:\` and JonDash's key still never leaves the machine.
- *
- * Writing is different, and stays absolute. A backup tool that can write into the app is
- * a backup tool that can REPLACE the app: overwrite `modules/`, drop something into
- * `.next`, and the next restart runs it. No warning covers that, so it is refused outright.
- * `process.cwd()` is the install root when the server runs.
+ * ⚠ A backup tool that can write into the app is a backup tool that can REPLACE the app —
+ * overwrite `modules/`, drop something into `.next`, and the next restart runs it. That is
+ * why this list is absolute rather than merely warned about. `process.cwd()` is the
+ * install root when the server runs.
  */
 export function writeForbiddenRoots(installDir = process.cwd()): string[] {
   const out: string[] = [];
@@ -194,28 +181,30 @@ function assertWellFormed(input: string): PathVerdict {
 }
 
 /**
- * A folder to READ from. Deliberately permissive.
+ * A folder to READ from. Deliberately permissive — a drive root or JonDash's own folder are
+ * both allowed, because protection lives on the FILES, not the location.
  *
- * Until 0.0.2 this refused drive roots and anything touching JonDash or the system, which
- * meant "back up `C:\`" was simply impossible. That refusal was also weaker than it looked:
- * it protected a *location*, so relocating the data directory walked straight around it.
+ * ⚠ Refusing broad folders would protect a *location*, which relocating the data directory
+ * walks straight around. `lib/secrets.ts` excludes the live secrets by file identity instead,
+ * wherever they move; `lib/risk.ts` tells the admin what a broad choice actually contains.
  *
- * The protection now lives where it belongs — on the files themselves. `secrets.ts`
- * resolves the live secrets from the app's own configuration and excludes them by file
- * identity, wherever they have been moved to. So anything may be a source, and the admin
- * is told what a broad choice really contains (`risk.ts`) rather than being stopped.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/admin.ts ·
+ *      helpers/filesystem/lib/copy.ts · helpers/filesystem/lib/probe.ts ·
+ *      helpers/filesystem/lib/roots.ts · helpers/filesystem/tests/paths.test.ts
  */
 export function assertUsableAsSource(input: string): PathVerdict {
   return assertWellFormed(input);
 }
 
 /**
- * A folder to WRITE into. Stricter, and not negotiable.
+ * A folder to WRITE into. Stricter, and not negotiable. A drive root IS allowed — `E:\` is
+ * what an external backup disk looks like — but anywhere writing could alter this machine
+ * rather than merely fill it (JonDash's own directory, the operating system) stays refused;
+ * see `writeForbiddenRoots` for the exact list.
  *
- * A drive root IS allowed here — `E:\` is what an external backup disk looks like, and
- * refusing it would rule out the most ordinary destination there is. What stays refused is
- * anywhere that writing could alter this machine rather than merely fill it up: JonDash's
- * own directory, and the operating system.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/copy.ts ·
+ *      helpers/filesystem/lib/prune.ts · helpers/filesystem/tests/paths.test.ts ·
+ *      helpers/filesystem/tests/probe.test.ts
  */
 export function assertUsableAsDestination(input: string, installDir = process.cwd()): PathVerdict {
   const c = assertWellFormed(input);
@@ -238,9 +227,12 @@ export function assertUsableAsDestination(input: string, installDir = process.cw
 }
 
 /**
- * Source and destination must not overlap in either direction — a mirror whose
- * destination sits inside its source copies its own output forever, and the reverse
- * deletes the thing it is meant to protect.
+ * Source and destination must not overlap in either direction — a mirror whose destination
+ * sits inside its source copies its own output forever, and the reverse deletes the thing
+ * it is meant to protect.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/copy.ts ·
+ *      helpers/filesystem/tests/paths.test.ts
  */
 export function assertDistinct(source: string, dest: string): PathVerdict {
   if (contains(source, dest)) {

@@ -98,6 +98,8 @@ async function dispatch(
 /**
  * Run one monitor and apply the result. Returns the state it settled on. Never throws —
  * the scheduler must survive any single monitor misbehaving.
+ *
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/scheduler.ts
  */
 export async function checkMonitor(
   ctx: ModuleContext,

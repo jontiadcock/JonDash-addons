@@ -4,18 +4,15 @@ import { formatBytes } from "../lib/constants";
 import { browseAction } from "../actions";
 
 /**
- * Look inside an approved folder and copy out the sub-folder path, instead of typing it.
+ * Look inside an approved folder and copy out the sub-folder path, instead of typing it —
+ * a typo in a hand-typed path produces a job that runs happily against the wrong folder, or
+ * one that doesn't exist at all.
  *
- * Typing `D:\Photos\2026\Holidays` by hand into a field is the worst part of setting a
- * backup up: a typo produces a job that runs happily against a folder that doesn't exist,
- * or worse, one that does but isn't the one you meant. This shows what's actually there.
+ * Plain forms, no client JavaScript. Position lives in the module's own store rather than the
+ * URL, because this renders inside the admin settings panel, which has no route of its own.
  *
- * Plain forms and no client JavaScript. The current position lives in the module's own
- * store rather than the URL, because this renders inside the admin settings panel, which
- * has no route of its own to hang state on.
- *
- * `browse` returns names, sizes and dates only — the helper exposes no way to read a
- * file's contents, so looking cannot leak anything.
+ * ⚠ `browse` returns names, sizes and dates only — the helper exposes no way to read a file's
+ * contents, so looking here cannot leak anything.
  */
 
 const muted = { color: "var(--muted)" } as const;
@@ -27,6 +24,7 @@ function parentOf(subpath: string): string {
   return parts.join("/");
 }
 
+/** REFS addons/backup-manager/ui/settings-panel.tsx */
 export default async function FolderPicker({
   ctx,
   roots,

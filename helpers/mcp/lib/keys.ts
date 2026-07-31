@@ -31,9 +31,12 @@ const PREFIX = "jd_mcp_";
  * `admin` was added in 0.0.2 for tools that act on the SERVER — restart, shut down, update. The
  * line between `act` and `admin` is who has to be present to undo it: an `act` tool can be
  * reversed from the dashboard, an `admin` tool can take the dashboard away.
+ * REFS helpers/mcp/lib/authorize.ts · helpers/mcp/lib/decide.ts ·
+ *      helpers/mcp/tests/escalation.test.ts
  */
 export type KeyMode = "read" | "act" | "admin";
 
+/** REFS helpers/mcp/lib/admin.ts */
 export type StoredKey = {
   id: string;
   hint: string;
@@ -44,7 +47,10 @@ export type StoredKey = {
   lastUsedAt: string | null;
 };
 
-/** Why a call was refused. For the admin's log only — NEVER returned to the caller. */
+/**
+ * Why a call was refused. For the admin's log only — NEVER returned to the caller.
+ * REFS helpers/mcp/lib/authorize.ts · helpers/mcp/lib/dispatch.ts · helpers/mcp/lib/transport.ts
+ */
 export type RefusalReason = "no-key" | "bad-key" | "revoked" | "account-gone" | "origin" | "host" | "blocked";
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -54,6 +60,7 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
  *
  * The caller must show it and discard it; there is no way to recover it afterwards, and that is
  * the point rather than an inconvenience.
+ * REFS helpers/mcp/helper.ts
  */
 export async function mintKey(input: {
   label: string;
@@ -82,6 +89,7 @@ export async function mintKey(input: {
   return { id, key, hint };
 }
 
+/** REFS helpers/mcp/api.ts · helpers/mcp/helper.ts · helpers/mcp/lib/admin.ts */
 export async function listKeys(): Promise<StoredKey[]> {
   return prisma.$queryRawUnsafe<StoredKey[]>(
     `SELECT id, hint, label, accountId, mode, createdAt, lastUsedAt
@@ -89,16 +97,23 @@ export async function listKeys(): Promise<StoredKey[]> {
   );
 }
 
-/** Revoking is a delete. There is no disabled state — a key that might come back is a key. */
+/**
+ * Revoking is a delete. There is no disabled state — a key that might come back is a key.
+ * REFS helpers/mcp/helper.ts
+ */
 export async function revokeKey(id: string): Promise<void> {
   await prisma.$executeRawUnsafe(`DELETE FROM ${T.keys()} WHERE id = ?`, id);
 }
 
+/** REFS helpers/mcp/helper.ts */
 export async function setKeyMode(id: string, mode: KeyMode): Promise<void> {
   await prisma.$executeRawUnsafe(`UPDATE ${T.keys()} SET mode = ? WHERE id = ?`, mode, id);
 }
 
-/** Drop every key bound to an account that no longer exists, or was just deleted. */
+/**
+ * Drop every key bound to an account that no longer exists, or was just deleted.
+ * REFS helpers/mcp/helper.ts
+ */
 export async function revokeKeysForAccount(accountId: string): Promise<number> {
   const rows = await prisma.$queryRawUnsafe<{ n: number }[]>(
     `SELECT count(*) AS n FROM ${T.keys()} WHERE accountId = ?`,
@@ -113,14 +128,13 @@ export type VerifiedKey = { keyId: string; accountId: string; mode: KeyMode };
 /**
  * Resolve a presented key, or `null`.
  *
- * **Constant-time comparison against every candidate**, so response time does not reveal how much
- * of a key was correct. The lookup is by hash — which is already effectively constant-time via the
- * unique index — and the explicit `timingSafeEqual` guards the case where a future change makes the
- * comparison data-dependent.
+ * ⚠ Constant-time comparison against every candidate — the lookup is by hash (already effectively
+ * constant-time via the unique index), and `timingSafeEqual` guards against a future change making
+ * it data-dependent.
  *
- * Returns `null` identically for: no key, wrong shape, unknown, revoked between calls. The `reason`
- * out-parameter exists purely so the caller can write the refusal log; it must never travel back to
- * the client.
+ * Returns `null` identically for no key, wrong shape, unknown, or revoked; `reason` is for the
+ * caller's refusal log only and must never travel back to the client.
+ * REFS helpers/mcp/lib/authorize.ts
  */
 export async function verifyKey(
   presented: string | undefined,
@@ -168,7 +182,10 @@ export async function verifyKey(
   };
 }
 
-/** Recorded after a successful call, so an unused key and a suddenly-used one are both visible. */
+/**
+ * Recorded after a successful call, so an unused key and a suddenly-used one are both visible.
+ * REFS helpers/mcp/lib/authorize.ts
+ */
 export async function touchKey(keyId: string, ip: string): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE ${T.keys()} SET lastUsedAt = ?, lastUsedIp = ? WHERE id = ?`,
@@ -202,40 +219,52 @@ async function set(key: string, value: string): Promise<void> {
   );
 }
 
-/** Absent means OFF. A missing row must never read as "listening". */
+/**
+ * Absent means OFF. A missing row must never read as "listening".
+ * REFS helpers/mcp/api.ts · helpers/mcp/lib/transport.ts · helpers/mcp/ui/settings-panel.tsx
+ */
 export const isEnabled = async () => (await get("enabled")) === "1";
+/** REFS helpers/mcp/helper.ts */
 export const setEnabled = (on: boolean) => set("enabled", on ? "1" : "0");
 
-/** Absent means loopback. A missing row must never read as "exposed to the network". */
+/**
+ * Absent means loopback. A missing row must never read as "exposed to the network".
+ * REFS helpers/mcp/api.ts · helpers/mcp/lib/transport.ts · helpers/mcp/ui/settings-panel.tsx
+ */
 export const isNetworkExposed = async () => (await get("exposed")) === "1";
+/** REFS helpers/mcp/helper.ts */
 export const setNetworkExposed = (on: boolean) => set("exposed", on ? "1" : "0");
 
 /**
- * May an assistant shut the whole server down? **Absent means NO** (owner's call, 2026-07-27).
+ * May an assistant shut the whole server down? ⚠ Absent means NO.
  *
  * Every other admin tool is recoverable — a restart returns by itself, a bad update rolls back, a
- * channel switch reverses in one call. This one leaves the dashboard down until somebody is
- * physically at the machine, because core's supervisor treats a shutdown as a clean stop and the
- * launcher window closes.
+ * channel switch reverses in one call. This one needs somebody physically at the machine: core's
+ * supervisor treats a shutdown as a clean stop, and the launcher window closes.
  *
- * So it is not enough to hold an `admin` key on an account with `settings.manage`: an administrator
- * has to have switched this specific tool on, having read what it does. That makes the unrecoverable
- * action the only one in the helper that cannot be reached by an assistant misreading a request.
+ * So holding an `admin` key with `settings.manage` is not enough — an administrator must switch
+ * this specific tool on, having read what it does: the one unrecoverable action an assistant
+ * cannot reach by misreading a request.
+ * REFS helpers/mcp/lib/tools-admin.ts · helpers/mcp/ui/settings-panel.tsx
  */
 export const isShutdownAllowed = async () => (await get("shutdown-allowed")) === "1";
+/** REFS helpers/mcp/helper.ts */
 export const setShutdownAllowed = (on: boolean) => set("shutdown-allowed", on ? "1" : "0");
 
+/** REFS helpers/mcp/ui/settings-panel.tsx */
 export const ALLOWED_PORTS = [3030, 3031, 3032, 3040, 3050] as const;
 
 /**
  * A dropdown rather than a free-text box: it keeps the choice clear of the ports JonDash and its
  * testbeds already use, and a typo'd port that silently binds nothing is worse than no choice.
+ * REFS helpers/mcp/api.ts · helpers/mcp/lib/transport.ts · helpers/mcp/ui/settings-panel.tsx
  */
 export async function getPort(): Promise<number> {
   const raw = Number(await get("port"));
   return (ALLOWED_PORTS as readonly number[]).includes(raw) ? raw : ALLOWED_PORTS[0];
 }
 
+/** REFS helpers/mcp/helper.ts */
 export async function setPort(port: number): Promise<boolean> {
   if (!(ALLOWED_PORTS as readonly number[]).includes(port)) return false;
   await set("port", String(port));

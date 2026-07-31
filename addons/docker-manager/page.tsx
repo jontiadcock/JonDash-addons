@@ -12,6 +12,7 @@ import { containerAction } from "./actions";
  * Stats are fetched here and not in the widget: Docker computes CPU by sampling twice about a
  * second apart, so a `stats()` call costs roughly a second however many containers you ask
  * about. That is fine on a page someone opened; it is not fine on every dashboard render.
+ * REFS addons/docker-manager/module.ts
  */
 export default async function DockerPage({ ctx }: ModulePageProps) {
   const api = docker(ctx);

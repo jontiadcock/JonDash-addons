@@ -24,15 +24,12 @@ import "./lib/tools-admin";
 /**
  * MCP helper — lets an AI assistant read and manage this install, as an account you choose.
  *
- * **Why a helper and not a separate server.** An external MCP process would have to authenticate
- * across a boundary, which is why it once needed core to build a whole API. A helper runs
- * in-process at boot with the database, the registry and the updater already in hand, so there is
- * no boundary and no API. The cost, accepted deliberately: this is an AI-facing network surface
- * inside the app process, and its own auth code is the only thing gating it — helpers are not
- * verifier-scanned. See HELPER.md.
+ * Runs in-process at boot with the database, the registry and the updater already in hand, so
+ * there is no auth boundary to cross. ⚠ The cost: this is an AI-facing network surface inside the
+ * app process, gated only by its own auth code — helpers are not verifier-scanned. See HELPER.md.
  *
- * **Nothing listens until an administrator switches it on AND a key exists.** Installing this opens
- * no port. That is checked in `startListener`, not merely intended.
+ * Nothing listens until an administrator switches it on AND a key exists — installing this opens
+ * no port, enforced in `startListener`, not merely intended.
  */
 
 /**
@@ -58,14 +55,9 @@ const helper: HelperDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-  version: "0.0.3",
-  // Service accounts arrived in 1.7.3-beta.1 (SEC-07) — without them this helper has nothing to
-  // bind a key to, so an older core is not a degraded experience, it is an unusable one.
-  //
-  // beta.**2**, because `resolveBindableAccount` takes the helper id there. That argument is
-  // optional and non-breaking, so beta.1 would still RUN — but it is called on the hot path of
-  // every request, and declaring a floor the code does not match is how a doc becomes a lie.
-  // The PRE-RELEASE, not a bare "1.7.3": semver ranks a pre-release below its release.
+  version: "0.0.4-beta.1",
+  // Needs beta.2, not just beta.1's service accounts (SEC-07): `resolveBindableAccount` only
+  // gained the helper-id argument it's called with on every request in beta.2.
   minAppVersion: "1.7.3-beta.2",
 
   /**
@@ -156,18 +148,12 @@ const helper: HelperDefinition = {
         const on = payload.value === true;
 
         /**
-         * **Opening this to the network without HTTPS is refused, not warned about.**
-         * (Pentest finding F2, 2026-07-27.)
+         * ⚠ Opening this to the network without HTTPS is refused, not merely warned about — a
+         * sniffed key is a *working* key, carrying whatever the bound account holds.
          *
-         * This previously returned the sentence "Turn on HTTPS if you have not" and opened the port
-         * anyway, while HELPER.md claimed the warning was "blocking, not advisory". During the
-         * penetration test the bearer key crossed the LAN in clear text — precisely the outcome
-         * that sentence was written to prevent, and the doc said it could not happen.
-         *
-         * A sniffed key is a *working* key, carrying whatever the bound account holds. So the
-         * default is refusal. The owner's call (2026-07-27) was to allow a deliberate override
-         * rather than an absolute bar — plain HTTP on a LAN you trust is a legitimate choice, and
-         * one confirmation is the difference between choosing it and stumbling into it.
+         * Override allowed rather than an absolute bar: plain HTTP on a LAN you trust is a
+         * legitimate choice, and one confirmation is the difference between choosing it and
+         * stumbling into it.
          */
         if (on && !payload.confirm) {
           const { readNetworkConfig } = await import("@/lib/tls/network-config.mjs");

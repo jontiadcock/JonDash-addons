@@ -46,6 +46,7 @@ function stateWord(run: Run): string {
   }
 }
 
+/** REFS addons/backup-manager/page.tsx */
 export default async function JobDetail({ ctx, jobId }: { ctx: ModuleContext; jobId: string }) {
   const db = ctx.db;
   if (!db) return null;

@@ -25,7 +25,10 @@ async function notice(
   await ctx.store?.set(NOTICE, { tone, text, at: new Date().toISOString() });
 }
 
-/** Start, stop, restart, pause or unpause one container. */
+/**
+ * Start, stop, restart, pause or unpause one container.
+ * REFS addons/docker-manager/page.tsx
+ */
 export const containerAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const id = str(form, "id");
   const name = str(form, "name") || id.slice(0, 12);
@@ -47,6 +50,7 @@ export const containerAction = moduleAction(MODULE_ID, async (ctx, form: FormDat
  *
  * Inert on its own: this writes a request. An admin approves it in JonDash — seeing the
  * package id verbatim — and then Windows asks again.
+ * REFS addons/docker-manager/ui/setup.tsx
  */
 export const requestDockerAction = moduleAction(MODULE_ID, async (ctx, _form: FormData): Promise<void> => {
   const r = await hostInstall(ctx).requestInstall(
@@ -68,7 +72,10 @@ export const requestDockerAction = moduleAction(MODULE_ID, async (ctx, _form: Fo
 // These reach host-install's admin surface, which refuses unless ctx.user is an ADMIN. The
 // helper re-checks rather than trusting that this panel is only reachable by admins.
 
-/** **Raises a UAC prompt and runs the installer**, which takes minutes. */
+/**
+ * **Raises a UAC prompt and runs the installer**, which takes minutes.
+ * REFS addons/docker-manager/ui/settings-panel.tsx
+ */
 export const approveInstallAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const outcome = await hostInstall(ctx).admin.approve(str(form, "id"));
   const say: Record<string, [("ok" | "warn" | "bad"), string]> = {
@@ -85,6 +92,7 @@ export const approveInstallAction = moduleAction(MODULE_ID, async (ctx, form: Fo
   revalidatePath(MODULE_PATH);
 });
 
+/** REFS addons/docker-manager/ui/settings-panel.tsx */
 export const declineInstallAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   await hostInstall(ctx).admin.decline(str(form, "id"));
   await notice(ctx, "ok", "Declined.");
@@ -96,6 +104,7 @@ export const declineInstallAction = moduleAction(MODULE_ID, async (ctx, form: Fo
  *
  * Deliberately a request rather than an immediate removal: it goes through the same approve
  * step, so removing software is never one click from a settings page.
+ * REFS addons/docker-manager/ui/settings-panel.tsx
  */
 export const requestRemoveDockerAction = moduleAction(MODULE_ID, async (ctx, _form: FormData): Promise<void> => {
   const r = await hostInstall(ctx).requestUninstall(

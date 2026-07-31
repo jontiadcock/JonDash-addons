@@ -33,30 +33,16 @@ import { probeLocation, type ProbeResult } from "./lib/probe";
 import { planCopy, runCopy, type CopyMode, type CopyPlan, type CopyResult } from "./lib/copy";
 
 /**
- * The ONLY surface a consuming module can reach — `@/helpers/filesystem/api`. The verifier
- * permits that import solely for modules that declared `helpers: ["filesystem"]`, and it
- * refuses any deeper path, so everything below is free to change without breaking anyone.
+ * The ONLY surface a consuming module can reach. The verifier allows `@/helpers/filesystem/api`
+ * for a module that declared `helpers: ["filesystem"]` and refuses any deeper path, so
+ * everything below may change without breaking a consumer.
  *
- * There is no call here that returns the contents of a file, and there must never be one.
- * A module names an operation and gets back counts; the bytes never leave this helper. That
- * single restriction is what stops this becoming a way to read `.data/secrets.json`.
+ * ⚠ Nothing here returns file CONTENTS, and nothing ever may. A module names an operation and
+ * gets back counts, so this can never become a way to read `.data/secrets.json`.
+ * ⚠ A module-supplied path resolves only against an admin-approved root — a module cannot name
+ * an absolute path, which is what lets the consent screen say "the folders you allow".
  *
- * Every path a module supplies is resolved RELATIVE TO A ROOT the administrator approved.
- * A module cannot name an absolute path at all — that is what lets the consent screen say
- * "the folders you allow" and mean it.
- *
- * ## What changed in 0.0.2
- *
- * A root may now be anything the admin can name, including `C:\`. Refusing broad folders
- * protected a *location*, which is a rule you can walk around by moving a file; the
- * protection now sits on the secrets themselves, which move with them. Three consequences
- * live in this file:
- *
- *  - `assessPath` exists so a module can WARN before saving, since the helper no longer
- *    refuses (see `lib/risk.ts`).
- *  - Every run loads a fresh secret registry and hands it to the copy engine.
- *  - Every run writes a downloadable log naming what it skipped, because a silent
- *    exclusion in a backup tool is discovered at restore time, which is far too late.
+ * REFS helpers/filesystem/HELPER.md — the guarantees this file must keep
  */
 
 const ROOTS = helperTableName("filesystem", "roots");
@@ -93,15 +79,14 @@ const ROOT_COLS = "id, path, label, riskLevel, riskNote";
 /**
  * The approved roots — plus a synthetic root per drive when "everything" is on.
  *
- * **Unbounded is expressed as roots rather than as a bypass, deliberately.** Every call in this
- * API is root-id based; nothing takes a raw path from a module, which is what stops this
- * becoming the general escape hatch the charter forbids. So "allow everything" adds the drive
- * roots to the list instead of switching the confinement off, and every existing check —
- * `resolveIn`, `contains`, the destination rules, the secret registry — keeps running exactly
- * as it did. There is no second code path to get wrong.
+ * ⚠ Unbounded is expressed AS ROOTS, never as a bypass. Every call in this API is root-id based
+ * and nothing takes a raw path from a module, which is what stops this becoming the general
+ * escape hatch the charter forbids. "Allow everything" therefore adds drive roots to the list
+ * instead of switching confinement off, so `resolveIn`, `contains`, the destination rules and
+ * the secret registry all keep running. There is no second code path to get wrong.
  *
- * Synthetic ids are prefixed so nothing can mistake one for a stored row, and they carry the
- * risk assessment a real root would.
+ * Synthetic ids are prefixed so nothing mistakes one for a stored row, and they carry the risk
+ * assessment a real root would.
  */
 async function allRoots(): Promise<Root[]> {
   const stored = await prisma.$queryRawUnsafe<Root[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} ORDER BY label`);
@@ -197,10 +182,8 @@ async function getSetting(key: string): Promise<string | null> {
 async function readRetention(): Promise<RetentionPolicy> {
   const [days, runs] = await Promise.all([getSetting("log.keepDays"), getSetting("log.keepRuns")]);
   const n = (v: string | null, dflt: number) => {
-    // The absent case must be tested BEFORE coercing: `Number(null)` and `Number("")` are
-    // both 0, which is a legitimate stored value meaning "keep forever". Coercing first
-    // silently turned "never configured" into "no retention at all" — caught in a browser,
-    // where the page read "keeping unlimited days" on a fresh install.
+    // ⚠ Test the absent case BEFORE coercing: `Number(null)` and `Number("")` are both 0, and 0
+    // is a legitimate stored value meaning "keep forever". Coercing first loses that distinction.
     if (v === null || v.trim() === "") return dflt;
     const parsed = Number(v);
     return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : dflt;
@@ -392,21 +375,16 @@ async function resolveSpec(
 }
 
 /**
- * Capability enforcement, added in 0.0.3 against core 1.5.2's `ctx.can()`.
+ * Capability enforcement against core's `ctx.can()`.
  *
- * **This is an ADDITIONAL gate. It never replaces one.** Root confinement, the write-side
- * deny-list and the secret registry are the real boundaries and every one of them still
- * runs after this passes. The danger of a check like this is not that it fails to stop an
- * attacker — it cannot, see below — but that its presence later persuades somebody the
- * checks underneath it are belt-and-braces. They are not.
+ * ⚠ An ADDITIONAL gate, never a replacement. Root confinement, the write deny-list and the
+ * secret registry are the real boundaries and all still run after this passes. The danger is
+ * not that it fails to stop an attacker — it cannot — but that its presence later persuades
+ * somebody the checks underneath are belt-and-braces. They are not.
  *
- * **It defends against mistakes, not malice.** `ctx` is a plain object the CONSUMING MODULE
- * hands us, so a module that wanted to could pass `{...ctx, can: () => true}` and this
- * would believe it; freezing `grants` doesn't help, because a spread builds a new object.
- * Core documents the same limitation and has a test asserting the bypass still works, so it
- * fails loudly if that ever changes. What this genuinely buys is an honest module that
- * under-declared being told so, clearly, instead of silently getting more than its consent
- * screen described.
+ * ⚠ It defends against mistakes, not malice: `ctx` comes from the consuming module, so
+ * `{...ctx, can: () => true}` defeats it and freezing `grants` does not help. What it buys is
+ * an honest module that under-declared being told so, clearly.
  */
 function requires(ctx: ModuleContext, permission: DeclaredPermission): string | null {
   // Absent on cores older than 1.5.2. `minAppVersion` rules those out, but a helper that
@@ -456,15 +434,13 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   /**
    * Ask. This is the whole of what a module may do about the root list.
    *
-   * `addRoot` and `removeRoot` used to live here, and that was the same defect
-   * `host-services` carried until 0.0.2: **the thing being bounded could edit its own
-   * boundary.** A module confined to approved folders could approve one, so the consent
-   * wording — "within the folders you allow" — was only true until the module chose to make
-   * it false. It needed no exploit, just the call it was already given.
+   * ⚠ `addRoot`/`removeRoot` must never return here. That was the defect `host-services` carried
+   * until 0.0.2: **the thing being bounded could edit its own boundary.** A module confined to
+   * approved folders could approve one, so "within the folders you allow" stayed true only until
+   * the module chose otherwise — no exploit needed, just the call it already had.
    *
-   * HELPERS-DESIGN rule 8: a helper's module-facing API carries read and request, never add,
-   * remove or approve. The editor is on Admin → Permissions, where `ctx.user` comes from the
-   * session and no module is anywhere in the path.
+   * REFS helpers/README.md — rule 8: read and request, never add, remove or approve
+   *      helpers/filesystem/lib/admin.ts — the editor, reached only with no module in the path
    */
   async suggestRoot(input, reason) {
     const denied = requires(ctx, "filesystem:read");
@@ -473,9 +449,8 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
     const text = String(reason ?? "").trim();
     if (!text) return { ok: false, reason: "Say why the folder is needed." };
 
-    // Validated for SHAPE only, and never canonicalised into the row. Resolving a module's
-    // string against the disk here would let it probe what exists by reading back which
-    // suggestions were accepted; the admin canonicalises when approving.
+    // ⚠ SHAPE only, never canonicalised into the row — resolving a module's string against the
+    // disk lets it probe what exists by reading back which suggestions were accepted.
     const verdict = assertUsableAsSource(input);
     if (!verdict.ok) {
       // Logged by the HELPER, not left to the caller — a module reaching outside its bounds
@@ -519,16 +494,13 @@ const api = (ctx: ModuleContext): FilesystemApi => ({
   /**
    * Listing honours the secret registry, exactly as copying does.
    *
-   * It did not until 0.0.5. The copy engine has always refused to carry a secret off the
-   * machine, so no *contents* were ever reachable — but a root at JonDash's own folder let a
-   * module read back the NAMES and sizes inside `.data`: that `secrets.json` exists, how big
-   * it is, which TLS keys are present. That is reconnaissance, not a leak, and it is still
-   * not something a module should be able to ask for.
+   * ⚠ Without this a root at JonDash's own folder lets a module read back the NAMES and sizes
+   * inside `.data` — that `secrets.json` exists, how big it is, which TLS keys are present.
+   * Reconnaissance rather than a leak, and still not something a module may ask for.
    *
-   * The check is by identity on a `stat` this loop already took, so it costs nothing and it
-   * follows the secrets if `JONDASH_DATA_DIR` or `DATABASE_URL` moves them. Protected entries
-   * are omitted rather than marked — telling a caller "something is here you may not see"
-   * hands back the fact it was asking for.
+   * Checked by identity on a `stat` this loop already took, so it costs nothing and follows the
+   * secrets if `JONDASH_DATA_DIR` or `DATABASE_URL` moves them. Protected entries are omitted,
+   * not marked — saying "something is here you may not see" hands back the fact being asked for.
    */
   async browse(rootId, subpath) {
     if (requires(ctx, "filesystem:read")) return [];
@@ -779,4 +751,16 @@ function clampPolicy(p: GfsPolicy): GfsPolicy {
   };
 }
 
+/**
+ * The factory every consumer imports, then calls as `filesystem(ctx)`.
+ *
+ * ⚠ Adding a call here widens what every consuming module can do. The capability labels in
+ * `helper.ts` must change in the same commit — nothing detects an API that outgrew its consent
+ * wording, so the label is part of this surface, not documentation of it.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/actions.ts ·
+ *      addons/backup-manager/page.tsx · addons/backup-manager/ui/folder-picker.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/settings-panel.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ *      helpers/filesystem/helper.ts › provides — the labels that must track this surface
+ */
 export default api;

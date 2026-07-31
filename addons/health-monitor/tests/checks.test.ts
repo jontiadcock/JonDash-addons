@@ -136,9 +136,8 @@ describe("tcp checks", () => {
 });
 
 describe("ping checks", () => {
-  // ICMP itself belongs to the framework (`ctx.net.ping`); what this module owns is the
-  // translation of its answer — a number is a reply, null is silence, a throw is a host
-  // the framework refused — into a check outcome.
+  // ICMP itself belongs to the framework (`ctx.net.ping`); this module only translates its
+  // answer — a number is a reply, null is silence, a throw is a host the framework refused.
   const withNet = (net: NonNullable<ModuleContext["net"]>): ModuleContext => ({ ...ctx(), net });
   const pingMonitor = { kind: "ping" as const, target: "192.168.1.1", port: null };
 
@@ -171,9 +170,8 @@ describe("ping checks", () => {
 });
 
 describe("dns checks", () => {
-  // Regression: this used to query the configured DNS server directly, which reports a
-  // false outage on any box whose resolver is a Pi-hole, a VPN or 127.0.0.1. "localhost"
-  // resolves through the OS but is not in DNS, so it only passes via the lookup path.
+  // Regression coverage: querying the DNS server directly false-outaged a Pi-hole/VPN/127.0.0.1
+  // resolver. "localhost" resolves via the OS, not DNS, so only the lookup path passes it.
   it("resolves a name the operating system knows", async () => {
     const out = await runCheck(ctx(), { kind: "dns", target: "localhost", port: null }, {}, 5000, 30);
     expect(out.state).toBe("up");

@@ -12,6 +12,11 @@ import { MAX_ITEM_LENGTH } from "./lib/text";
  * client-side JavaScript. The forms post to the Server Actions in actions.ts, so even
  * adding and deleting needs no `"use client"`.
  */
+
+/**
+ * The entry point core renders at /m/template.
+ * REFS addons/template/module.ts › Page
+ */
 export default async function TemplatePage({ ctx, path }: ModulePageProps) {
   const heading = String((await ctx.settings.get("heading")) ?? "Items");
   const items = ctx.db ? await listItems(ctx.db) : [];

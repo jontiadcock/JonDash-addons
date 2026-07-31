@@ -2,40 +2,27 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 /**
- * Per-run log files, and how long they are kept.
+ * Per-run log files, and how long they are kept. A backup that reports "3 files copied, 2
+ * skipped" is not accountable — *which* two? Since the helper steps over JonDash's secrets
+ * rather than refusing the folder outright, an unenumerable skip is indistinguishable from
+ * a bug, so each run writes a plain-text log naming every file it copied, skipped or failed
+ * on, downloadable by the admin.
  *
- * A backup that reports "3 files copied, 2 skipped" is not accountable. *Which* two? A
- * skipped file is the whole point of the redesign — the helper now steps over JonDash's
- * secrets instead of refusing the folder outright — and a skip nobody can enumerate is
- * indistinguishable from a bug. Each run therefore writes a plain-text log naming every
- * file it copied, skipped or failed on, and the admin can download it.
- *
- * ## Where these live, and why
- *
- * `<install>/logs/helpers/filesystem/`. Three properties had to hold at once:
- *
- *  - **Survives an update.** `logs` is in the updater's preserve list, so history is not
- *    lost the moment JonDash upgrades.
- *  - **Stays out of JonDash's own backups.** Core's config backup walks `.data` with an
- *    *exclude* list, so anything put there travels inside every backup file. Months of
- *    copy logs have no business inflating a restore archive.
- *  - **Matches where JonDash already logs.** The launcher writes to `logs/`, so an admin
- *    looking for logs finds them all in one place.
- *
- * ## Size
- *
- * Logging every file means a `C:\` run could otherwise produce a log larger than some of
- * the files it copied. Past a cap the per-file detail stops, but **skips and errors keep
- * being written** — the lines that exist for accountability are the ones worth keeping
- * when something has to give.
+ * See `logDir()` for where these live and why, `MAX_DETAIL_BYTES` for the size cap.
  */
 
-/** Stop recording per-file successes past this point. Skips and errors continue. */
+/**
+ * Stop recording per-file successes past this point — skips and errors continue. Logging
+ * every file means a `C:\` run could otherwise produce a log larger than some of the files
+ * it copied; past the cap, the lines that exist for accountability (skips, errors) are the
+ * ones worth keeping when something has to give.
+ */
 const MAX_DETAIL_BYTES = 32 * 1024 * 1024;
 
 /** Flush after this many lines. Small enough to survive a crash, large enough to be cheap. */
 const FLUSH_EVERY = 128;
 
+/** REFS helpers/filesystem/api.ts · helpers/filesystem/lib/admin.ts */
 export type RetentionPolicy = {
   /** Delete logs older than this many days. 0 disables the age rule. */
   keepDays: number;
@@ -43,9 +30,22 @@ export type RetentionPolicy = {
   keepRuns: number;
 };
 
+/**
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/helper.ts ·
+ *      helpers/filesystem/lib/admin.ts
+ */
 export const DEFAULT_RETENTION: RetentionPolicy = { keepDays: 30, keepRuns: 50 };
 
-/** Resolved per call so it honours a relocated install, like everything else here. */
+/**
+ * `<install>/logs/helpers/filesystem/` — resolved per call so it honours a relocated
+ * install, like everything else here. Three properties had to hold: it survives an update
+ * (`logs` is in the updater's preserve list), it stays out of JonDash's own backups (core's
+ * config backup walks `.data` with an EXCLUDE list, so anything elsewhere travels with every
+ * backup file), and it matches where JonDash already logs, so an admin finds everything in
+ * one place.
+ *
+ * REFS helpers/filesystem/tests/logfile.test.ts
+ */
 export function logDir(): string {
   return path.join(process.cwd(), "logs", "helpers", "filesystem");
 }
@@ -94,7 +94,12 @@ export type LogSummary = {
   kind?: "copy" | "prune";
 };
 
-/** An open log for one run. Writes are appended; nothing is held in memory but a buffer. */
+/**
+ * An open log for one run. Writes are appended; nothing is held in memory but a buffer.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/copy.ts ·
+ *      helpers/filesystem/lib/prune.ts · helpers/filesystem/tests/logfile.test.ts
+ */
 export class RunLog {
   private buf: string[] = [];
   private written = 0;
@@ -206,9 +211,13 @@ export class RunLog {
   }
 }
 
+/** REFS helpers/filesystem/api.ts */
 export type LogEntry = { runId: string; bytes: number; modifiedAt: string };
 
-/** Newest first. Never throws — an unreadable log directory simply has no logs in it. */
+/**
+ * Newest first. Never throws — an unreadable log directory simply has no logs in it.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/logfile.test.ts
+ */
 export async function listLogs(): Promise<LogEntry[]> {
   const dir = logDir();
   const out: LogEntry[] = [];
@@ -230,7 +239,10 @@ export async function listLogs(): Promise<LogEntry[]> {
   return out.sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt));
 }
 
-/** The log text, or null if there isn't one. */
+/**
+ * The log text, or null if there isn't one.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/logfile.test.ts
+ */
 export async function readLog(runId: string): Promise<string | null> {
   const file = fileFor(runId);
   if (!file) return null;
@@ -255,6 +267,9 @@ export async function deleteLog(runId: string): Promise<void> {
  * Apply retention. Age and count are independent rules and BOTH apply — a log is removed
  * if it is too old *or* if it has fallen outside the most recent `keepRuns`. Setting
  * either to 0 disables that rule; setting both to 0 keeps everything forever.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/helper.ts ·
+ *      helpers/filesystem/lib/admin.ts · helpers/filesystem/tests/logfile.test.ts
  */
 export async function pruneLogs(policy: RetentionPolicy = DEFAULT_RETENTION): Promise<{ removed: number }> {
   const entries = await listLogs(); // already newest-first
@@ -274,7 +289,10 @@ export async function pruneLogs(policy: RetentionPolicy = DEFAULT_RETENTION): Pr
   return { removed: doomed.size };
 }
 
-/** Total bytes on disk, so an admin can see what retention is actually costing. */
+/**
+ * Total bytes on disk, so an admin can see what retention is actually costing.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/logfile.test.ts
+ */
 export async function logsFootprint(): Promise<{ count: number; bytes: number }> {
   const entries = await listLogs();
   return { count: entries.length, bytes: entries.reduce((n, e) => n + e.bytes, 0) };

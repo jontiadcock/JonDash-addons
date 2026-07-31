@@ -6,39 +6,24 @@ import { MODULE_PATH, type MonitorRow } from "./lib/types";
 import { HealthStyles, InlineStatusStrip, StatusDot } from "./ui/parts";
 
 /**
- * The dashboard widget: a single reassuring line when everything is up, and the detail
- * only when it isn't.
+ * The dashboard widget: a single reassuring line when everything is up, and the detail only
+ * when it isn't. Rendering does no work beyond reading — monitoring runs on the `scheduler`
+ * helper from server start, so this shows the state as of the last tick, not something this
+ * render just produced.
  *
- * Rendering does no work beyond reading. Monitoring runs on the `scheduler` helper from
- * server start, so what you see here is the state as of the last tick — not something
- * this render just went and produced.
- *
- * # Sizing (JonDash 1.8.0 B5/B6)
- *
- * The user can make this anything from 1×1 to full width, and the frame **clips rather than
- * scrolls**. Three rules, all learned the hard way on `host-vitals`:
- *
- * 1. **Core's two thresholds** (`@[6rem]`, `@[8rem]`) decide what *kind* of content appears.
- * 2. **Every row is exactly one line**, and the list is the `FILL_GRID` below — `1fr` rows that
- *    stretch to use the tile's height, flowing into a new column only once the height is spent.
- *    A container query reports width and never height, so the grid is how you adapt to the axis
- *    you cannot ask about — and, unlike the two mechanisms tried before it, it fills the card
- *    rather than leaving most of it empty.
- * 3. **Priority order**, because whatever doesn't fit is clipped: anything broken comes first,
- *    so a failing monitor is never the thing that disappears.
- *
- * `MAX_ROWS = 4` is gone. A constant row count was chosen for one box size and was wrong at every
- * other — clipped when small, half-empty when large. The count now follows the container.
+ * Resizable from 1×1 to full width, and the frame clips rather than scrolls. The container-query
+ * breakpoints at 6rem and 8rem (used throughout the JSX below) decide what content appears; the
+ * row layout and clip-priority rules live with `FILL_GRID` and `shown` below, not here.
  */
 
-/** See `service-control` for the reasoning: a guard against an unbounded list, not a layout size. */
+/** See `service-control` — a guard against an unbounded list, not a layout size. */
 const TILE_CAP = 24;
 
 /**
  * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
  * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
- * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
- * so a few rows spread one-per-column across the top and left the rest of the card empty).
+ * first: a wrapping flex layout (columns ran off the side of the card) and CSS `columns` (it
+ * balances, so a few rows spread one-per-column across the top and left the rest empty).
  *
  * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
  * sideways, so a tall tile is one long list and a wide short one flows into columns.
@@ -56,6 +41,7 @@ const FILL_GRID = {
   fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
 } as const;
 
+/** REFS addons/health-monitor/module.ts */
 export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
   const db = ctx.db;
   const monitors: MonitorRow[] = db ? await listMonitors(db) : [];
@@ -70,14 +56,12 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
   const overall = worstState(active.map((m) => m.status));
   const problems = active.filter((m) => m.status === "down" || m.status === "degraded");
 
-  // Problems first, then everything else, so the frame clipping the tail always clips a healthy
-  // monitor. The cap is a guard against an unbounded list, not the old layout constant: how many
-  // of these 24 you SEE still follows the container. A tile is a summary; the page is the list.
+  // Problems first, then everything else, so clipping the tail always clips a healthy monitor.
+  // The cap only bounds the list — how many of these 24 you SEE still follows the container.
   const shown = [...problems, ...monitors.filter((m) => !problems.includes(m))].slice(0, TILE_CAP);
 
-  // "All up" has to mean it: a monitor that has failed once but hasn't been confirmed
-  // down yet is neither up nor down, and saying otherwise is the one thing a status
-  // widget must never do.
+  // "All up" has to mean it: a monitor that failed once but isn't confirmed down yet is
+  // neither — saying otherwise is the one thing a status widget must never do.
   const pending = active.filter((m) => m.status === "unknown").length;
   const summary =
     problems.length > 0
@@ -134,8 +118,8 @@ export default async function HealthWidget({ ctx }: ModuleWidgetProps) {
             {openIncidents > 0 ? ` · ${openIncidents} ongoing` : ""}
           </p>
 
-          {/* `min-h-0` is what bounds the list; without it the flex child grows to its content
-              and the grid has no height to divide into rows. */}
+          {/* A zero minimum height is what bounds the list — without it the flex child grows
+              to its content and the grid has no height to divide into rows. */}
           <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
             <ul className="h-full" style={FILL_GRID}>
             {shown.map((m) => (

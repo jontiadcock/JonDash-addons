@@ -13,6 +13,9 @@ import { stateColour } from "../lib/format";
 /**
  * Status colours, scoped to `.hm` so nothing leaks into the base app's stylesheet, with
  * a dark variant matching how the core defines its own tokens.
+ *
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/ui/settings-panel.tsx ·
+ *      addons/health-monitor/widget.tsx
  */
 export function HealthStyles() {
   return (
@@ -27,6 +30,10 @@ export function HealthStyles() {
   );
 }
 
+/**
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/ui/settings-panel.tsx ·
+ *      addons/health-monitor/widget.tsx
+ */
 export function StatusDot({ state, size = 10 }: { state: MonitorState; size?: number }) {
   return (
     <span
@@ -41,12 +48,12 @@ export function StatusDot({ state, size = 10 }: { state: MonitorState; size?: nu
  * The 24-hour strip drawn INSIDE a row rather than under it — absolutely positioned into the
  * row's bottom padding, so it costs no height.
  *
- * That sounds like a detail and is the whole reason the widget survives being resized. A strip
- * on its own line made every monitor row about 34px tall; a widget one grid unit high gives its
- * list roughly 19px, so those rows spilled straight out of the card while one-line rows fitted.
- * Anything that grows a row vertically has to be paid for at the smallest size the user can
- * choose — and since a container query can only report WIDTH, a wide-and-short widget will
- * happily tell you there is room when there is none. So: never add height, overlay instead.
+ * That sounds like a detail and is the whole reason the widget survives being resized: a strip
+ * on its own line made every row ~34px tall against a one-grid-unit tile's ~19px, so those rows
+ * spilled straight out of the card. A container query can only report WIDTH, so a wide-and-short
+ * widget will say there's room when there is none — never add height here, overlay instead.
+ *
+ * REFS addons/health-monitor/widget.tsx
  */
 export function InlineStatusStrip({ buckets }: { buckets: HourBucket[] }) {
   return (
@@ -70,6 +77,7 @@ function bucketState(b: HourBucket): MonitorState {
 /**
  * One bar per hour, oldest on the left. Bars are drawn at a fixed size and the SVG
  * scales to its container, so the same strip works in a narrow widget and a wide page.
+ * REFS addons/health-monitor/page.tsx
  */
 export function StatusStrip({
   buckets,
@@ -124,7 +132,10 @@ export function StatusStrip({
   );
 }
 
-/** A latency trace. Flat line when every sample is identical, empty when there's nothing. */
+/**
+ * A latency trace. Flat line when every sample is identical, empty when there's nothing.
+ * REFS addons/health-monitor/page.tsx
+ */
 export function Sparkline({
   values,
   height = 40,
@@ -164,7 +175,10 @@ export function Sparkline({
   );
 }
 
-/** A labelled figure, used for the uptime and latency read-outs. */
+/**
+ * A labelled figure, used for the uptime and latency read-outs.
+ * REFS addons/health-monitor/page.tsx
+ */
 export function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div>

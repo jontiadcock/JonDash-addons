@@ -4,48 +4,29 @@ import crypto from "node:crypto";
 import { dataDir, secretsPath } from "@/lib/config";
 
 /**
- * The secret registry — what a backup must never carry off this machine.
+ * The secret registry — what a backup must never carry off this machine. Matches by FILE
+ * IDENTITY (`identityOf`) rather than by path, because path-based refusal is both too
+ * strict (blocks backing up `C:\` at all) and too weak (relocate `JONDASH_DATA_DIR` or
+ * `DATABASE_URL` and it protects nothing).
  *
- * This replaces the old approach of refusing any source that touched the JonDash folder.
- * Refusing by path was both too strict and too weak: it blocked backing up `C:\` at all,
- * yet it protected nothing if the data directory had been relocated (`JONDASH_DATA_DIR`)
- * or the database moved (`DATABASE_URL`). A rule that can be walked around by moving a
- * file is not a rule.
- *
- * So this module answers a different question: **which files on disk ARE the secrets,
- * right now?** It resolves them from the same configuration the running app reads, and
- * then matches them by FILE IDENTITY rather than by name.
- *
- * ## Why identity beats path
- *
- * `fs.stat()` reports a volume serial (`dev`) and a file index (`ino`) — on NTFS as well
- * as POSIX. That pair is stable across a rename, a move within the volume, a hard link,
- * and any casing or junction used to reach the file. Verified on Windows: the same file
- * renamed, moved into a subfolder, reached via `SUB\DEEP.JSON`, and opened through a hard
- * link all report one identity. So a secret that has MOVED is still recognised, and a
- * secret reached by a sneaky second path cannot slip through under a different name.
- *
- * ## Three tiers, and the honest limit of each
- *
- *  1. **Identity** (below, `protectedIdentities`) — catches the live secrets wherever they
- *     now live, plus every alternative route to them. This is the load-bearing tier.
- *  2. **Content** (`protectedContent`) — a verbatim COPY of a secret is a different file
- *     with a different identity, so tier 1 cannot see it. Hashing small files catches
- *     `secrets.json.bak`. We also look for the master key's literal value, which catches
- *     the key pasted into someone's notes.
- *  3. **Nothing catches the rest.** A re-encoded secret, a key inside a screenshot, a
- *     value typed into a document — that is data-loss prevention, an entire product
- *     category, and it does not work reliably. This helper must not imply otherwise. What
- *     it promises is precise: *JonDash's own secrets, and verbatim copies of them.*
- *
- * Nothing here throws. A secret that cannot be resolved is simply one this pass could not
- * protect, and the caller reports that rather than failing the backup.
+ * ⚠ Three tiers, and tier 3 is the honest limit: identity (`protectedIdentities`) catches
+ * the live secrets wherever they now live; content (`protectedContent`) catches a verbatim
+ * copy; nothing here catches a re-encoded secret, a key in a screenshot, or one typed into
+ * a document — that is data-loss prevention, a different product, and this helper must
+ * never imply otherwise. It promises exactly: JonDash's own secrets, and verbatim copies.
  */
 
 /** How large a file may be before we stop content-checking it. Secrets are small. */
 const SMALL_FILE_MAX = 64 * 1024;
 
-/** A stable identity for a file or directory: volume serial + file index. */
+/**
+ * A stable identity for a file or directory: volume serial + file index. Stable across a
+ * rename, a move within the volume, a hard link, and any casing or junction used to reach
+ * it — verified on Windows, where the same file renamed, moved, and reached through a hard
+ * link all report one identity. So a secret that has MOVED is still recognised.
+ *
+ * REFS helpers/filesystem/lib/scopes.ts · helpers/filesystem/tests/secrets.test.ts
+ */
 export function identityOf(st: { dev: number | bigint; ino: number | bigint }): string {
   return `${st.dev}:${st.ino}`;
 }
@@ -89,11 +70,12 @@ function candidatePaths(installDir: string): { path: string; reason: string }[] 
 }
 
 /**
- * Tier 1 — identities of the live secrets, mapped to why each is protected.
+ * Tier 1 — identities of the live secrets, mapped to why each is protected. Directories are
+ * included so a whole subtree can be skipped by one comparison: the walk checks each
+ * directory's identity before descending, so `.data` is stepped over entirely without
+ * needing to know what is inside it.
  *
- * Directories are included so a whole subtree can be skipped by one comparison: the walk
- * checks each directory's identity before descending, so `.data` is stepped over entirely
- * without needing to know what is inside it.
+ * REFS helpers/filesystem/lib/scopes.ts
  */
 export async function protectedIdentities(installDir = process.cwd()): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -154,13 +136,7 @@ export async function protectedContent(installDir = process.cwd()): Promise<Prot
   return { hashes, literals: [...new Set(literals)] };
 }
 
-/**
- * The whole registry, resolved once at the start of a run.
- *
- * Resolved per run rather than cached for the process lifetime: an admin may move the
- * database or rotate the key between runs, and a stale registry would protect a location
- * that no longer holds anything while missing the one that does.
- */
+/** REFS helpers/filesystem/lib/copy.ts */
 export type SecretRegistry = {
   identities: Map<string, string>;
   content: ProtectedContent;
@@ -168,6 +144,13 @@ export type SecretRegistry = {
   keyUnresolved: boolean;
 };
 
+/**
+ * The whole registry, resolved once at the start of a run — not cached for the process
+ * lifetime, since an admin may move the database or rotate the key between runs, and a
+ * stale registry would protect a location that no longer holds anything.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/secrets.test.ts
+ */
 export async function loadRegistry(installDir = process.cwd()): Promise<SecretRegistry> {
   const [identities, content] = await Promise.all([
     protectedIdentities(installDir),
@@ -177,20 +160,23 @@ export async function loadRegistry(installDir = process.cwd()): Promise<SecretRe
 }
 
 /**
- * Is this file or directory protected? Returns the reason, or null.
+ * Is this file or directory protected? Returns the reason, or null. `stat` alone answers
+ * tier 1 and costs nothing — the walk has already taken it. The content check is offered
+ * separately (`contentReason`) because it needs a read, paid only on files about to copy.
  *
- * `stat` alone answers tier 1 and costs nothing — the walk has already taken it. The
- * content check is offered separately (`contentReason`) because it needs a read, and the
- * caller only pays for it on files it is actually about to copy.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/copy.ts ·
+ *      helpers/filesystem/tests/secrets.test.ts
  */
 export function identityReason(reg: SecretRegistry, st: { dev: number | bigint; ino: number | bigint }): string | null {
   return reg.identities.get(identityOf(st)) ?? null;
 }
 
 /**
- * Tier 2 applied to one candidate file's bytes. Only worth calling for small files that
- * are about to be written to the destination — which is precisely where a leak would
- * happen, so nothing is given up by skipping the check on files we aren't copying.
+ * Tier 2 applied to one candidate file's bytes. Only worth calling for small files about to
+ * be written to the destination — precisely where a leak would happen, so nothing is given
+ * up by skipping the check on files that aren't being copied.
+ *
+ * REFS helpers/filesystem/lib/copy.ts · helpers/filesystem/tests/secrets.test.ts
  */
 export function contentReason(reg: SecretRegistry, buf: Buffer): string | null {
   const hash = crypto.createHash("sha256").update(buf).digest("hex");
@@ -208,5 +194,8 @@ export function contentReason(reg: SecretRegistry, buf: Buffer): string | null {
   return null;
 }
 
-/** Files above this size are not content-checked. Exposed so the walk can avoid the read. */
+/**
+ * Files above this size are not content-checked, so the walk can skip the read.
+ * REFS helpers/filesystem/lib/copy.ts
+ */
 export const CONTENT_CHECK_MAX_BYTES = SMALL_FILE_MAX;

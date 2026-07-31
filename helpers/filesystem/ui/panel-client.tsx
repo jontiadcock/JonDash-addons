@@ -7,13 +7,14 @@ import { saveHelperSettingsAction } from "@/app/admin/helpers/actions";
  * of its own — a helper reaching around core's audited entry point would be the same mistake
  * as a module reaching around the helper.
  *
- * Interim UI; see the note in settings-panel.tsx. Kept deliberately plain.
+ * Interim UI; see the `⚠` in `settings-panel.tsx`. Kept deliberately plain.
  */
 
 export type Root = { id: string; path: string; label: string; riskLevel: string; riskNote: string | null };
 export type Suggestion = { id: string; moduleId: string; path: string; reason: string; createdAt: string };
 export type Retention = { keepDays: number; keepRuns: number };
 
+/** REFS helpers/filesystem/ui/settings-panel.tsx */
 export default function PanelClient({
   helperId,
   roots,

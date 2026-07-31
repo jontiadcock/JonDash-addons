@@ -30,6 +30,7 @@ const err = (id: unknown, code: number, message: string) => ({
   body: { jsonrpc: "2.0", id, error: { code, message } },
 });
 
+/** REFS helpers/mcp/helper.ts */
 export const dispatch: Dispatch = async (message: Req, auth) => {
   const { method, id, params } = message;
 
@@ -64,9 +65,8 @@ export const dispatch: Dispatch = async (message: Req, auth) => {
     const p = (params ?? {}) as { name?: string; arguments?: Record<string, unknown> };
     const tool = p.name ? getTool(p.name) : undefined;
 
-    // **Unknown tool and unauthorized tool must be indistinguishable.** So an unknown name is
-    // authorized as if it needed nothing, and only then reported as unknown — a caller holding a
-    // valid key learns a name was wrong, and a caller without one learns nothing at all.
+    // ⚠ Unknown and unauthorized tools must be indistinguishable — an unknown name is authorized
+    // as if it needed nothing, then reported unknown only once that check has passed.
     const res = await identityFor(
       tool ? { kind: tool.kind, permission: tool.permission } : { kind: "read", permission: null },
     );
@@ -80,20 +80,16 @@ export const dispatch: Dispatch = async (message: Req, auth) => {
       });
     } catch (e) {
       /**
-       * **A tool that refuses is a RESULT, not a protocol error.**
+       * ⚠ A tool that refuses is a RESULT, not a protocol error: a malformed request is the
+       * caller's (JSON-RPC `error`); a tool that ran and declined is an outcome (`isError`ed
+       * result) — clients feed only results to the model, an error code often never reaches it.
        *
-       * The spec draws the line at whose problem it is: a malformed request is the caller's and
-       * belongs in a JSON-RPC `error`; a tool that ran and declined is an outcome, and goes back
-       * as a normal result carrying `isError`. Clients only feed results to the model — a
-       * JSON-RPC error is surfaced as a transport failure and frequently never reaches it.
+       * Every refusal in `tools-act.ts` is written to be READ BY THE ASSISTANT and acted on ("do
+       * it from Admin → Sessions" instead) — as an error code the guard still holds, but the person
+       * never learns what to do.
        *
-       * That distinction is the whole point here. Every refusal in `tools-act.ts` is written to be
-       * READ BY THE ASSISTANT and passed on: "an assistant cannot sign an administrator out — do
-       * it from Admin → Sessions." Returned as -32603 that sentence is thrown away and the user
-       * gets an opaque failure, so the guard holds but the person never learns what to do instead.
-       *
-       * The message a tool throws reaches the model. Keep it about the request, never about the
-       * internals — a stack trace or a SQL error is an information leak with a model attached.
+       * ⚠ Keep the thrown message about the request, never the internals — a stack trace or SQL
+       * error is an information leak with a model attached.
        */
       return ok(id, {
         content: [{ type: "text", text: e instanceof Error ? e.message : "The tool failed." }],

@@ -28,10 +28,15 @@ export type ToolDef = {
 
 const registry = new Map<string, ToolDef>();
 
+/**
+ * REFS helpers/mcp/lib/tools-act.ts · helpers/mcp/lib/tools-admin.ts ·
+ *      helpers/mcp/lib/tools-read.ts
+ */
 export function register(tool: ToolDef): void {
   registry.set(tool.name, tool);
 }
 
+/** REFS helpers/mcp/lib/dispatch.ts */
 export function getTool(name: string): ToolDef | undefined {
   return registry.get(name);
 }
@@ -46,12 +51,11 @@ export function getTool(name: string): ToolDef | undefined {
  *
  * An unauthenticated caller never reaches this. The transport refuses before the body is parsed, so
  * the tool list cannot be used to fingerprint an install.
+ * REFS helpers/mcp/lib/dispatch.ts
  */
 export function listFor(identity: Identity): ToolDef[] {
-  // Calls `decide()` rather than repeating the rules. It used to carry its own copy — two ifs that
-  // happened to agree with the gate — which is the same duplication `decide.ts` exists to prevent
-  // and would have drifted the moment a third mode was added. It was: adding `admin` would have
-  // left every admin tool listed to an `act` key while `authorize()` correctly refused it.
+  // Calls `decide()` rather than repeating the rules — the same duplication `decide.ts` exists to
+  // prevent. Adding `admin` without this would have left every admin tool listed to an `act` key.
   return [...registry.values()].filter(
     (t) =>
       decide({
@@ -63,11 +67,15 @@ export function listFor(identity: Identity): ToolDef[] {
   );
 }
 
-/** The wire shape a client sees. `run` and the internal fields never cross. */
+/**
+ * The wire shape a client sees. `run` and the internal fields never cross.
+ * REFS helpers/mcp/lib/dispatch.ts
+ */
 export function toWire(t: ToolDef) {
   return { name: t.name, description: t.description, inputSchema: t.inputSchema };
 }
 
+/** REFS helpers/mcp/api.ts · helpers/mcp/helper.ts */
 export function allTools(): ToolDef[] {
   return [...registry.values()];
 }

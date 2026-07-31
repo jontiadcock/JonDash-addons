@@ -27,6 +27,7 @@ type Props = {
   submitLabel: string;
 };
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export function CheckForm({
   action,
   channels,

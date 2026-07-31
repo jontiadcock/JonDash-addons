@@ -38,7 +38,10 @@ const int = (f: FormData, k: string, dflt: number) => {
 };
 const bool = (f: FormData, k: string) => (f.get(k) ? 1 : 0);
 
-/** Assess a folder WITHOUT saving it — the warning an admin reads before committing. */
+/**
+ * Assess a folder WITHOUT saving it — the warning an admin reads before committing.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const assessPathAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const a = filesystem(ctx).assessPath(str(form, "path"));
   await ctx.store?.set(
@@ -67,6 +70,7 @@ export const assessPathAction = moduleAction(MODULE_ID, async (ctx, form: FormDa
  * helper. That made the consent wording — "within the folders you allow" — true only until
  * this module chose otherwise: the thing confined to approved folders could approve them.
  * The editor is now on Admin → Permissions → Files and folders, and all this can do is ask.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
  */
 export const suggestRootAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const res = await filesystem(ctx).suggestRoot(str(form, "path"), str(form, "reason"));
@@ -77,13 +81,17 @@ export const suggestRootAction = moduleAction(MODULE_ID, async (ctx, form: FormD
   revalidatePath(ADMIN_PATH);
 });
 
-/** Prove a location works BEFORE relying on it nightly. Does real I/O, on demand only. */
+/**
+ * Prove a location works BEFORE relying on it nightly. Does real I/O, on demand only.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const testLocationAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const r = await filesystem(ctx).testLocation(str(form, "path"));
   await ctx.store?.set("lastTest", `${r.ok ? "OK" : "Failed"} — ${r.message} (${r.elapsedMs}ms)`);
   revalidatePath(ADMIN_PATH);
 });
 
+/** REFS addons/backup-manager/ui/settings-panel.tsx */
 export const saveJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const name = str(form, "name");
@@ -139,14 +147,14 @@ export const saveJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
     "backup.job.save",
     `${job.name} (${job.mode}${job.pruneEnabled ? ", retention on" : ""})`,
   );
-  // Confirm in words. The form lives inside a <details>, and a server re-render resets that
-  // element's open state — so without this the section simply folds shut and you are left
-  // guessing whether anything happened.
+  // The form lives inside a <details> that a server re-render collapses, so this text is the
+  // only sign anything happened.
   await ctx.store?.set("lastJobSave", `Saved “${job.name}”. Next run ${job.enabled ? job.nextRunAt : "— paused"}.`);
   revalidatePath(ADMIN_PATH);
   revalidatePath(MODULE_PATH);
 });
 
+/** REFS addons/backup-manager/ui/settings-panel.tsx */
 export const deleteJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const id = str(form, "id");
@@ -159,6 +167,7 @@ export const deleteJobAction = moduleAction(MODULE_ID, async (ctx, form: FormDat
 
 /** Run one now. Starts it and returns; the result appears once the helper finishes and the
  *  next tick reconciles — the same code path as the schedule, so both behave identically. */
+/** REFS addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/settings-panel.tsx */
 export const runNowAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   await runJob(ctx, str(form, "id"));
   revalidatePath(ADMIN_PATH);
@@ -170,6 +179,7 @@ export const runNowAction = moduleAction(MODULE_ID, async (ctx, form: FormData):
  *
  * Deliberately available whether or not retention is enabled — seeing the answer is how an
  * admin decides whether to turn it on.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
  */
 export const previewPruneAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
@@ -193,7 +203,10 @@ export const previewPruneAction = moduleAction(MODULE_ID, async (ctx, form: Form
   revalidatePath(ADMIN_PATH);
 });
 
-/** Read one run's log back, for reading in place or copying out. */
+/**
+ * Read one run's log back, for reading in place or copying out.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/job-detail.tsx
+ */
 export const viewLogAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const text = await filesystem(ctx).logText(str(form, "runId"));
   await ctx.store?.set("lastLog", text ?? "That log has been removed by the log retention policy.");
@@ -207,6 +220,7 @@ export const viewLogAction = moduleAction(MODULE_ID, async (ctx, form: FormData)
  * finishes rather than leaving a half-written one at the destination. The run then
  * reconciles as `cancelled` on the next tick, like any other outcome — cancelling is not a
  * failure and must not be reported as one.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/job-detail.tsx
  */
 export const cancelRunAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
@@ -224,6 +238,7 @@ export const cancelRunAction = moduleAction(MODULE_ID, async (ctx, form: FormDat
  * Distinct from the retention preview, which is about what would be deleted. This is the
  * question people actually ask before trusting a new job: "is it going to pick up what I
  * think it will?"
+ * REFS addons/backup-manager/ui/settings-panel.tsx
  */
 export const previewBackupAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
@@ -268,6 +283,7 @@ export const previewBackupAction = moduleAction(MODULE_ID, async (ctx, form: For
  * renders inside the admin settings panel, which has no route of its own to hang state on.
  * `browse` returns names and sizes only — never file contents — so nothing sensitive
  * crosses into this module by looking.
+ * REFS addons/backup-manager/ui/folder-picker.tsx
  */
 export const browseAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const rootId = str(form, "rootId");
@@ -277,7 +293,10 @@ export const browseAction = moduleAction(MODULE_ID, async (ctx, form: FormData):
   revalidatePath(ADMIN_PATH);
 });
 
-/** Copy an existing job as a starting point, rather than retyping every field. */
+/**
+ * Copy an existing job as a starting point, rather than retyping every field.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const cloneJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const src = await getJob(ctx.db, str(form, "id"));
@@ -304,7 +323,10 @@ export const cloneJobAction = moduleAction(MODULE_ID, async (ctx, form: FormData
   revalidatePath(MODULE_PATH);
 });
 
-/** Stop or start everything at once — for "we're moving the NAS this weekend". */
+/**
+ * Stop or start everything at once — for "we're moving the NAS this weekend".
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const setAllEnabledAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const on = str(form, "enabled") === "1";
@@ -315,7 +337,10 @@ export const setAllEnabledAction = moduleAction(MODULE_ID, async (ctx, form: For
   revalidatePath(MODULE_PATH);
 });
 
-/** How many backups may copy at once. A property of the disk, not of any one job. */
+/**
+ * How many backups may copy at once. A property of the disk, not of any one job.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const setConcurrencyAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const n = await setConcurrency(ctx.db, int(form, "concurrency", 1));
@@ -324,7 +349,10 @@ export const setConcurrencyAction = moduleAction(MODULE_ID, async (ctx, form: Fo
   revalidatePath(ADMIN_PATH);
 });
 
-/** Where the weekly summary goes. Empty turns it off. */
+/**
+ * Where the weekly summary goes. Empty turns it off.
+ * REFS addons/backup-manager/ui/settings-panel.tsx
+ */
 export const setDigestAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   if (!ctx.db) return;
   const email = str(form, "digestEmail");

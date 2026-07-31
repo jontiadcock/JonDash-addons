@@ -11,6 +11,7 @@ import type { addEntry, removeEntry } from "./allowlist";
  * has no usable characters" tells them why and what to change.
  */
 
+/** REFS helpers/host-services/helper.ts · helpers/host-services/lib/scopes.ts */
 export function explainAdd(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok: true }>): string {
   switch (r.reason) {
     case "duplicate":
@@ -33,7 +34,10 @@ export function explainAdd(r: Exclude<Awaited<ReturnType<typeof addEntry>>, { ok
   }
 }
 
-/** A remove fails only when the OS refuses to give the permission back. */
+/**
+ * A remove fails only when the OS refuses to give the permission back.
+ * REFS helpers/host-services/lib/scopes.ts
+ */
 export function explainRemove(r: Awaited<ReturnType<typeof removeEntry>>): string {
   const o = r.outcome;
   if (!o) return "That service could not be removed.";

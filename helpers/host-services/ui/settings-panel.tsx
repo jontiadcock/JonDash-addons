@@ -8,19 +8,14 @@ import PanelClient from "./panel-client";
 /**
  * The allowlist editor, on JonDash's own page.
  *
- * **A SERVER component that loads, wrapping a client component that renders.** Core calls
- * `<SettingsPanel ctx={{ helperId, user }} />` and passes nothing else — so a client component
- * has no route to the data at all: it cannot reach the database, and there is no prop carrying
- * the list. The first version was a single client component reading a `data` prop that nothing
- * supplied, so it showed "Nothing approved yet" however many services were approved. It
- * typechecked, because the prop was optional.
+ * ⚠ A SERVER component wrapping a client component that renders. Core passes only
+ * `ctx={{ helperId, user }}`, so a client alone has no route to the data — a prior version read
+ * an optional `data` prop nothing supplied, typechecked, and silently showed "Nothing approved
+ * yet" regardless of how many services existed.
  *
- * **This is where the editor belongs.** It lived in a consuming module's settings panel until
- * 2026-07-26, which meant the module supplied the service name being approved — it could
- * display "Add Plex" and submit `sshd`, and the UAC prompt names the binary rather than the
- * service. The thing being bounded could edit its own boundary. Now core renders this behind
- * `modules.manage`, `onSettingsSubmit` receives a `ctx.user` resolved from the session, and no
- * module is anywhere in the path.
+ * This is where the editor belongs, not in a consuming module's settings panel — see
+ * `helper.ts`'s "no third capability" for why. Core renders this behind `modules.manage`.
+ * REFS helpers/host-services/helper.ts
  */
 export default async function HostServicesSettings({ ctx }: { ctx: HelperSettingsContext }) {
   const [entries, pending, suggestions] = await Promise.all([

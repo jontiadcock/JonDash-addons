@@ -35,34 +35,23 @@ import {
 /**
  * Backup Manager — keeps folders copied somewhere else, on a schedule.
  *
- * It performs no file access itself; it cannot. Everything is done by the `filesystem`
- * helper, which confines every operation to a folder the administrator approved and
- * excludes JonDash's own secrets by file identity. This module decides WHAT to copy and
- * WHEN, records what happened, and shouts when something didn't.
+ * It performs no file access itself: every operation goes through the `filesystem` helper,
+ * confined to an administrator-approved folder and excluding JonDash's own secrets by file
+ * identity. This module decides WHAT to copy and WHEN, records outcomes, and alerts on failure.
  *
- * ## No restore, deliberately (owner's decision, 2026-07-23)
- *
- * What this produces is *plain files*: `sync` leaves an ordinary mirror, `snapshot` leaves
- * ordinary dated folders. Both are already usable — you open the destination and copy back
- * whatever you want, with the same tools you'd use for anything else.
- *
- * A restore button would add the single most dangerous operation this module could have,
- * writing old data over current data, to save a drag-and-drop. That trade is only worth
- * making once the backup format stops being directly readable — compressed, encrypted, or
- * deduplicated. Until then it buys convenience and costs the possibility of destroying
- * someone's work. Revisit only if the format changes.
+ * ⚠ No restore button, deliberately. `sync`/`snapshot` leave plain, already-usable files you
+ * copy back with any tool. A restore button would add the single most dangerous operation this
+ * module could have — writing old data over current — to save a drag-and-drop; revisit only if
+ * the backup format stops being directly readable.
  */
 const backupManager: ModuleDefinition = {
   id: MODULE_ID,
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.2.5",
-  // Follows the filesystem helper's floor, which has now moved three times: 0.0.6 put the
-  // folder editor on the helper's own settings page, 0.0.7 declared CORE-10 `scope`, and 0.0.8
-  // declares `unbounded.option` — the "exclude JonDash's own data" switch — which arrived in
-  // 1.7.2-beta.2. A helper compiles into the app, so bringing 0.0.8 onto an older core fails
-  // the build rather than degrading; the floor has to move with the helper this module pulls in.
+  version: "0.2.6-beta.1",
+  // Follows the filesystem helper's floor: needs `unbounded.option` (0.0.8); a helper compiles
+  // into the app, so an old core fails the build rather than degrading quietly.
   minAppVersion: "1.7.2-beta.2",
 
   /**
@@ -87,27 +76,16 @@ const backupManager: ModuleDefinition = {
   ],
 
   /**
-   * `filesystem` is PINNED, `scheduler` is not.
+   * `filesystem` is PINNED at 0.0.8-beta.1 (this module calls `prune`, `planPrune`,
+   * `listSnapshots` and `suggestRoot`, none of which exist on an older helper — they'd be
+   * silently undefined until the first scheduled run). `scheduler` is not: it only declares
+   * schedules, which every published version has supported.
    *
-   * This module calls `prune`, `planPrune` and `listSnapshots`, none of which existed before
-   * filesystem 0.0.3. Against 0.0.2 they are simply undefined, and the failure would land at
-   * the first scheduled run — in the background, at 2am, on somebody's server.
-   *
-   * Be precise about what the floor buys, because it is less than it looks: core reads
-   * `minVersion` to work out which modules a helper update would BREAK (paired with the
-   * helper's `breakingFrom`), and surfaces that on Admin → Updates. It does not refuse an
-   * install against an older helper. So this is a truthful declaration that makes that
-   * warning correct for this module — not a guard. What actually keeps the pairing sane is
-   * that helpers install from the same official source and channel, and now have their own
-   * update path.
-   *
-   * `scheduler` needs no floor: this module only DECLARES schedules, which every published
-   * version has supported. Stating a floor we don't require would make the break-analysis
-   * wrong in the other direction.
+   * ⚠ `minVersion` is a declaration, not a guard — core reads it only to warn on Admin →
+   * Updates when a helper update would BREAK this module (paired with the helper's
+   * `breakingFrom`). It does not refuse an install against an older helper; that safety comes
+   * from helpers sharing the app's own update channel.
    */
-  // Pinned to 0.0.8-beta.1: 0.0.6 removed addRoot/removeRoot/setRetention and added
-  // suggestRoot (an older helper has no suggestRoot to call), and 0.0.8 is the build this
-  // module's app floor now assumes.
   helpers: [{ id: "filesystem", minVersion: "0.0.8-beta.1" }, "scheduler"],
 
   /** Backups are infrastructure: the paths alone tell you how the machine is laid out. */
@@ -173,6 +151,7 @@ const backupManager: ModuleDefinition = {
  * a page or ticks a schedule may block for that long. The helper owns the run and records
  * its outcome; `reconcileRuns` picks the result up on a later tick. The same function serves
  * the schedule and the "Run now" button, so both behave identically.
+ * REFS addons/backup-manager/actions.ts
  */
 export async function runJob(ctx: ModuleContext, jobId: string): Promise<boolean> {
   if (!ctx.db) return false;

@@ -44,6 +44,7 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString
 
 /* ------------------------------------------------------------------ what we installed */
 
+/** REFS helpers/host-install/api.ts */
 export async function listInstalled(): Promise<InstalledRecord[]> {
   return prisma.$queryRawUnsafe<InstalledRecord[]>(`SELECT * FROM ${T.installed()} ORDER BY installedAt DESC`);
 }
@@ -54,6 +55,7 @@ export async function listInstalled(): Promise<InstalledRecord[]> {
  * Answered from our own record rather than from the machine, and that is the entire point: the
  * machine can tell you a package is present, but only this table can tell you whether we are
  * the reason. Software the admin installed themselves must never be offered for removal by us.
+ * REFS helpers/host-install/api.ts
  */
 export async function weInstalled(packageId: string): Promise<InstalledRecord | null> {
   const rows = await prisma.$queryRawUnsafe<InstalledRecord[]>(
@@ -63,6 +65,7 @@ export async function weInstalled(packageId: string): Promise<InstalledRecord | 
   return rows[0] ?? null;
 }
 
+/** REFS helpers/host-install/api.ts */
 export async function recordInstalled(input: {
   packageId: string;
   manager: string;
@@ -83,12 +86,14 @@ export async function recordInstalled(input: {
   );
 }
 
+/** REFS helpers/host-install/api.ts */
 export async function forgetInstalled(packageId: string): Promise<void> {
   await prisma.$executeRawUnsafe(`DELETE FROM ${T.installed()} WHERE packageId = ? COLLATE NOCASE`, packageId);
 }
 
 /* ------------------------------------------------------------------ requests */
 
+/** REFS helpers/host-install/api.ts */
 export async function createRequest(input: {
   moduleId: string;
   packageId: string;
@@ -109,7 +114,10 @@ export async function createRequest(input: {
   return id;
 }
 
-/** Scoped to the asking module — one module must not read another's outcome. */
+/**
+ * Scoped to the asking module — one module must not read another's outcome.
+ * REFS helpers/host-install/api.ts
+ */
 export async function getRequest(moduleId: string, requestId: string): Promise<RequestRow | null> {
   const rows = await prisma.$queryRawUnsafe<RequestRow[]>(
     `SELECT * FROM ${T.requests()} WHERE id = ? AND moduleId = ? LIMIT 1`,
@@ -119,6 +127,7 @@ export async function getRequest(moduleId: string, requestId: string): Promise<R
   return rows[0] ?? null;
 }
 
+/** REFS helpers/host-install/api.ts */
 export async function getRequestAnyModule(requestId: string): Promise<RequestRow | null> {
   const rows = await prisma.$queryRawUnsafe<RequestRow[]>(
     `SELECT * FROM ${T.requests()} WHERE id = ? LIMIT 1`,
@@ -127,6 +136,7 @@ export async function getRequestAnyModule(requestId: string): Promise<RequestRow
   return rows[0] ?? null;
 }
 
+/** REFS helpers/host-install/api.ts */
 export async function pendingRequests(): Promise<RequestRow[]> {
   return prisma.$queryRawUnsafe<RequestRow[]>(
     `SELECT * FROM ${T.requests()} WHERE state = 'pending' AND createdAt >= ? ORDER BY createdAt`,
@@ -138,6 +148,7 @@ export async function pendingRequests(): Promise<RequestRow[]> {
  * A module may have ONE open request at a time. The risk here is habituation rather than
  * anything technical — a module that asks repeatedly trains the admin to click yes, and the
  * thing being clicked installs software as administrator.
+ * REFS helpers/host-install/api.ts
  */
 export async function hasOpenRequest(moduleId: string): Promise<boolean> {
   const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
@@ -148,6 +159,7 @@ export async function hasOpenRequest(moduleId: string): Promise<boolean> {
   return rows.length > 0;
 }
 
+/** REFS helpers/host-install/api.ts */
 export async function settleRequest(
   id: string,
   state: RequestState,
@@ -166,6 +178,7 @@ export async function settleRequest(
 
 /** Expiry is evaluated on read rather than by a sweeper — a helper must not need a timer to
  *  tell the truth, and a request that aged out while nothing ran is still expired. */
+/** REFS helpers/host-install/api.ts */
 export function isExpired(r: RequestRow): boolean {
   return r.state === "pending" && r.createdAt < daysAgo(EXPIRY_DAYS);
 }

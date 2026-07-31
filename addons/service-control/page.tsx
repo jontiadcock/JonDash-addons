@@ -9,6 +9,7 @@ import { requestAction } from "./actions";
  *
  * Mostly the same data as the widget, but this is where the explanations live: why a service
  * has no buttons, what "waiting for approval" means, and what the machine can actually do.
+ * REFS addons/service-control/module.ts
  */
 export default async function ServiceControlPage({ ctx }: ModulePageProps) {
   const api = hostServices(ctx);

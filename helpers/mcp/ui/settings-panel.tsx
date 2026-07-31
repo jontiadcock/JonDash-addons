@@ -13,6 +13,7 @@ import PanelClient from "./panel-client";
  *
  * Everything dangerous is here rather than in the module: minting a key, changing the binding,
  * switching the listener on. A module holding `mcp:read` sees status and nothing else.
+ * REFS helpers/mcp/helper.ts
  */
 export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext }) {
   const [keys, accounts, refusals, enabled, exposed, port, carrier, https, shutdownAllowed] = await Promise.all([
@@ -31,9 +32,8 @@ export default async function McpSettings({ ctx }: { ctx: HelperSettingsContext 
     <PanelClient
       helperId={ctx.helperId}
       enabled={enabled}
-      // Enabled and LISTENING are different: enabled with no keys binds no port, which is the
-      // state a fresh install is in. The page says which, because "on" that isn't listening is
-      // exactly the sort of thing an admin should not have to infer.
+      // Enabled and LISTENING are different: enabled with no keys binds no port, a state a fresh
+      // install is in. The page says which — not something an admin should have to infer.
       listening={isListening()}
       // Switched on with keys and STILL not listening is the one state an admin cannot work out
       // for themselves — the reason is on a different screen entirely.

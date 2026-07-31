@@ -9,43 +9,16 @@ import { readStates, type ServiceState } from "./lib/services";
 import { isVerb, type Verb } from "./lib/names";
 
 /**
- * The ENTIRE surface a module may reach. A module imports `@/helpers/host-services/api` and
- * nothing else — the verifier refuses any deeper path — so everything exported here is
- * supported forever, and everything not exported here is unreachable.
+ * The ENTIRE surface a module may reach — it imports `@/helpers/host-services/api` and nothing
+ * deeper, so everything exported here is supported forever and nothing else is reachable.
  *
- * > **A module can name a service. It can never add one.**
- *
- * That sentence is true again, and this time it is structural rather than promised.
- *
- * ## The history, because it is the reason for HELPERS-DESIGN rule 8
- *
- * Up to `0.0.1` this file exposed `admin.add`/`remove`/`setUnattended`/`approve`, because a
- * helper had no settings page and the allowlist had to be editable *somewhere*. That put the
- * consuming module in the path: **it supplied the service name being approved**, so it could
- * display "Add Plex" and submit `sshd`. The UAC prompt names `jondash-grant.exe` rather than
- * the service, so nothing on screen caught the substitution. The thing being bounded could
- * edit its own boundary.
- *
- * Two fixes were tried and neither was right. Deleting the calls left the allowlist
- * unpopulatable. Adding a `host-services:configure` capability made the consent screen honest
- * while leaving the module able to submit one service and display another.
- *
- * **JonDash 1.7.1 gave helpers their own settings page, so the editor moved there and the
- * capability was deleted.** Core renders the form, `onSettingsSubmit` receives a `ctx.user`
- * resolved from the session, and no module is anywhere in the path.
- *
- * ## Rule 8 — no mutators for admin-owned configuration
- *
- * A helper's module-facing API contains **read and request, never add, remove or approve**.
- * If configuration bounds a capability, the thing being bounded must not be able to write it.
- *
- * ## Absent, and must stay absent
- *
- *  - **Anything that edits the allowlist.** It lives on Admin → Permissions.
- *  - **No way to run a command.** Verbs against a list. This is not a shell.
- *  - **No way to enumerate services.** A module cannot discover what exists on the machine;
- *    that is a scoping decision and a privacy one.
- *  - **No `execute`.** Turning a request into an action belongs to an administrator.
+ * ⚠ A module can name a service. It can never add one — structural, not promised. This file
+ * once exposed the allowlist mutators directly, so the CALLING module supplied the service
+ * name being approved and could show "Add Plex" while submitting `sshd`. HELPERS-DESIGN Rule 8:
+ * a module-facing API is read and request, never add, remove or approve.
+ * ⚠ Absent, and must stay absent: allowlist edits (Admin → Permissions owns them), running an
+ * arbitrary command (verbs against a list only), service enumeration, and `execute` — turning a
+ * request into an action belongs to an administrator alone.
  */
 
 export type { ServiceState, RequestOutcome, ElevationSupport, Verb };
@@ -162,9 +135,8 @@ const api: HelperApiFor<HostServicesApi> = (ctx: ModuleContext) => ({
       `${ctx.moduleId} asked to ${action} ${entry.serviceName}`,
     );
 
-    // The admin decided, per service, whether this needs a click. Automation is the entire
-    // reason the option exists — a health check restarting a hung service at 3am cannot wait
-    // for a human — but it is never a default and never something a module can set.
+    // The admin decided, per service, whether this needs a click — automation exists because a
+    // health check can't wait for a human at 3am, but it is never a default a module can set.
     if (entry.unattended) {
       const outcome = await execute(requestId, null);
       if (outcome.status === "approved" && outcome.ok) return { ok: true, requestId, status: "ran" };
@@ -219,4 +191,8 @@ function toPending(
    settings panel and `onSettingsSubmit` live. Nothing in this file can change the allowlist,
    so nothing in it needs to explain why a change was refused. */
 
+/**
+ * REFS addons/service-control/actions.ts · addons/service-control/page.tsx ·
+ *      addons/service-control/ui/settings-panel.tsx · addons/service-control/ui/widget.tsx
+ */
 export default api;

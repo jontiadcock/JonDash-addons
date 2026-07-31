@@ -44,6 +44,7 @@ function suspiciouslySmall(runs: Run[]): { latest: number; typical: number } | n
   return latest.bytesCopied * 10 < typical ? { latest: latest.bytesCopied, typical } : null;
 }
 
+/** REFS addons/backup-manager/ui/job-detail.tsx */
 export default function Activity({ runs }: { runs: Run[] }) {
   const recent = runs.slice(0, 20);
   if (recent.length === 0) return null;

@@ -5,32 +5,16 @@ import { MODULE_PATH, STATE_LABEL, STATE_TONE, verbsFor, type ServiceState } fro
 import { requestAction } from "../actions";
 
 /**
- * The dashboard tile — "is everything up, and can I fix it from here".
+ * The dashboard tile — draws its OWN card (the dashboard gives only a grid cell). Buttons are
+ * plain server-rendered forms — no client JS, so a control that stops a service never depends
+ * on a hydration step.
  *
- * It draws its OWN card: the dashboard gives a widget a grid cell and nothing else, so
- * without `card` and a title it renders as loose text with no name.
- *
- * Buttons are plain server-rendered forms. No client JavaScript, which matters here more
- * than usual — a control that stops a service should not depend on a hydration step having
- * succeeded, and a form that posts is honest about the fact that something is happening.
- *
- * # Sizing (JonDash 1.8.0 B5/B6)
- *
- * The user can size this from 1×1 upward and the frame **clips rather than scrolls**, so:
- * core's two thresholds decide what kind of content appears, every row is exactly one line so
- * the list is the `FILL_GRID` below (see host-vitals for why not `columns` or `flex-wrap`), and
- * rows are in priority order —
- * stopped services first, because if anything is clipped it must not be the broken one.
- *
- * `.slice(0, 6)` is gone: a constant row count was picked for one box size and was wrong at
- * every other.
- *
- * **The trap specific to this widget:** only services with `canControl` have buttons, so the
- * rows were about to be two different heights — and uneven rows make column-wrap ragged and
- * unpredictable. `min-h-6` on every row fixes the height whether or not buttons are present.
- * The buttons themselves wait for `@[14rem]`, which is a *horizontal* decision and therefore
- * safe: adding content on a width threshold is only ever safe if it adds no height, because a
- * wide-and-short tile reports a huge container while having almost no room.
+ * The frame CLIPS rather than scrolls: every row is one line in `FILL_GRID` below, stopped
+ * services first since a clipped row must never be the broken one.
+ * ⚠ Only `canControl` services have buttons, so rows would otherwise be two heights — a fixed
+ * minimum row height settles it. ⚠ Buttons wait for the 14rem container breakpoint, a
+ * horizontal decision only: adding content on a WIDTH threshold is safe only if it adds no
+ * height, since a wide-and-short tile reports a huge container with almost no room.
  */
 
 /**
@@ -39,15 +23,16 @@ import { requestAction } from "../actions";
  * The difference matters. `.slice(0, 6)` decided *how much of the tile to fill*, which is the
  * container's job and was wrong at every size but one. This decides *how much is worth rendering
  * at all*: the allowlist is admin-controlled and can hold hundreds of entries, and a test machine
- * with ~80 approved services rendered 80 rows, which is pointless work whatever the layout does. How many of these 24 you actually see still follows the
- * container. A tile is a summary; the page is the list.
+ * with ~80 approved services rendered 80 rows, which is pointless work whatever the layout does.
+ * How many of these 24 you actually see still follows the container. A tile is a summary; the
+ * page is the list.
  */
 const TILE_CAP = 24;
 
 /**
  * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
  * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
- * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * first: flex wrapping (columns ran off the side of the card) and CSS multi-column (it balances,
  * so a few rows spread one-per-column across the top and left the rest of the card empty).
  *
  * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
@@ -66,6 +51,7 @@ const FILL_GRID = {
   fontSize: "clamp(0.75rem, 1.3cqw, 1rem)",
 } as const;
 
+/** REFS addons/service-control/module.ts */
 export default async function ServiceControlWidget({ ctx }: ModuleWidgetProps) {
   const api = hostServices(ctx);
   const [services, support] = await Promise.all([api.list(), api.capability()]);

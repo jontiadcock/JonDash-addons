@@ -45,9 +45,8 @@ describe("toContainer", () => {
   });
 
   it("falls back to a SHORT id when a container has no name", () => {
-    // Real ids are 64 hex characters. The fixture above is 12, so it would have passed this
-    // test without truncating anything — which is how the first version of it passed while
-    // asserting the wrong string.
+    // Must be a full 64-char id, not the 12-char default fixture — anything shorter passes
+    // without ever exercising the truncation this test is meant to check.
     const long = "a1b2c3d4e5f6".repeat(5) + "abcd"; // 64 chars
     expect(toContainer(raw({ Names: [], Id: long })).name).toBe("a1b2c3d4e5f6");
   });

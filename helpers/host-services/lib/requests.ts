@@ -21,6 +21,7 @@ const T = {
 
 export type RequestState = "pending" | "approved" | "declined" | "cancelled-at-uac" | "expired" | "failed";
 
+/** REFS helpers/host-services/api.ts */
 export type RequestOutcome =
   | { status: "pending" }
   | { status: "approved"; ranAt: string; ok: boolean; detail: string }
@@ -56,7 +57,10 @@ function daysAgo(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString();
 }
 
-/** Queue a request. Grants nothing; may never run. */
+/**
+ * Queue a request. Grants nothing; may never run.
+ * REFS helpers/host-services/api.ts
+ */
 export async function createRequest(moduleId: string, entryId: string, action: Verb): Promise<string> {
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
@@ -75,6 +79,7 @@ export async function createRequest(moduleId: string, entryId: string, action: V
  *
  * `moduleId` is checked here rather than trusted: a module must not be able to read the
  * outcome of another module's request, and this is the one place that could leak it.
+ * REFS helpers/host-services/api.ts
  */
 export async function requestStatus(moduleId: string, requestId: string): Promise<RequestOutcome | null> {
   const rows = await prisma.$queryRawUnsafe<ReqRow[]>(
@@ -112,7 +117,10 @@ export async function requestStatus(moduleId: string, requestId: string): Promis
   }
 }
 
-/** Open suggestions, for the settings screen's prefilled-form flow. */
+/**
+ * Open suggestions, for the settings screen's prefilled-form flow.
+ * REFS helpers/host-services/ui/settings-panel.tsx
+ */
 export async function openSuggestions(): Promise<
   { id: string; moduleId: string; serviceName: string; reason: string; createdAt: string }[]
 > {
@@ -121,7 +129,10 @@ export async function openSuggestions(): Promise<
   );
 }
 
-/** Requests awaiting an administrator. The settings screen's queue. */
+/**
+ * Requests awaiting an administrator. The settings screen's queue.
+ * REFS helpers/host-services/api.ts · helpers/host-services/ui/settings-panel.tsx
+ */
 export async function pendingRequests(): Promise<ReqRow[]> {
   return prisma.$queryRawUnsafe<ReqRow[]>(
     `SELECT * FROM ${T.requests()} WHERE state = 'pending' AND createdAt >= ? ORDER BY createdAt`,
@@ -135,6 +146,7 @@ export async function pendingRequests(): Promise<ReqRow[]> {
  * Called either by an administrator approving it, or directly for an entry the
  * administrator marked unattended. A module can never call this: it is not exported through
  * `api.ts`, which is the boundary that makes the distinction real rather than documented.
+ * REFS helpers/host-services/api.ts · helpers/host-services/helper.ts
  */
 export async function execute(requestId: string, decidedBy: string | null): Promise<RequestOutcome> {
   const rows = await prisma.$queryRawUnsafe<ReqRow[]>(`SELECT * FROM ${T.requests()} WHERE id = ? LIMIT 1`, requestId);
@@ -174,6 +186,7 @@ export async function execute(requestId: string, decidedBy: string | null): Prom
 
 /** An administrator refusing a request. Terminal — a module must not be able to re-raise
  *  the same ask and wear them down. */
+/** REFS helpers/host-services/helper.ts */
 export async function decline(requestId: string, decidedBy: string | null): Promise<void> {
   await settle(requestId, "declined", decidedBy, null, "");
 }
@@ -212,6 +225,7 @@ export type SuggestResult =
  * one open suggestion per module, and a declined one cannot come back for a week. A module
  * that keeps asking becomes visibly annoying on the settings screen, which is the correct
  * outcome — it makes pestering legible instead of effective.
+ * REFS helpers/host-services/api.ts
  */
 export async function suggest(moduleId: string, serviceName: string, reason: string): Promise<SuggestResult> {
   const name = serviceName.trim();

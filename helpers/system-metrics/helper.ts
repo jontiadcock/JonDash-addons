@@ -14,13 +14,14 @@ const helper: HelperDefinition = {
   name: "System metrics",
   description:
     "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-  version: "0.0.4",
-  // Raised from 1.5.2-beta.1 for CORE-10. `label` and `risk` are optional to omit but not to
-  // declare: on a 1.7.1 clone they fail to compile (TS2353), and a helper compiles into the
-  // app, so an older core gets a failed build rather than a plainer screen.
-  //
-  // The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
-  // "1.7.2" would be refused on every 1.7.2 beta.
+  version: "0.0.5-beta.1",
+  /**
+   * ⚠ `label` and `risk` are optional in the type but not in practice: omitting them fails to
+   * compile on a 1.7.1 clone (TS2353), and a helper compiles into the app, so an older core
+   * gets a failed build rather than a plainer screen.
+   * ⚠ The PRE-RELEASE tag matters here, not a bare "1.7.2": semver ranks a pre-release below
+   * its release, so "1.7.2" would be refused on every 1.7.2 beta.
+   */
   minAppVersion: "1.7.2-beta.1",
 
   /**

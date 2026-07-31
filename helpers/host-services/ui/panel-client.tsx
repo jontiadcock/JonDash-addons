@@ -28,6 +28,7 @@ export type Pending = { id: string; moduleId: string; serviceLabel: string; acti
 export type Suggestion = { id: string; moduleId: string; serviceName: string; reason: string };
 export type Support = { ok: boolean; reason?: string };
 
+/** REFS helpers/host-services/ui/settings-panel.tsx */
 export default function PanelClient({
   helperId,
   entries,
@@ -113,7 +114,7 @@ export default function PanelClient({
           entries.map((e) => (
             <div key={e.id} className="card flex flex-wrap items-center justify-between gap-3 p-3">
               <span className="flex min-w-0 flex-col">
-                {/* The real service name leads. The label is decoration; this is what Windows acts on. */}
+                {/* The real name leads; the label is decoration — Windows acts on the name. */}
                 <span className="truncate font-medium">{e.name}</span>
                 <span className="truncate text-xs" style={{ color: "var(--muted)" }}>
                   {e.label !== e.name && `“${e.label}” · `}permission <code>{e.taskBase}</code> · {e.state}

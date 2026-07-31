@@ -15,6 +15,7 @@ import type { Job } from "./store";
  * into a failed one because an SMTP server was down would be its own bug.
  */
 
+/** REFS addons/backup-manager/module.ts */
 export type Alert = {
   job: Job;
   /** Short, factual subject line. */
@@ -29,6 +30,7 @@ export type Alert = {
  * "Failed" is obvious. "Stale" is the one people forget to build and then wish they had:
  * a job that stopped running altogether raises nothing, because nothing failed. A disabled
  * schedule, a job deleted by accident, a server that never came back up — all silent.
+ * REFS addons/backup-manager/module.ts
  */
 export function failureAlert(job: Job, detail: string): Alert {
   return {
@@ -45,6 +47,7 @@ export function failureAlert(job: Job, detail: string): Alert {
   };
 }
 
+/** REFS addons/backup-manager/module.ts */
 export function staleAlert(job: Job, hours: number, lastSuccess: string | null): Alert {
   return {
     job,
@@ -68,6 +71,7 @@ export function staleAlert(job: Job, hours: number, lastSuccess: string | null):
  *
  * Every transport is wrapped: one broken webhook must not stop the email, and neither may
  * throw into the scheduler tick that called us.
+ * REFS addons/backup-manager/module.ts
  */
 export async function send(ctx: ModuleContext, alert: Alert): Promise<string[]> {
   const sent: string[] = [];
@@ -120,6 +124,7 @@ export async function send(ctx: ModuleContext, alert: Alert): Promise<string[]> 
  *
  * Sent module-wide rather than per job — nobody wants six emails — and deliberately leads
  * with anything that went wrong rather than a cheerful total.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/tests/notify.test.ts
  */
 export type DigestLine = {
   name: string;
@@ -130,6 +135,7 @@ export type DigestLine = {
   paused: boolean;
 };
 
+/** REFS addons/backup-manager/module.ts · addons/backup-manager/tests/notify.test.ts */
 export function digest(lines: DigestLine[], days: number, formatBytes: (n: number) => string): Alert["body"] {
   const failing = lines.filter((l) => l.failures > 0);
   const stale = lines.filter((l) => !l.paused && l.runs === 0);
@@ -169,6 +175,7 @@ export function digest(lines: DigestLine[], days: number, formatBytes: (n: numbe
  * A job that is broken stays broken, and a tick that fires every minute would otherwise
  * send a thousand emails before anybody woke up. One alert per `everyHours` window is
  * enough to be noticed and few enough to still be read.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/tests/notify.test.ts
  */
 export function shouldNotify(job: Job, now = new Date()): boolean {
   if (!job.notifyEmail && !job.notifyWebhook) return false;

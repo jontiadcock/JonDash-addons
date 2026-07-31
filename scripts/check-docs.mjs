@@ -92,9 +92,8 @@ for (const entry of manifest.helpers ?? []) {
     if (!carries) continue;
     for (const docPath of moduleDocs(path.join(ROOT, "addons", mod.id))) {
       const text = fs.readFileSync(docPath, "utf8");
-      // Only guides that already enumerate tools are held to enumerating all of them. A MODULE.md
-      // that never mentions a tool is describing something else, and forcing a list into it would
-      // make it worse.
+      // Only guides that already enumerate tools are held to enumerating all of them — one that
+      // never mentions a tool describes something else, and forcing a list in would make it worse.
       const enumerates = tools.filter((t) => text.includes(t)).length;
       if (enumerates === 0) continue;
       const absent = tools.filter((t) => !text.includes(t));

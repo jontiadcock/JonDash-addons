@@ -7,25 +7,16 @@ import { explainAdd } from "./lib/wording";
 import SettingsPanel from "./ui/settings-panel";
 
 /**
- * Last chance to take back what this helper gave the operating system.
+ * Last chance to take back what this helper gave the operating system. Grants outlive JonDash
+ * by design, so once the helper is pruned nothing is left that knows they exist. Owner:
+ * *"when the module is removed, I don't want a random task present."*
  *
- * Grants outlive JonDash by design — that is the whole point of granting once — so when the
- * helper is pruned there is nothing left that knows they exist. Owner: *"when the module is
- * removed, I don't want a random task present."*
+ * Fast path costs nothing: `readGrants()` needs no elevation, so an install that never
+ * approved a service returns in milliseconds. Revoking a live grant is the slow path, which
+ * needs elevation — hence `uninstallMayPrompt` below.
  *
- * **The fast path is the common one and costs nothing.** `readGrants()` needs no elevation, so
- * an install that never approved a service returns in milliseconds and never prompts. Only a
- * machine with live grants pays for the slow path.
- *
- * **The slow path is allowed to wait, via `uninstallMayPrompt`.** Revoking needs elevation and
- * elevation waits on a human, so the 5s default could never cover it. Setting that flag raises
- * the budget to the elevation timeout, and the hook already runs *inside* the uninstall the
- * admin just clicked — they are at the screen, so the prompt has obvious provenance.
- *
- * The failure path still has to be loud, because an orphaned grant nobody knows about is
- * exactly what this hook exists to prevent: a declined or timed-out revocation writes an
- * INCOMPLETE entry naming the tasks and both ways to remove them, since once this returns
- * there is no JonDash screen left that knows they exist.
+ * ⚠ A declined or timed-out revocation stays loud: it writes an INCOMPLETE entry naming the
+ * tasks and both ways to remove them, since nothing else will know once this returns.
  */
 async function revokeGrantsOnUninstall(
   ctx: Parameters<NonNullable<HelperDefinition["onUninstall"]>>[0],
@@ -37,9 +28,8 @@ async function revokeGrantsOnUninstall(
     return;
   }
 
-  // Absent is not false, and neither is consent. The question defaults to ON, so a screen that
-  // failed to render it must not silently mean "keep the permissions" — but an explicit
-  // untick must be honoured. Hence `=== false` rather than a falsy check.
+  // Absent is not false, and neither is consent — the question defaults to ON, so a missing
+  // answer must not silently mean "keep the permissions". Hence `=== false`, not a falsy check.
   if (answers.revoke === false) {
     await ctx.audit(
       "host-services.uninstall",
@@ -57,9 +47,8 @@ async function revokeGrantsOnUninstall(
     return;
   }
 
-  // Never report a clean uninstall when privileges remain on the machine. The wording names
-  // the tasks and both ways to remove them, because after this returns there is no JonDash
-  // screen left that knows about them.
+  // Never report a clean uninstall while privileges remain on the machine — the wording below
+  // names the tasks and both ways to remove them, since no JonDash screen will know of them.
   const why =
     outcome.status === "cancelled-at-uac"
       ? "the permission prompt was declined"
@@ -77,55 +66,34 @@ async function revokeGrantsOnUninstall(
 }
 
 /**
- * Host services helper — lets a module start, stop and restart services an administrator
- * has explicitly listed, and nothing else.
+ * Host services helper — lets a module start, stop and restart services an administrator has
+ * explicitly listed, and nothing else. Both safeguards are admin-owned config, not caller
+ * arguments: a module can NAME a service on the allowlist but never add one, and each grant is
+ * a Scheduled Task with the service and verb baked in, so `schtasks /run` (which takes no args)
+ * makes Windows — not this code — enforce what can run unprompted. Removing an entry prompts
+ * again, since withdrawing a standing privilege is itself an administrator action.
  *
- * The two things that make this safe are both configuration the admin owns, not arguments
- * the caller supplies:
- *
- *  1. **The allowlist.** A module can name a service; it can never add one. Being on the
- *     list IS the privilege, which is why adding an entry is the moment elevation is
- *     requested.
- *  2. **The grant is fixed at that instant.** Each entry's grants are Scheduled Tasks with
- *     the service and verb baked in, and `schtasks /run` cannot pass arguments — so what
- *     can happen without a prompt is enforced by Windows rather than by this code.
- *
- * See HELPER.md, and ../ELEVATION.md for the model this is an application of.
- *
- * **Working end to end since JonDash 1.7.1-beta.7** (OPS-18). Proven on a real machine: one
- * approval when a service is added, then start and stop with no further prompt, verified by
- * reading the service's actual state either side. Removing an entry prompts again, because
- * withdrawing a standing privilege is itself an administrator action.
- *
- * **What is NOT proven, and must not be claimed:** whether the task's security descriptor
- * stops a standard user *editing* a grant. It is coded that way and neither session has
- * tested it. Until someone does, a grant is a narrow permanent capability — not a
- * tamper-proof one.
+ * ⚠ NOT proven, and must not be claimed: whether the task's security descriptor stops a
+ * standard user *editing* a grant. Until tested, treat a grant as narrow and permanent, not
+ * tamper-proof. See HELPER.md and ../ELEVATION.md for the model this applies.
  */
 const helper: HelperDefinition = {
   id: "host-services",
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.5",
+  version: "0.0.6-beta.1",
   /**
-   * 1.7.1-beta.**9**, the first build carrying `SettingsPanel` / `onSettingsSubmit` — checked
-   * tag by tag rather than assumed, because beta.7 and beta.8 do not have them and this
-   * release cannot work without them.
+   * ⚠ Hard floor, not a preference — this build is the first with `SettingsPanel` /
+   * `onSettingsSubmit`, and it also clears every earlier floor this helper has needed
+   * (`@/lib/elevation`, audit-before-acting, `runGrant`, `uninstallQuestions`).
    *
-   * It also clears every earlier floor this helper has needed: `@/lib/elevation` (beta.1),
-   * audit-before-acting so an elevated action cannot happen unrecorded (beta.2), `runGrant`
-   * so the restart itself is logged (beta.2), and `uninstallQuestions` (beta.7).
+   * A pre-release value, not a bare "1.7.2": semver ranks a pre-release below its release, so
+   * "1.7.2" would refuse every 1.7.2 beta, including the one with the feature.
    *
-   * The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
-   * "1.7.2" would refuse every 1.7.2 beta — including beta.1, which has the feature.
-   *
-   * **Raised to 1.7.2-beta.1 for CORE-10, and this is a hard floor rather than a preference.**
-   * The new `label` / `risk` / `scope` fields are optional in the contract, so a helper that
-   * omits them still installs on an older core — but a helper that DECLARES them does not.
-   * Measured against a 1.7.1 clone: `TS2353 'label' does not exist in type 'HelperCapability'`
-   * and `TS2724 no exported member 'HelperCapabilityScope'`. Helpers compile into the app, so
-   * that is a failed build and an app that will not start, not a degraded screen.
+   * ⚠ Raised for CORE-10: the `label`/`risk`/`scope` fields are optional in the contract, so
+   * omitting them still installs on an older core, but DECLARING them does not — a core below
+   * this floor fails to build (helpers compile into the app) — re-verify before lowering it.
    */
   minAppVersion: "1.7.2-beta.1",
 
@@ -161,18 +129,16 @@ const helper: HelperDefinition = {
       scope: controlScope,
     },
     /*
-     * There is no third capability, and there must not be one again.
-     *
-     * `host-services:configure` existed briefly (0.0.1 stable) because the allowlist editor
-     * had nowhere to live but a consuming module's settings panel, which meant the module
-     * supplied the service name being approved — it could display "Add Plex" and submit
-     * `sshd`. Declaring the power made the consent screen honest without making the
+     * ⚠ No third capability, ever again. `host-services:configure` existed briefly because the
+     * allowlist editor had nowhere else to live but a module's own settings panel — which meant
+     * the MODULE supplied the service name being approved, so it could display "Add Plex" and
+     * submit `sshd`. Declaring the power made the consent screen honest without making the
      * arrangement right: the thing being bounded could still edit its own boundary.
      *
-     * JonDash 1.7.1 gave helpers their own settings page, so the editor moved to
-     * `ui/settings-panel.tsx` and the capability was deleted. **Rule 8 of HELPERS-DESIGN
-     * now states it generally: a helper's module-facing API must contain no mutators for
-     * admin-owned configuration — read and request, never add, remove or approve.**
+     * The editor now lives in `ui/settings-panel.tsx`, reachable only through core (see
+     * `onSettingsSubmit` below). Generalised as HELPERS-DESIGN Rule 8: a helper's module-facing
+     * API must contain no mutators for admin-owned configuration — read and request, never add,
+     * remove or approve.
      */
   ],
 

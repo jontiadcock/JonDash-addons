@@ -7,26 +7,16 @@ import { readStates } from "./services";
 import { explainAdd, explainRemove } from "./wording";
 
 /**
- * The two scopes CORE-10 renders on Admin → Permissions.
+ * The two scopes CORE-10 renders on Admin → Permissions. `scope` is per CAPABILITY, not per
+ * helper, so one table backs both and the split falls out of it: `host-services:read` is every
+ * approved service, adding one needs no elevation so `mayPrompt` is false and "see them all" is
+ * offerable; `host-services:control` is only the controllable ones, adding creates the OS
+ * grant so `mayPrompt` is true and there is no "control them all".
  *
- * **`scope` is per CAPABILITY, not per helper, and that turns out to do real work here.** One
- * table backs both, and the split falls out of it:
- *
- *  - `host-services:read`  — every approved service. Adding one takes no elevation, so
- *                            `mayPrompt` is false, and "see them all" is offerable.
- *  - `host-services:control` — only the ones actually controllable. Adding creates the OS
- *                            grant, so `mayPrompt` is true, and there is no "control them all".
- *
- * A service approved read-only is simply a member of the first and not the second. No flag on
- * the item, no wording to explain it — the two lists say it.
- *
- * **`host-services:control` deliberately omits `unbounded`, and that is structural.** A grant is
- * one Scheduled Task per (service, verb) with both baked into the task definition, because
- * `schtasks /run` takes a task name and cannot pass arguments. "Control everything" would need
- * either a task per service — about a thousand, each with its own prompt — or one elevated
- * runner taking a service name, which converts a frozen action into a variable one and must
- * then be approved every time. That is the thing the elevation design exists to prevent, so the
- * switch would buy nothing. See helpers/ELEVATION.md.
+ * ⚠ `host-services:control` deliberately omits `unbounded` — structural, not an oversight. A
+ * grant is one Scheduled Task per (service, verb) baked in, so `schtasks /run` cannot pass
+ * arguments; "control everything" would need a task per service, or one elevated runner that
+ * takes a service name — the variable action the elevation design exists to prevent.
  */
 
 const SETTINGS = () => helperTableName("host-services", "settings");
@@ -55,7 +45,10 @@ async function setFlag(key: string, on: boolean): Promise<void> {
   );
 }
 
-/** Whether a module holding `host-services:read` may see every service, not just the listed ones. */
+/**
+ * Whether a module holding `host-services:read` may see every service, not just the listed ones.
+ * REFS helpers/host-services/api.ts
+ */
 export function readIsUnbounded(): Promise<boolean> {
   return getFlag(UNBOUNDED_READ);
 }
@@ -84,6 +77,7 @@ async function candidates(query: string, taken: Set<string>): Promise<ScopeCandi
 
 /* ------------------------------------------------------------------ read */
 
+/** REFS helpers/host-services/helper.ts */
 export const readScope: HelperCapabilityScope = {
   noun: "service",
   addHint: "Spooler",
@@ -133,6 +127,7 @@ export const readScope: HelperCapabilityScope = {
 
 /* --------------------------------------------------------------- control */
 
+/** REFS helpers/host-services/helper.ts */
 export const controlScope: HelperCapabilityScope = {
   noun: "service",
   addHint: "Spooler",

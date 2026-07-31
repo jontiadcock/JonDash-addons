@@ -26,6 +26,7 @@ const notice = writeNotice;
  *
  * The reply distinguishes "it ran" from "it is waiting for you" — those look identical
  * otherwise, and the difference is the entire point of the approval model.
+ * REFS addons/service-control/page.tsx · addons/service-control/ui/widget.tsx
  */
 export const requestAction = moduleAction(MODULE_ID, async (ctx, form: FormData): Promise<void> => {
   const id = str(form, "id");

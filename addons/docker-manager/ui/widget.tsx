@@ -4,32 +4,25 @@ import docker from "@/helpers/docker/api";
 import { MODULE_PATH, STATE_TONE, type ContainerState } from "../lib/constants";
 
 /**
- * The dashboard tile — "is everything up".
+ * The dashboard tile — "is everything up". Draws its own card: the dashboard gives a widget
+ * only a grid cell and nothing else.
  *
- * Draws its own card: the dashboard gives a widget a grid cell and nothing else.
+ * ⚠ No `stats()` here, deliberately — it costs about a second per call since Docker samples
+ * CPU twice, and the dashboard renders whether or not anyone is looking. Names and states are
+ * cheap; resource use belongs on the page someone opened.
  *
- * **No `stats()` here, deliberately.** It costs about a second per call because Docker samples
- * CPU twice, and a dashboard renders whether or not anyone is looking at this tile. Names and
- * states are cheap; resource use belongs on the page someone opened.
- *
- * # Sizing (JonDash 1.8.0 B5/B6)
- *
- * The user can size this from 1×1 upward and the frame **clips rather than scrolls**, so:
- * core's two thresholds decide what kind of content appears, every row is exactly one line and the
- * list is CSS multi-column, so it flows into extra columns when the tile is wide and short, and
- * rows are in priority order — unhealthy, then stopped, then running.
- *
- * `.slice(0, 6)` is gone. A constant row count was picked for one box size and was wrong at
- * every other: clipped when small, half-empty when large. With the order above, whatever the
- * frame does clip is always the least interesting container.
+ * Sizing: the frame **clips rather than scrolls** from 1×1 upward. Rows are one line each in a
+ * CSS multi-column list that flows wider on a short tile, sorted unhealthy → stopped → running
+ * so whatever gets clipped is always the least interesting container.
  */
+
 /** See `service-control`: a guard against an unbounded list, not a layout size. */
 const TILE_CAP = 24;
 
 /**
  * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
  * See `host-vitals/ui/widget.tsx` for the full reasoning and the two mechanisms that were wrong
- * first: flex `flex-wrap` (columns ran off the side of the card) and CSS `columns` (it balances,
+ * first: flex wrapping (columns ran off the side of the card) and CSS multi-column (it balances,
  * so a few rows spread one-per-column across the top and left the rest of the card empty).
  *
  * `1fr` rows are what fill the height; `gridAutoFlow: column` fills downward before going
@@ -49,6 +42,7 @@ const FILL_GRID = {
 } as const;
 
 
+/** REFS addons/docker-manager/module.ts */
 export default async function DockerWidget({ ctx }: ModuleWidgetProps) {
   const api = docker(ctx);
   const status = await api.status();

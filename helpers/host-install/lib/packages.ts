@@ -20,6 +20,7 @@ export type IdVerdict = { ok: true; id: string } | { ok: false; reason: string }
  * pass-through gets smuggled in wearing a package name. The first character is therefore
  * restricted separately from the rest, which is why the pattern above has two classes rather
  * than one with a length bound.
+ * REFS helpers/host-install/api.ts · helpers/host-install/tests/packages.test.ts
  */
 export function validatePackageId(raw: string): IdVerdict {
   const id = raw.trim();
@@ -43,6 +44,7 @@ export function validatePackageId(raw: string): IdVerdict {
  *
  * Deliberately short. A long curated list ages badly and starts to look like an endorsement
  * of software we have not checked.
+ * REFS helpers/host-install/api.ts · helpers/host-install/tests/packages.test.ts
  */
 export const KNOWN: { id: string; label: string; note: string }[] = [
   {

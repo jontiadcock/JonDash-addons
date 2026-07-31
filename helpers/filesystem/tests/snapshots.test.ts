@@ -137,9 +137,8 @@ describe("selectForRetention — weekly tier and ISO weeks", () => {
   });
 
   it("puts a year-end date in the ISO week it actually belongs to", () => {
-    // 2025-12-29 (Mon) through 2026-01-04 (Sun) are all ISO week 2026-W01. Treating the
-    // December dates as belonging to 2025 would merge two real weeks into one bucket and
-    // delete a backup that should have survived.
+    // 2025-12-29 (Mon) through 2026-01-04 (Sun) are all ISO week 2026-W01 — treating the
+    // December dates as 2025 would merge two real weeks and delete a backup that survived.
     const plan = selectForRetention(
       toSnapshots(["2026-01-02-10-00-00", "2025-12-30-10-00-00", "2025-12-24-10-00-00"]),
       { ...NONE, keepWeekly: 2 },

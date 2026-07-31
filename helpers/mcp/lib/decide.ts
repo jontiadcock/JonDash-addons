@@ -1,18 +1,14 @@
 import type { KeyMode } from "./keys";
 
 /**
- * The authorization decision, in one place.
+ * The authorization decision, in one place — `authorize()` and the escalation test both call
+ * this, so the test proves the real code rather than a copy of the table.
  *
- * **Extracted so the test exercises the real thing.** The first version of the escalation test
- * carried its own copy of this table, which meant it proved the table was correct while proving
- * nothing about the code that runs — precisely the failure that shipped an empty settings panel
- * earlier in this project. `authorize()` calls this; the test calls this; there is one table.
+ * Plain data in, no I/O or context, so it is trivially testable and cannot be made to pass by
+ * mocking.
  *
- * It takes plain data rather than a database row on purpose: no I/O, no context, so it is trivially
- * testable and cannot be made to pass by mocking.
- *
- * > **The mode NARROWS. It never widens.** With `accountHasPermission: false` and a permission
- * > required, every combination of mode and tool kind must refuse.
+ * ⚠ The mode NARROWS, never widens: with `accountHasPermission: false` and a permission
+ * required, every mode/tool-kind combination must refuse.
  */
 export type Decision = "allow" | "refuse";
 
@@ -25,6 +21,8 @@ export type Decision = "allow" | "refuse";
  *   write a backup. The distinction is not "more dangerous", it is **who has to be present to
  *   undo it**. Every `act` tool can be reversed by someone at the dashboard; an `admin` tool can
  *   take the dashboard away.
+ * REFS helpers/mcp/lib/authorize.ts · helpers/mcp/lib/tools.ts ·
+ *      helpers/mcp/tests/escalation.test.ts
  */
 export type ToolKind = "read" | "act" | "admin";
 
@@ -47,18 +45,21 @@ export type DecisionInput = {
  * Does this mode reach this rung? Exported so callers can tell WHY a refusal happened without
  * repeating the ladder — the refusal log distinguishes "wrong mode" from "missing permission", and
  * that distinction is worth keeping accurate for the admin reading the tripwire.
+ * REFS helpers/mcp/lib/authorize.ts
  */
 export const modeAllows = (mode: KeyMode, kind: ToolKind): boolean => NEEDS[kind] <= RANK[mode];
 
+/**
+ * REFS helpers/mcp/lib/authorize.ts · helpers/mcp/lib/tools.ts ·
+ *      helpers/mcp/tests/escalation.test.ts
+ */
 export function decide(input: DecisionInput): Decision {
-  // Gate 1 — the key's own mode, as a ladder rather than a pair of ifs. Expressed by rank so that
-  // adding a rung later cannot accidentally leave a tool reachable: a new kind must be given a
-  // number, and an unranked one refuses rather than falls through.
+  // Gate 1 — the mode, as a ladder rather than a pair of ifs: a new tool kind must be given a
+  // rank, so an unranked one refuses rather than falls through.
   if (NEEDS[input.toolKind] > RANK[input.mode]) return "refuse";
 
-  // Gate 2 — the account's real permissions. This is the one that cannot be bypassed by choosing
-  // a different mode, which is what makes promoting a key safe: `admin` mode on an account without
-  // `settings.manage` still cannot restart anything.
+  // Gate 2 — the account's real permissions, which mode cannot bypass: `admin` mode on an account
+  // without `settings.manage` still cannot restart anything.
   if (input.permissionRequired && !input.accountHasPermission) return "refuse";
 
   return "allow";

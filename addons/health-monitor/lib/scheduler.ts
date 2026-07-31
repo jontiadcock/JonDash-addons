@@ -5,32 +5,35 @@ import { dueMonitors, rollupAndPrune } from "./store";
 import { readSettings } from "./settings";
 
 /**
- * The work the scheduler helper runs.
+ * The work the scheduler helper runs. A module's code loads only when something imports it, so
+ * this file can't own its own timer — a `setInterval` in a widget or page render would mean
+ * nothing runs until someone opens the dashboard, and stops silently on an unwatched restart.
  *
- * This module used to own a timer. It doesn't any more: a module's code is only loaded
- * when something imports it, so a `setInterval` started from a widget or page render
- * meant nothing was monitored until somebody opened the dashboard. Restart at 03:00 with
- * nobody looking and the monitoring simply stopped — precisely when it matters most.
- *
- * The `scheduler` helper declares that work instead (see `module.ts` → `schedules`), and
- * runs it from server start. What's left here is the work itself, which was always the
- * module's business: decide what's due, run it, and keep the history tidy.
- *
- * The helper guarantees scheduled ticks never overlap. It cannot know about `catchUp`,
- * which an admin action calls directly — so the overlap guard below stays, covering both.
+ * The `scheduler` helper declares this work instead (`module.ts` → `schedules`) and runs it from
+ * server start; what's left here is deciding what's due, running it, and keeping history tidy.
  */
 
-/** The scan interval, fixed. The shortest per-monitor interval offered is 30s, so looking
- *  every 15s honours every choice; a monitor's own interval is what decides when it runs. */
+/**
+ * The scan interval, fixed. The shortest per-monitor interval offered is 30s, so looking
+ * every 15s honours every choice; a monitor's own interval is what decides when it runs.
+ * REFS addons/health-monitor/module.ts
+ */
 export const SCAN_EVERY_MS = 15_000;
 
-/** How often history is compacted and pruned. Cheap, and nowhere near time-critical. */
+/**
+ * How often history is compacted and pruned. Cheap, and nowhere near time-critical.
+ * REFS addons/health-monitor/module.ts
+ */
 export const MAINTENANCE_EVERY_MS = 3_600_000;
 
 /** Bounds one pass, so a large backlog can't monopolise a tick. */
 const MAX_BATCHES_PER_TICK = 5;
 
-/** Kept on `globalThis` so a re-evaluated bundle can't run two passes at once. */
+/**
+ * Kept on `globalThis` so a re-evaluated bundle can't run two passes at once. Needed because
+ * the helper only guarantees scheduled ticks don't overlap each other — it doesn't know about
+ * `catchUp`, which an admin action calls directly, so this guard is what covers both paths.
+ */
 type SchedulerState = { running: boolean };
 const KEY = "__jondash_health_monitor_scheduler__";
 
@@ -61,6 +64,7 @@ async function runDue(ctx: ModuleContext): Promise<number> {
 /**
  * One pass: run whatever is due. Skipped rather than queued if a pass is already in
  * flight, so a slow batch can't stack on itself.
+ * REFS addons/health-monitor/module.ts
  */
 export async function tick(ctx: ModuleContext): Promise<void> {
   const s = state();
@@ -79,6 +83,7 @@ export async function tick(ctx: ModuleContext): Promise<void> {
  * Compact old results into hourly summaries and drop anything past its retention.
  * Separate from the poll: it has nothing to do with noticing an outage, and folding it
  * into the fast tick meant a time-check on every single pass.
+ * REFS addons/health-monitor/module.ts
  */
 export async function runMaintenance(ctx: ModuleContext): Promise<void> {
   const db = ctx.db;
@@ -90,6 +95,7 @@ export async function runMaintenance(ctx: ModuleContext): Promise<void> {
 /**
  * Run anything overdue right now, for an explicit admin action — adding a monitor should
  * show a result immediately rather than after the next tick. Not used by the schedule.
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/module.ts
  */
 export async function catchUp(ctx: ModuleContext): Promise<void> {
   await tick(ctx);

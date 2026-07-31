@@ -3,9 +3,9 @@ import path from "node:path";
 import { assessRoot, riskSummary } from "../lib/risk";
 
 /**
- * Warnings replaced refusals in 0.0.2, so these are now the only thing standing between an
- * admin and copying their whole disk to a NAS without realising what is in it. A warning
- * that fails to fire is the new version of a deny-list hole.
+ * Warnings replaced refusals, so these are now the only thing standing between an admin
+ * and copying their whole disk to a NAS without realising what is in it. A warning that
+ * fails to fire is the new version of a deny-list hole.
  */
 
 const WIN = process.platform === "win32";

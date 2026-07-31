@@ -6,17 +6,28 @@
  * bundle. Same rule the other modules follow.
  */
 
-/** Must match the folder name. Changing it later orphans the module's data. */
+/**
+ * Must match the folder name. Changing it later orphans the module's data.
+ * REFS addons/service-control/actions.ts
+ */
 export const MODULE_ID = "service-control";
+/** REFS addons/service-control/actions.ts · addons/service-control/ui/widget.tsx */
 export const MODULE_PATH = `/m/${MODULE_ID}`;
+/** REFS addons/service-control/actions.ts · addons/service-control/page.tsx */
 export const ADMIN_PATH = `/admin/modules/${MODULE_ID}`;
 
+/**
+ * REFS addons/service-control/page.tsx · addons/service-control/ui/settings-panel.tsx ·
+ *      addons/service-control/ui/widget.tsx
+ */
 export type ServiceState = "running" | "stopped" | "starting" | "stopping" | "unknown";
 
 /**
  * How a state reads to a person. "unknown" is deliberately not an error tone: on a machine
  * where the service was renamed or removed it is the honest answer, and colouring it red
  * would send people hunting for a fault that is really a typo in the allowlist.
+ * REFS addons/service-control/page.tsx · addons/service-control/ui/settings-panel.tsx ·
+ *      addons/service-control/ui/widget.tsx
  */
 export const STATE_LABEL: Record<ServiceState, string> = {
   running: "Running",
@@ -26,6 +37,10 @@ export const STATE_LABEL: Record<ServiceState, string> = {
   unknown: "Not found",
 };
 
+/**
+ * REFS addons/service-control/page.tsx · addons/service-control/ui/settings-panel.tsx ·
+ *      addons/service-control/ui/widget.tsx
+ */
 export const STATE_TONE: Record<ServiceState, string> = {
   running: "var(--success, inherit)",
   stopped: "var(--muted)",
@@ -34,7 +49,10 @@ export const STATE_TONE: Record<ServiceState, string> = {
   unknown: "var(--muted)",
 };
 
-/** Which verbs make sense right now. Offering "Start" on a running service is noise. */
+/**
+ * Which verbs make sense right now. Offering "Start" on a running service is noise.
+ * REFS addons/service-control/page.tsx · addons/service-control/ui/widget.tsx
+ */
 export function verbsFor(state: ServiceState): ("start" | "stop" | "restart")[] {
   switch (state) {
     case "running":
@@ -49,7 +67,10 @@ export function verbsFor(state: ServiceState): ("start" | "stop" | "restart")[] 
   }
 }
 
-/** "2 hours ago". Relative, because the question is "is this recent?". */
+/**
+ * "2 hours ago". Relative, because the question is "is this recent?".
+ * REFS addons/service-control/ui/settings-panel.tsx
+ */
 export function formatRelative(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "never";
   const t = Date.parse(iso);

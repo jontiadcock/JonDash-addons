@@ -4,6 +4,8 @@
  * An inline SVG rather than an image file: it ships inside the module, needs no upload
  * or serving route, and `currentColor` means it follows light and dark themes without
  * two versions. A heartbeat line — the shape people already read as "health".
+ *
+ * REFS addons/health-monitor/module.ts
  */
 export function HealthIcon({ className }: { className?: string }) {
   return (

@@ -1,15 +1,15 @@
 import { assertUsableAsSource, type PathVerdict } from "./paths";
 
 /**
- * Roots — the admin-approved locations this helper may touch.
+ * Roots — the admin-approved locations this helper may touch. A root is stored on the
+ * HELPER, never on the consuming module, so a module cannot widen its own reach: every
+ * operation names a root by id and the helper resolves it — what lets the consent screen
+ * honestly say "the folders you allow".
  *
- * A root is stored on the HELPER, never on the consuming module, so a module cannot widen
- * its own reach: every operation names a root by id and the helper resolves it. That is
- * what lets the consent screen honestly say "the folders you allow".
- *
- * NOTE: this file is the CONFIG-shaped read side, used only by `describe()` for the
- * consent sentence. The live roots — the ones operations actually resolve against — are
- * rows in `hlp_filesystem_roots`, owned by `api.ts`.
+ * ⚠ This file is the CONFIG-shaped read side only, used by `describe()` for the consent
+ * sentence — do not confuse `listRoots` here with `lib/admin.ts`'s same-named function. The
+ * live roots operations actually resolve against are rows in `hlp_filesystem_roots`, owned
+ * by `api.ts`.
  */
 
 export type Root = {
@@ -36,7 +36,10 @@ export function listRoots(config: Record<string, unknown>): Root[] {
   return out;
 }
 
-/** Just the paths, for the consent sentence. */
+/**
+ * Just the paths, for the consent sentence.
+ * REFS helpers/filesystem/helper.ts
+ */
 export function listRootPaths(config: Record<string, unknown>): string[] {
   return listRoots(config).map((r) => r.path);
 }
@@ -45,9 +48,9 @@ export function listRootPaths(config: Record<string, unknown>): string[] {
  * Validate a path an admin has offered as a new root. Returns the canonical form, or a
  * refusal carrying a reason they can act on. Never narrows a bad path to a working one.
  *
- * Source rules: since 0.0.2 a root may be as broad as a whole drive. Breadth is warned
- * about (`risk.ts`) and the secrets inside are excluded by identity (`secrets.ts`), rather
- * than the folder being refused.
+ * Source rules: a root may be as broad as a whole drive — breadth is warned about
+ * (`risk.ts`) and the secrets inside are excluded by identity (`secrets.ts`), rather than
+ * the folder being refused.
  */
 export function validateRootPath(input: string): PathVerdict {
   return assertUsableAsSource(input);
