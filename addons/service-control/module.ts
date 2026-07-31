@@ -23,7 +23,7 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.7-beta.1",
+  version: "0.0.7",
   // Matches the helper's floor: beta.9 is the first build with helper settings pages, which
   // is where the allowlist editor now lives. The PRE-RELEASE, not a bare "1.7.1" — semver
   // ranks a pre-release below its release, so "1.7.1" would refuse every 1.7.1 beta,
