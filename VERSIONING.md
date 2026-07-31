@@ -123,11 +123,42 @@ instead. *(Future core modifications use the distinct namespace `mod-<id>/v<vers
       "permissions": ["network:outbound"],
       "path": "addons/health-monitor",
       "tag": "health-monitor/v1.0.0",  // the tag to download this version from
-      "notes": "What changed in this version, in one line."   // optional
+      "notes": "What changed in this version, in one line.",  // optional
+      "screenshots": [                 // optional, max 4 — see below
+        { "file": "widget.png", "caption": "The dashboard tile, at a glance" }
+      ]
     }
   ]
 }
 ```
+
+### `screenshots` — the only look anyone gets before installing
+
+Image files live **in the module folder** and are named here. JonDash fetches each one from the
+module's **pinned `tag`**, not from the branch, so the images and the version bump have to ship in the
+same release — adding pictures without bumping changes nothing for anybody, because the tag a user
+resolves has no images in it.
+
+| Rule | Detail |
+| ---- | ------ |
+| Count | **4 maximum**; extras are dropped |
+| Formats | `png` · `jpg` · `jpeg` · `webp` |
+| Size | **1 MB each**, hard limit |
+| Filename | **Flat. No folder** — see the warning |
+| Caption | Optional, plain text, **80 characters** |
+| Shape | 16:10, ≥1280px wide (1920×1200 ideal) — below that it renders soft |
+
+> **An entry JonDash dislikes is skipped in silence.** The module installs, the manifest validates,
+> and the image never appears — nothing logged, nothing on screen. **Run
+> `node scripts/check-screenshots.mjs` before publishing**; it turns every silent skip into a failure.
+
+> **A folder path (`screenshots/widget.png`) works only on JonDash 1.8.1 and newer**, and is silently
+> dropped on 1.8.0. Every add-on here declares a floor at or below 1.8.0, so **use a flat filename**
+> until those floors rise past 1.8.1.
+
+**Use invented data** — made-up hostnames and services, never a real machine. These sit in a public
+repository inside a tag that never changes. Mix the states too: something healthy, something degraded,
+something failed. An all-green picture says nothing about the thing a person is actually judging.
 
 ### `minAppVersion` — name the pre-release, not the release
 

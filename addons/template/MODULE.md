@@ -122,6 +122,51 @@ you. It needs no other context.
 > backtick spans as readily as out of real `className` strings, and an invalid one can take the CSS
 > build down rather than merely doing nothing.
 
+> ### Screenshots — what someone sees before they install you
+>
+> Browse shows your images on the module's page, so this is the only look at your module anybody gets
+> before deciding. Put the image files **in your module folder** and declare them in your manifest
+> entry:
+>
+> ```json
+> "screenshots": [
+>   { "file": "widget.png",   "caption": "The dashboard tile, at a glance" },
+>   { "file": "page.png",     "caption": "The full page, with real data" },
+>   { "file": "settings.png", "caption": "What an administrator can change" }
+> ]
+> ```
+>
+> | Rule | Detail |
+> | ---- | ------ |
+> | How many | **4 maximum** — extras are dropped |
+> | Formats | `png` · `jpg` · `jpeg` · `webp` |
+> | Size | **1 MB each**, hard limit |
+> | Filename | **A flat filename. No folder.** See the warning below |
+> | Caption | Optional, plain text, **80 characters** — longer is truncated |
+> | Shape | 16:10, at least 1280px wide. 1920×1200 is ideal |
+>
+> **Two things that will catch you out.**
+>
+> **A screenshot JonDash does not like is skipped in silence.** Your module still installs, the
+> manifest still validates, and the picture simply never appears — no error, no log line, nothing on
+> screen. So a typo in a filename is invisible until somebody tells you your module has no images.
+> Run `node scripts/check-screenshots.mjs` before you publish; it turns every one of those silent
+> skips into a failure.
+>
+> **A folder path only works on JonDash 1.8.1 and newer.** `screenshots/widget.png` is valid there and
+> is *silently dropped* on 1.8.0. If your `minAppVersion` is below 1.8.1 — as every module here is —
+> use a flat filename or your images will not exist for a large share of your users.
+>
+> **Your images are fetched from the tag your manifest pins**, not from your branch. So the pictures
+> and the tag have to be one release: adding images without a version bump changes nothing for
+> anybody, because the old tag has no images in it.
+>
+> **Show the module doing its job, and be honest about it.** A tile where everything is green says
+> nothing about what your module does when something breaks. Mix the states — something healthy,
+> something degraded, something failed — and use **invented data**: made-up hostnames, made-up
+> services. Never publish a screenshot of your own machine; these go into a public repository, inside
+> a tag that never changes.
+
 Delete anything you don't need. A module with just `module.ts` and `MODULE.md` that declares a couple
 of settings is perfectly valid.
 

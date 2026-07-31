@@ -34,7 +34,7 @@ This module touches no service itself; it cannot. Every read and every action go
   `request()` takes an *id from that list*. An unknown id and a read-only one return the identical
   refusal, so the list cannot be probed by trying ids.
 - **It cannot add itself to that list.** Approving a service happens in JonDash's own UI, under
-  Admin → Permissions, where `ctx.user` comes from the session and no module is in the path.
+  Admin → Addons → Shared capabilities, where `ctx.user` comes from the session and no module is in the path.
 - **It cannot discover what services exist.** There is no enumerate call on the helper's API.
 - **It cannot run a command.** Three verbs against a list; this is not a shell.
 
@@ -51,7 +51,7 @@ request, never add, remove or approve.
 ## Asking for a service
 
 A module may *suggest* one. `suggest(name, reason)` records a request and does nothing else — an
-administrator sees it under Admin → Permissions and decides. Declines are remembered, because a
+administrator sees it under Admin → Addons → Shared capabilities and decides. Declines are remembered, because a
 module that re-asks after every refusal trains someone to click yes without reading.
 
 ## Two capabilities, not one
