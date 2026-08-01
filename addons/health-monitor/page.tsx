@@ -13,7 +13,7 @@ import {
 import { formatAgo, formatDuration, formatMs, formatUptime, stateColour, STATE_LABEL, worstState } from "./lib/format";
 import { KIND_CHOICES } from "./lib/forms";
 import { ADMIN_PATH, MODULE_PATH, type MonitorRow } from "./lib/types";
-import { HealthStyles, LatencyChart, Stat, StatusDot, StatusStrip } from "./ui/parts";
+import { HealthStyles, LatencyChart, SpeedChart, Stat, StatusDot, StatusStrip } from "./ui/parts";
 
 /**
  * The module's pages, split so that looking and changing are different places:
@@ -230,7 +230,9 @@ async function MonitorDetail({
         <div className="mt-5">
           <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-xs" style={{ color: "var(--muted)" }}>
-              Response time · the band is the slowest 5%, red marks failed checks
+              {monitor.kind === "speed"
+                ? "Speed · dashed is upload, amber bars are latency, red bars jitter"
+                : "Response time · the band is the slowest 5%, red marks failed checks"}
             </p>
             <span className="flex gap-1 text-xs">
               {[7, 30].map((d) => (
@@ -245,7 +247,7 @@ async function MonitorDetail({
               ))}
             </span>
           </div>
-          <LatencyChart buckets={latency} />
+          {monitor.kind === "speed" ? <SpeedChart buckets={latency} /> : <LatencyChart buckets={latency} />}
         </div>
       </section>
 

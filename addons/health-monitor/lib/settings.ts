@@ -1,5 +1,5 @@
 import type { ModuleContext, ModuleSettingField } from "@/lib/modules/types";
-import type { ModuleSettings } from "./types";
+import { MAX_INTERVAL_SEC, MIN_INTERVAL_SEC, type ModuleSettings } from "./types";
 
 /**
  * The module's settings: one declaration used both for the framework's auto-rendered
@@ -132,7 +132,7 @@ function list(v: unknown): string[] {
 export async function readSettings(ctx: ModuleContext): Promise<ModuleSettings> {
   const s = await ctx.settings.all();
   return {
-    defaultIntervalSec: num(s.defaultIntervalSec, 60, 10, 86_400),
+    defaultIntervalSec: num(s.defaultIntervalSec, 60, MIN_INTERVAL_SEC, MAX_INTERVAL_SEC),
     defaultTimeoutMs: num(s.defaultTimeoutMs, 10_000, 500, 120_000),
     defaultRetries: num(s.defaultRetries, 2, 0, 10),
     degradedMs: num(s.degradedMs, 2000, 1, 120_000),

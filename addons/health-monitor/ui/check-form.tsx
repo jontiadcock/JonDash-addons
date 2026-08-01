@@ -60,8 +60,11 @@ export function CheckForm({
 
   const spec = KIND_CHOICES.find((k) => k.value === kind) ?? KIND_CHOICES[0];
   const routed = new Set(routedTo);
-  const interval = monitor?.intervalSec ?? 60;
+  // A kind may set its own default — a speed check spends real bandwidth, so a minute would be
+  // indefensible. An existing monitor keeps whatever it was saved with.
+  const interval = monitor?.intervalSec ?? spec.defaultIntervalSec ?? 60;
   const knownInterval = INTERVAL_CHOICES.some((c) => c.value === interval);
+  const payloadMb = config?.payloadBytes ? Math.round(config.payloadBytes / 1024 / 1024) : "";
 
   return (
     <form action={formAction} className="flex flex-col gap-4">
@@ -139,7 +142,7 @@ export function CheckForm({
 
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium">Check how often</span>
-        <select className="input" name="intervalSec" defaultValue={knownInterval ? interval : 60}>
+        <select className="input" name="intervalSec" defaultValue={knownInterval ? interval : (spec.defaultIntervalSec ?? 60)}>
           {INTERVAL_CHOICES.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -210,6 +213,53 @@ export function CheckForm({
                 For a device on your own network that issues its own certificate, like a NAS or a
                 router. Leave off for anything on the internet.
               </span>
+            </>
+          ) : null}
+
+          {spec.speedOptions ? (
+            <>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="skipUpload" defaultChecked={Boolean(config?.skipUpload)} />
+                Skip the upload test
+              </label>
+              <span className="-mt-2 text-xs" style={{ color: "var(--muted)" }}>
+                Halves the data each run uses, and some test servers refuse uploads anyway.
+              </span>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium">Warn below (Mbps)</span>
+                <input
+                  className="input"
+                  name="minMbps"
+                  type="number"
+                  min={0}
+                  max={100000}
+                  step="0.1"
+                  defaultValue={config?.minMbps ?? ""}
+                  placeholder="never warn"
+                />
+                <span className="text-xs" style={{ color: "var(--muted)" }}>
+                  A download slower than this is reported as degraded and can alert you. Leave blank
+                  to record the speed without ever complaining about it.
+                </span>
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium">Transfer per test (MB)</span>
+                <input
+                  className="input"
+                  name="payloadMb"
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue={payloadMb}
+                  placeholder="10"
+                />
+                <span className="text-xs" style={{ color: "var(--muted)" }}>
+                  Bigger is more accurate on a fast line and uses more data. This much is
+                  downloaded, and the same again uploaded unless you skip it above.
+                </span>
+              </label>
             </>
           ) : null}
 

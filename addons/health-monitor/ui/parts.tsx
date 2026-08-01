@@ -1,10 +1,12 @@
 import type { MonitorState } from "../lib/types";
 import type { HourBucket, LatencyBucket } from "../lib/store";
+import { ChartHover, type ChartPoint } from "./chart-client";
 import { stateColour } from "../lib/format";
 
 /**
- * The module's presentational pieces. All server components — nothing here needs
- * interactivity, so the module ships no client JavaScript at all.
+ * The module's presentational pieces. Server components — the one piece of browser code is the
+ * pointer readout in `chart-client.tsx`, which wraps a chart rather than drawing it, so every
+ * chart here still renders with JavaScript switched off.
  *
  * Charts are hand-drawn SVG on purpose: a charting library would be a new dependency in
  * an app that keeps its install small, and a status strip is a row of rectangles.
@@ -239,7 +241,20 @@ export function LatencyChart({
   const gridAt = [0, 0.5, 1];
   const dayEvery = Math.max(1, Math.round(buckets.length / 7));
 
+  // The viewBox is `W x height` and the SVG renders at exactly `height`, so an SVG coordinate
+  // over its own axis length IS the fraction the hover layer wants — no second scale to keep.
+  const hoverPoints: ChartPoint[] = buckets.map((b, i) => ({
+    x: x(i) / W,
+    y: b.avgMs == null ? null : y(b.avgMs) / height,
+    label: `${b.hour.replace("T", " ")}:00`,
+    detail:
+      b.avgMs == null
+        ? "no checks"
+        : `${b.avgMs}ms typical · ${b.p95Ms ?? b.avgMs}ms slowest 5%${b.failures ? ` · ${b.failures} failed` : ""}`,
+  }));
+
   return (
+    <ChartHover points={hoverPoints} height={height}>
     <svg
       viewBox={`0 0 ${W} ${height}`}
       width="100%"
@@ -303,6 +318,108 @@ export function LatencyChart({
           )
         : null}
     </svg>
+    </ChartHover>
+  );
+}
+
+/**
+ * A speed check over time: throughput as a filled area behind, latency and jitter as bars in
+ * front on their own scale.
+ *
+ * ⚠ Two scales, the one place this module allows it: megabits and milliseconds share no axis, and
+ * plotting the bars against the speed axis would draw 20ms of jitter as a flat line forever. The
+ * bars read against each other, which is why they are a different kind of mark.
+ *
+ * Absent upload means the leg was off or refused — drawn as nothing, never as zero.
+ *
+ * REFS addons/health-monitor/lib/store.ts › LatencyBucket · addons/health-monitor/page.tsx
+ */
+export function SpeedChart({ buckets, height = 170 }: { buckets: LatencyBucket[]; height?: number }) {
+  const withData = buckets.filter((b) => b.downMbps != null);
+  if (withData.length < 2) {
+    return (
+      <p className="text-xs" style={{ color: "var(--muted)" }}>
+        Not enough speed tests yet — this fills in as they run.
+      </p>
+    );
+  }
+
+  const W = 720;
+  const padL = 44, padR = 40, padT = 6, padB = 24;
+  const plotH = height - padT - padB;
+  const maxMbps = niceMax(Math.max(...withData.map((b) => Math.max(b.downMbps ?? 0, b.upMbps ?? 0))));
+  const maxMs = niceMax(Math.max(1, ...withData.map((b) => Math.max(b.avgMs ?? 0, b.jitterMs ?? 0))));
+  const x = (i: number) => padL + (i / Math.max(1, buckets.length - 1)) * (W - padL - padR);
+  const ySpeed = (v: number) => padT + plotH - (v / maxMbps) * plotH;
+  const yMs = (v: number) => padT + plotH - (v / maxMs) * plotH;
+  const barW = Math.max(1.5, (W - padL - padR) / buckets.length / 3);
+
+  const area: string[] = [];
+  const upLine: string[] = [];
+  for (const [i, b] of buckets.entries()) {
+    if (b.downMbps == null) continue;
+    area.push(`${x(i).toFixed(1)},${ySpeed(b.downMbps).toFixed(1)}`);
+    if (b.upMbps != null) upLine.push(`${x(i).toFixed(1)},${ySpeed(b.upMbps).toFixed(1)}`);
+  }
+  const floor = `${x(buckets.length - 1).toFixed(1)},${(padT + plotH).toFixed(1)} ${x(0).toFixed(1)},${(padT + plotH).toFixed(1)}`;
+
+  const hoverPoints: ChartPoint[] = buckets.map((b, i) => ({
+    x: x(i) / W,
+    y: b.downMbps == null ? null : ySpeed(b.downMbps) / height,
+    label: `${b.hour.replace("T", " ")}:00`,
+    detail:
+      b.downMbps == null
+        ? "no test"
+        : [
+            `${b.downMbps} Mbps down`,
+            b.upMbps != null ? `${b.upMbps} up` : null,
+            b.avgMs != null ? `${b.avgMs}ms` : null,
+            b.jitterMs != null ? `${b.jitterMs}ms jitter` : null,
+          ].filter(Boolean).join(" · "),
+  }));
+
+  return (
+    <ChartHover points={hoverPoints} height={height}>
+      <svg
+        viewBox={`0 0 ${W} ${height}`}
+        width="100%"
+        height={height}
+        role="img"
+        aria-label={`Connection speed over the last ${Math.round(buckets.length / 24)} days, peaking near ${maxMbps} megabits per second`}
+      >
+        {[0, 0.5, 1].map((f) => (
+          <g key={f}>
+            <line x1={padL} y1={ySpeed(maxMbps * f)} x2={W - padR} y2={ySpeed(maxMbps * f)} stroke="var(--border)" strokeWidth={1} />
+            <text x={padL - 6} y={ySpeed(maxMbps * f) + 3.5} textAnchor="end" fontSize={11} fill="var(--muted)">
+              {Math.round(maxMbps * f)}
+            </text>
+            <text x={W - padR + 6} y={yMs(maxMs * f) + 3.5} fontSize={11} fill="var(--muted)">
+              {Math.round(maxMs * f)}
+            </text>
+          </g>
+        ))}
+
+        <polygon points={`${area.join(" ")} ${floor}`} fill="var(--primary)" opacity={0.18} />
+        <polyline points={area.join(" ")} fill="none" stroke="var(--primary)" strokeWidth={2} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {upLine.length > 1 ? (
+          <polyline points={upLine.join(" ")} fill="none" stroke="var(--primary)" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.75} vectorEffect="non-scaling-stroke" />
+        ) : null}
+
+        {buckets.map((b, i) =>
+          b.avgMs != null ? (
+            <rect key={`l-${b.hour}`} x={x(i) - barW} y={yMs(b.avgMs)} width={barW} height={padT + plotH - yMs(b.avgMs)} fill="var(--warning, #b45309)" opacity={0.8} />
+          ) : null,
+        )}
+        {buckets.map((b, i) =>
+          b.jitterMs != null ? (
+            <rect key={`j-${b.hour}`} x={x(i)} y={yMs(b.jitterMs)} width={barW} height={padT + plotH - yMs(b.jitterMs)} fill="var(--danger)" opacity={0.65} />
+          ) : null,
+        )}
+
+        <text x={4} y={padT + 4} fontSize={10} fill="var(--muted)">Mbps</text>
+        <text x={W - padR + 6} y={padT + 4} fontSize={10} fill="var(--muted)">ms</text>
+      </svg>
+    </ChartHover>
   );
 }
 

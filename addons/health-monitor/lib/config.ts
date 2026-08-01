@@ -7,6 +7,7 @@ import {
   upsertMaintenance,
   upsertMonitor,
 } from "./store";
+import { MAX_INTERVAL_SEC, MIN_INTERVAL_SEC } from "./types";
 
 /**
  * Bulk import.
@@ -27,10 +28,10 @@ const idSchema = z
 const monitorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(80),
-  kind: z.enum(["http", "tcp", "ping", "dns", "tls"]),
+  kind: z.enum(["http", "tcp", "ping", "dns", "tls", "speed"]),
   target: z.string().min(1).max(500),
   port: z.number().int().min(1).max(65535).optional(),
-  intervalSec: z.number().int().min(10).max(86_400).optional(),
+  intervalSec: z.number().int().min(MIN_INTERVAL_SEC).max(MAX_INTERVAL_SEC).optional(),
   timeoutMs: z.number().int().min(500).max(120_000).optional(),
   retries: z.number().int().min(0).max(10).optional(),
   degradedMs: z.number().int().min(1).max(120_000).optional(),

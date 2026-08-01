@@ -335,7 +335,7 @@ export async function hourlyBuckets(db: Db, monitorId: string, hours: number): P
   return out;
 }
 
-/** REFS addons/health-monitor/ui/parts.tsx › LatencyChart() — the only thing that draws this. */
+/** REFS addons/health-monitor/ui/parts.tsx › LatencyChart() · SpeedChart() */
 export type LatencyBucket = {
   hour: string;
   /** null when no check ran in this hour — a gap, which is not the same as 0ms. */
@@ -343,6 +343,10 @@ export type LatencyBucket = {
   p95Ms: number | null;
   checks: number;
   failures: number;
+  /** Speed readings, present only for a `speed` monitor. Averaged over the hour's samples. */
+  downMbps?: number;
+  upMbps?: number;
+  jitterMs?: number;
 };
 
 /**
@@ -359,8 +363,8 @@ export type LatencyBucket = {
  */
 export async function latencyBuckets(db: Db, monitorId: string, hours: number): Promise<LatencyBucket[]> {
   const since = new Date(Date.now() - hours * 3_600_000).toISOString();
-  const samples = await db.query<{ h: string; state: string; latencyMs: unknown }>(
-    `SELECT substr(ts, 1, 13) AS h, state, latencyMs
+  const samples = await db.query<{ h: string; state: string; latencyMs: unknown; phasesJson: string | null }>(
+    `SELECT substr(ts, 1, 13) AS h, state, latencyMs, phasesJson
        FROM ${db.table("results")} WHERE monitorId = ? AND ts >= ?`,
     monitorId,
     since,
@@ -379,12 +383,25 @@ export async function latencyBuckets(db: Db, monitorId: string, hours: number): 
     byHour.set(r.h, { hour: r.h, avgMs: r.a == null ? null : n(r.a), p95Ms: r.p == null ? null : n(r.p), checks: n(r.c), failures: n(r.f) });
   }
 
-  const grouped = new Map<string, { lat: number[]; checks: number; failures: number }>();
+  const mean = (v: number[]) => (v.length ? Math.round((v.reduce((t, x) => t + x, 0) / v.length) * 10) / 10 : undefined);
+
+  type Group = { lat: number[]; down: number[]; up: number[]; jit: number[]; checks: number; failures: number };
+  const grouped = new Map<string, Group>();
   for (const s of samples) {
-    const g = grouped.get(s.h) ?? { lat: [], checks: 0, failures: 0 };
+    const g = grouped.get(s.h) ?? { lat: [], down: [], up: [], jit: [], checks: 0, failures: 0 };
     g.checks++;
     if (s.state === "down") g.failures++;
     if (s.latencyMs != null) g.lat.push(n(s.latencyMs));
+    // Speed readings ride in phasesJson. Bad JSON is ignored rather than thrown — one unreadable
+    // row must not blank an hour that has perfectly good samples beside it.
+    if (s.phasesJson) {
+      try {
+        const p = JSON.parse(s.phasesJson) as { downMbps?: number; upMbps?: number; jitterMs?: number };
+        if (typeof p.downMbps === "number") g.down.push(p.downMbps);
+        if (typeof p.upMbps === "number") g.up.push(p.upMbps);
+        if (typeof p.jitterMs === "number") g.jit.push(p.jitterMs);
+      } catch { /* not speed data, or truncated */ }
+    }
     grouped.set(s.h, g);
   }
   for (const [h, g] of grouped) {
@@ -392,7 +409,16 @@ export async function latencyBuckets(db: Db, monitorId: string, hours: number): 
     const avg = sorted.length ? Math.round(sorted.reduce((t, v) => t + v, 0) / sorted.length) : null;
     // Nearest-rank: the smallest sample at or above the 95th percentile position.
     const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)] : null;
-    byHour.set(h, { hour: h, avgMs: avg, p95Ms: p95, checks: g.checks, failures: g.failures });
+    byHour.set(h, {
+      hour: h,
+      avgMs: avg,
+      p95Ms: p95,
+      checks: g.checks,
+      failures: g.failures,
+      downMbps: mean(g.down),
+      upMbps: mean(g.up),
+      jitterMs: mean(g.jit),
+    });
   }
 
   const out: LatencyBucket[] = [];

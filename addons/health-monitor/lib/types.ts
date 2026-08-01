@@ -42,7 +42,33 @@ export type ActionResult = { ok: boolean; message: string };
  * REFS addons/health-monitor/lib/checks.ts · addons/health-monitor/lib/forms.ts ·
  *      addons/health-monitor/ui/check-form.tsx
  */
-export type MonitorKind = "http" | "tcp" | "ping" | "dns" | "tls";
+export type MonitorKind = "http" | "tcp" | "ping" | "dns" | "tls" | "speed";
+
+/**
+ * The bounds on how often a check may run.
+ *
+ * ⚠ Lives here because THREE files enforce it and they must agree: the form parser
+ * (`lib/forms.ts`), the bulk-import schema (`lib/config.ts`) and the global default clamp
+ * (`lib/settings.ts`). Raising one alone means a value the form accepts is refused on import.
+ *
+ * REFS addons/health-monitor/lib/forms.ts › parseMonitorForm() ·
+ *      addons/health-monitor/lib/config.ts › monitorSchema ·
+ *      addons/health-monitor/lib/settings.ts › readSettings()
+ */
+export const MIN_INTERVAL_SEC = 10;
+export const MAX_INTERVAL_SEC = 604_800;
+
+/**
+ * Cloudflare's public speed endpoint. No key, no account, and it serves both legs.
+ *
+ * ⚠ Lives here, not beside `runSpeed()`, because the check form shows it as the placeholder and
+ * that form is a CLIENT component. `lib/checks.ts` imports `server-only`, so a client component
+ * reaching into it fails the build rather than failing at runtime.
+ *
+ * REFS addons/health-monitor/lib/checks.ts › runSpeed() ·
+ *      addons/health-monitor/lib/forms.ts › KIND_CHOICES
+ */
+export const SPEED_ENDPOINT = "https://speed.cloudflare.com";
 
 /**
  * A monitor's health. `unknown` = never checked yet.
@@ -75,6 +101,19 @@ export type Phases = {
   tlsMs?: number;
   ttfbMs?: number;
   totalMs: number;
+  /**
+   * Speed-check readings, present only for a `speed` monitor.
+   *
+   * ⚠ These ride in the existing `phasesJson` column rather than new columns, so a speed check
+   * needs no migration. `upMbps` is absent when the check has its upload leg switched off, which
+   * is not the same as an upload that measured zero.
+   *
+   * REFS addons/health-monitor/lib/checks.ts › runSpeed() ·
+   *      addons/health-monitor/ui/parts.tsx › SpeedChart()
+   */
+  downMbps?: number;
+  upMbps?: number;
+  jitterMs?: number;
 };
 
 /**
@@ -144,6 +183,12 @@ export type MonitorConfig = {
   certWarnDays?: number;
   /** http/tls: accept an untrusted or self-signed certificate. Opt-in, for LAN services. */
   insecureTls?: boolean;
+  /** speed: skip the upload leg. Halves what a run costs, and some endpoints refuse uploads. */
+  skipUpload?: boolean;
+  /** speed: below this download rate the check reports `degraded`. 0 or absent never degrades. */
+  minMbps?: number;
+  /** speed: bytes to transfer per leg. Bigger is more accurate and costs more. */
+  payloadBytes?: number;
 };
 
 /** REFS addons/health-monitor/lib/store.ts */

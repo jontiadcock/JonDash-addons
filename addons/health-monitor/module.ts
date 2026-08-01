@@ -2,7 +2,6 @@ import type { ModuleDefinition } from "@/lib/modules/types";
 import HealthWidget from "./widget";
 import HealthPage from "./page";
 import { MODULE_ID } from "./lib/types";
-import { SETTING_FIELDS } from "./lib/settings";
 import { HealthIcon } from "./ui/icon";
 import HealthSettingsPanel from "./ui/settings-panel";
 import { catchUp, tick, runMaintenance, SCAN_EVERY_MS, MAINTENANCE_EVERY_MS } from "./lib/scheduler";
@@ -23,8 +22,8 @@ const healthMonitor: ModuleDefinition = {
   id: MODULE_ID,
   name: "Health monitoring",
   description:
-    "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.10-beta.2",
+    "Watches your services with HTTP, TCP, ping, DNS, certificate and internet speed checks, records uptime and response times, and alerts by email or webhook when something goes down.",
+  version: "0.1.0-beta.1",
   /**
    * Named as a PRE-RELEASE (`-beta.1`) because semver ranks a pre-release below its release,
    * so a bare "1.5.0" would refuse every 1.5.0 beta — the builds beta-channel users actually
@@ -46,13 +45,21 @@ const healthMonitor: ModuleDefinition = {
   // admin-only: monitor targets and failure details are infrastructure information.
   adminOnly: true,
 
-  settings: SETTING_FIELDS,
+  /**
+   * ⚠ NO `settings` array, deliberately. The framework always draws declared settings ABOVE a
+   * module's own panel, so declaring them put fourteen tuning fields in front of the checks
+   * people actually came for. `SETTING_FIELDS` is now rendered inside the panel instead, below
+   * the checks — adding a `settings` key here would silently undo that.
+   *
+   * REFS addons/health-monitor/ui/settings-panel.tsx › AdvancedSettings()
+   *      addons/health-monitor/actions.ts › saveSettingsAction()
+   */
 
   /** Shown beside the module name; inherits the theme colour. */
   icon: HealthIcon,
 
-  /** Adding and changing checks happens here, in Admin -> Addons, below the settings
-   *  fields above. The module's own pages stay read-only. */
+  /** Adding and changing checks happens here, in Admin -> Addons. The module's own pages
+   *  stay read-only. */
   SettingsPanel: HealthSettingsPanel,
   DashboardWidget: HealthWidget,
   Page: HealthPage,

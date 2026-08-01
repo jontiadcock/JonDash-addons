@@ -20,7 +20,7 @@ import {
 import { monitorConfigFrom, parseChannelForm, parseMonitorForm, slugify, uniqueId } from "./lib/forms";
 import { checkMonitor } from "./lib/engine";
 import { importConfigJson } from "./lib/config";
-import { readSettings } from "./lib/settings";
+import { readSettings, SETTING_FIELDS } from "./lib/settings";
 import { sendAlert } from "./lib/notify";
 import { catchUp } from "./lib/scheduler";
 
@@ -186,8 +186,44 @@ export const deleteChannelAction = moduleAction(
 );
 
 /**
+ * Save the module's own settings, which the framework used to render above the panel.
+ *
+ * ⚠ Keys come from `SETTING_FIELDS` itself, never written out by hand. They address the same
+ * store the framework form used, so an upgrade keeps every value — and a hand-typed key that
+ * drifted from the declaration would silently reset somebody's tuning to a default.
+ *
+ * REFS addons/health-monitor/lib/settings.ts › SETTING_FIELDS — the single declaration
+ *      addons/health-monitor/ui/settings-panel.tsx › AdvancedSettings() — same list
+ */
+export const saveSettingsAction = moduleAction(
+  MODULE_ID,
+  async (ctx, fd: FormData): Promise<ActionResult> => {
+    for (const field of SETTING_FIELDS) {
+      const raw = fd.get(field.key);
+      if (field.type === "boolean") {
+        // An unticked checkbox sends nothing at all, so absence is "off" — not "unchanged".
+        await ctx.settings.set(field.key, raw === "on");
+        continue;
+      }
+      if (raw === null) continue;
+      const text = String(raw).trim();
+      if (field.type === "number") {
+        const n = Number(text);
+        if (text === "" || !Number.isFinite(n)) continue;
+        await ctx.settings.set(field.key, n);
+        continue;
+      }
+      await ctx.settings.set(field.key, text);
+    }
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(MODULE_PATH);
+    return { ok: true, message: "Settings saved." };
+  },
+);
+
+/**
  * Apply whatever is in the bulk-import box. Adds and updates only — never deletes.
- * REFS addons/health-monitor/ui/settings-panel.tsx
+ * REFS addons/health-monitor/ui/settings-panel.tsx — the bulk-import block
  */
 export const importConfigAction = moduleAction(MODULE_ID, async (ctx): Promise<ActionResult> => {
   const outcome = await importConfigJson(ctx);
