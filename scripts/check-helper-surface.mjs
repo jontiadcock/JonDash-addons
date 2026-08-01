@@ -166,10 +166,38 @@ function lastPublishedTag() {
 
 // ---------------------------------------------------------------------------
 
-const current = fs.readFileSync(path.join(REPO, API_PATH), "utf8");
+const currentPath = path.join(REPO, API_PATH);
 const tag = lastPublishedTag();
 
 console.log(`Helper surface check — ${helperId}`);
+
+/**
+ * A helper need not expose a module-facing API at all — `scheduler` runs work at boot and no
+ * module imports it. Reading `api.ts` unconditionally crashed with a raw ENOENT stack trace.
+ *
+ * ⚠ Say which case this is; never just skip. A check that exits quietly reads as a pass, and the
+ * two cases could not be further apart: "never had an API" is fine, whereas "had one and it is
+ * GONE" breaks every consuming module on update — the exact thing this gate exists to catch.
+ */
+if (!fs.existsSync(currentPath)) {
+  let hadOne = false;
+  // stdio pipe: this probe EXPECTS to fail, so git's own "fatal:" must not reach the console and
+  // read as an error the check did not raise.
+  if (tag) {
+    try { execFileSync("git", ["show", `${tag}:${API_PATH}`], { cwd: REPO, stdio: "pipe" }); hadOne = true; }
+    catch { /* the tag genuinely had no api.ts */ }
+  }
+  if (hadOne) {
+    console.log(`  ERROR — ${API_PATH} existed at ${tag} and is now GONE.`);
+    console.log("  Every module importing this helper breaks on update. Restore it or publish a new helper.");
+    process.exit(1);
+  }
+  console.log(`  no ${API_PATH}, and ${tag ? `none at ${tag}` : "no previous tag"} — this helper exposes`);
+  console.log("  no module-facing API, so there is no surface to break. Nothing to check.");
+  process.exit(process.exitCode ?? 0);
+}
+
+const current = fs.readFileSync(currentPath, "utf8");
 if (!tag) {
   console.log("  no previous tag; nothing to compare against. First publish is never a break.");
   process.exit(process.exitCode ?? 0);

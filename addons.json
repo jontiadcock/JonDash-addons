@@ -68,7 +68,7 @@
       "id": "backup-manager",
       "name": "Backup Manager",
       "description": "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did. Can keep dated copies and tidy old ones away automatically.",
-      "version": "0.2.6-beta.1",
+      "version": "0.2.6-beta.2",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "filesystem:read",
@@ -83,7 +83,7 @@
         "scheduler"
       ],
       "path": "addons/backup-manager",
-      "tag": "backup-manager/v0.2.6-beta.1",
+      "tag": "backup-manager/v0.2.6-beta.2",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
       "screenshots": [
         {
@@ -104,7 +104,7 @@
       "id": "host-vitals",
       "name": "Host vitals",
       "description": "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-      "version": "0.0.8-beta.1",
+      "version": "0.0.8-beta.2",
       "minAppVersion": "1.8.0-beta.14",
       "permissions": [
         "system-metrics:read"
@@ -113,7 +113,7 @@
         "system-metrics"
       ],
       "path": "addons/host-vitals",
-      "tag": "host-vitals/v0.0.8-beta.1",
+      "tag": "host-vitals/v0.0.8-beta.2",
       "notes": "Corrects where the app tells you to go: JonDash renamed the Modules menu to Addons and moved approvals to Permissions, so the old wording pointed at menus that no longer exist. Text only — nothing behaves differently.",
       "screenshots": [
         {

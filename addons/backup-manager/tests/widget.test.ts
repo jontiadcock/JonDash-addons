@@ -49,13 +49,14 @@ describe("dashboard tile", () => {
   it("draws its own card when there are no backups yet", async () => {
     const html = await render(stubCtx({ jobs: [] }));
     expect(html).toContain("No backups set up yet.");
-    // The regression: this state used to render as a bare div.
-    expect(html).toMatch(/class="card p-4"/);
+    // ⚠ Match the `card` class ALONE, never the full class string — the rest is layout and
+    // changes. Asserting `card p-4` broke on the B5/B6 resize while the tile was still correct.
+    expect(html).toMatch(/class="card[ "]/);
   });
 
   it("draws its own card when there are backups", async () => {
     const html = await render(stubCtx({ jobs: [job()], runs: [] }));
-    expect(html).toMatch(/class="card p-4"/);
+    expect(html).toMatch(/class="card[ "]/);
   });
 
   it("names itself, so a dashboard of tiles says which module this is", async () => {

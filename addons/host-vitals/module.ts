@@ -18,7 +18,7 @@ const hostVitals: ModuleDefinition = {
   name: "Host vitals",
   description:
     "Shows how this server is doing — CPU, memory, how full each disk is, uptime and temperatures — as a dashboard tile and a page.",
-  version: "0.0.8-beta.1",
+  version: "0.0.8-beta.2",
   /**
    * ⚠ The PRE-RELEASE tag matters, not a bare "1.7.2": semver ranks a pre-release below its
    * release, so "1.7.2" would be refused on every 1.7.2 beta — the builds beta users run.

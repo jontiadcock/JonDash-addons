@@ -49,7 +49,7 @@ const backupManager: ModuleDefinition = {
   name: "Backup Manager",
   description:
     "Keeps folders copied to another location — a network share or an external drive — on a schedule, and tells you what it did.",
-  version: "0.2.6-beta.1",
+  version: "0.2.6-beta.2",
   // Follows the filesystem helper's floor: needs `unbounded.option` (0.0.8); a helper compiles
   // into the app, so an old core fails the build rather than degrading quietly.
   minAppVersion: "1.7.2-beta.2",
