@@ -335,6 +335,74 @@ export async function hourlyBuckets(db: Db, monitorId: string, hours: number): P
   return out;
 }
 
+/** REFS addons/health-monitor/ui/parts.tsx › LatencyChart() — the only thing that draws this. */
+export type LatencyBucket = {
+  hour: string;
+  /** null when no check ran in this hour — a gap, which is not the same as 0ms. */
+  avgMs: number | null;
+  p95Ms: number | null;
+  checks: number;
+  failures: number;
+};
+
+/**
+ * Hourly latency for the last `hours`, merging raw results with rollups the same way
+ * `hourlyBuckets` does, so the shape survives old results being summarised.
+ *
+ * ⚠ An hour with no checks comes back `null`, never 0 — zero reads as "instant", which is the
+ * opposite of what happened. The chart draws null as a break in the line.
+ * ⚠ p95 for a raw hour is computed from the actual samples, never derived from the average: a
+ * percentile guessed as a multiple of the mean is not a percentile. Rollups store a real one.
+ *
+ * REFS addons/health-monitor/page.tsx › MonitorDetail() ·
+ *      addons/health-monitor/lib/store.ts › rollupAndPrune() — the fold this must agree with
+ */
+export async function latencyBuckets(db: Db, monitorId: string, hours: number): Promise<LatencyBucket[]> {
+  const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+  const samples = await db.query<{ h: string; state: string; latencyMs: unknown }>(
+    `SELECT substr(ts, 1, 13) AS h, state, latencyMs
+       FROM ${db.table("results")} WHERE monitorId = ? AND ts >= ?`,
+    monitorId,
+    since,
+  );
+  const rolled = await db.query<{ h: string; c: unknown; f: unknown; a: unknown; p: unknown }>(
+    `SELECT substr(hourStart, 1, 13) AS h, checks AS c, failures AS f, avgMs AS a, p95Ms AS p
+       FROM ${db.table("rollups")} WHERE monitorId = ? AND hourStart >= ?`,
+    monitorId,
+    since,
+  );
+
+  // Raw wins where both exist: it is the finer record, and rollup only covers hours old
+  // enough to have been folded, so an overlap means the fold is mid-flight.
+  const byHour = new Map<string, LatencyBucket>();
+  for (const r of rolled) {
+    byHour.set(r.h, { hour: r.h, avgMs: r.a == null ? null : n(r.a), p95Ms: r.p == null ? null : n(r.p), checks: n(r.c), failures: n(r.f) });
+  }
+
+  const grouped = new Map<string, { lat: number[]; checks: number; failures: number }>();
+  for (const s of samples) {
+    const g = grouped.get(s.h) ?? { lat: [], checks: 0, failures: 0 };
+    g.checks++;
+    if (s.state === "down") g.failures++;
+    if (s.latencyMs != null) g.lat.push(n(s.latencyMs));
+    grouped.set(s.h, g);
+  }
+  for (const [h, g] of grouped) {
+    const sorted = g.lat.sort((a, b) => a - b);
+    const avg = sorted.length ? Math.round(sorted.reduce((t, v) => t + v, 0) / sorted.length) : null;
+    // Nearest-rank: the smallest sample at or above the 95th percentile position.
+    const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)] : null;
+    byHour.set(h, { hour: h, avgMs: avg, p95Ms: p95, checks: g.checks, failures: g.failures });
+  }
+
+  const out: LatencyBucket[] = [];
+  for (let i = hours - 1; i >= 0; i--) {
+    const h = new Date(Date.now() - i * 3_600_000).toISOString().slice(0, 13);
+    out.push(byHour.get(h) ?? { hour: h, avgMs: null, p95Ms: null, checks: 0, failures: 0 });
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- retention */
 
 /**

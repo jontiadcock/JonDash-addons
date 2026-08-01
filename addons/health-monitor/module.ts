@@ -24,7 +24,7 @@ const healthMonitor: ModuleDefinition = {
   name: "Health monitoring",
   description:
     "Watches your services with HTTP, TCP, ping, DNS and certificate checks, records uptime and response times, and alerts by email or webhook when something goes down.",
-  version: "0.0.10-beta.1",
+  version: "0.0.10-beta.2",
   /**
    * Named as a PRE-RELEASE (`-beta.1`) because semver ranks a pre-release below its release,
    * so a bare "1.5.0" would refuse every 1.5.0 beta — the builds beta-channel users actually

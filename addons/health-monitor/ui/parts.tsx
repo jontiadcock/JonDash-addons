@@ -1,5 +1,5 @@
 import type { MonitorState } from "../lib/types";
-import type { HourBucket } from "../lib/store";
+import type { HourBucket, LatencyBucket } from "../lib/store";
 import { stateColour } from "../lib/format";
 
 /**
@@ -171,6 +171,137 @@ export function Sparkline({
       aria-label={`Response time trend, ${Math.round(min)} to ${Math.round(max)} milliseconds`}
     >
       <polyline points={points} fill="none" stroke={colour} strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/** Round up to a readable axis top — 137 becomes 150, 1,180 becomes 1,200. */
+function niceMax(v: number): number {
+  if (v <= 0) return 1;
+  const mag = 10 ** Math.floor(Math.log10(v));
+  return Math.ceil(v / (mag / 2)) * (mag / 2);
+}
+
+/**
+ * Response time over days, with the slow tail drawn as a band behind the average.
+ *
+ * ⚠ An hour with no checks is a BREAK in the line, never a zero — zero reads as "instant",
+ * the opposite of what happened. Null `avgMs` splits the polyline into segments.
+ *
+ * The failure ticks are the point of this over a plain latency trace: they answer "was it slow
+ * *because* it was struggling", from counts already stored beside the timings.
+ *
+ * REFS addons/health-monitor/lib/store.ts › latencyBuckets() — the shape this draws
+ *      addons/health-monitor/page.tsx › MonitorDetail()
+ */
+export function LatencyChart({
+  buckets,
+  height = 150,
+  dayLabels = true,
+}: {
+  buckets: LatencyBucket[];
+  height?: number;
+  dayLabels?: boolean;
+}) {
+  const withData = buckets.filter((b) => b.avgMs != null);
+  if (withData.length < 2) {
+    return (
+      <p className="text-xs" style={{ color: "var(--muted)" }}>
+        Not enough history yet — this fills in as checks run.
+      </p>
+    );
+  }
+
+  const W = 720;
+  const padL = 40, padR = 6, padT = 6, padB = dayLabels ? 26 : 8, tickH = 12;
+  const plotH = height - padT - padB - tickH;
+  const max = niceMax(Math.max(...withData.map((b) => b.p95Ms ?? b.avgMs ?? 0)));
+  const x = (i: number) => padL + (i / Math.max(1, buckets.length - 1)) * (W - padL - padR);
+  const y = (v: number) => padT + plotH - (v / max) * plotH;
+
+  // The band is one polygon: p95 left-to-right, then the average back again.
+  const top: string[] = [];
+  const bottom: string[] = [];
+  const segments: string[][] = [];
+  let run: string[] = [];
+  for (const [i, b] of buckets.entries()) {
+    if (b.avgMs == null) {
+      if (run.length) segments.push(run);
+      run = [];
+      continue;
+    }
+    run.push(`${x(i).toFixed(1)},${y(b.avgMs).toFixed(1)}`);
+    top.push(`${x(i).toFixed(1)},${y(b.p95Ms ?? b.avgMs).toFixed(1)}`);
+    bottom.unshift(`${x(i).toFixed(1)},${y(b.avgMs).toFixed(1)}`);
+  }
+  if (run.length) segments.push(run);
+
+  const gridAt = [0, 0.5, 1];
+  const dayEvery = Math.max(1, Math.round(buckets.length / 7));
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${height}`}
+      width="100%"
+      height={height}
+      role="img"
+      aria-label={`Response time over the last ${Math.round(buckets.length / 24)} days, between ${Math.min(
+        ...withData.map((b) => b.avgMs ?? 0),
+      )} and ${max} milliseconds`}
+    >
+      {gridAt.map((f) => (
+        <g key={f}>
+          <line x1={padL} y1={y(max * f)} x2={W - padR} y2={y(max * f)} stroke="var(--border)" strokeWidth={1} />
+          <text x={padL - 6} y={y(max * f) + 3.5} textAnchor="end" fontSize={11} fill="var(--muted)">
+            {Math.round(max * f)}
+          </text>
+        </g>
+      ))}
+
+      <polygon points={[...top, ...bottom].join(" ")} fill="var(--primary)" opacity={0.16} />
+
+      {segments.map((s) => (
+        <polyline
+          key={s[0]}
+          points={s.join(" ")}
+          fill="none"
+          stroke="var(--primary)"
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      ))}
+
+      {buckets.map((b, i) =>
+        b.failures > 0 ? (
+          <rect key={b.hour} x={x(i) - 1.6} y={padT + plotH + 6} width={3.2} height={tickH - 2} rx={1} fill="var(--danger)">
+            <title>{`${b.hour.replace("T", " ")}:00 — ${b.failures} of ${b.checks} checks failed`}</title>
+          </rect>
+        ) : null,
+      )}
+
+      {buckets.map((b, i) => (
+        <rect key={`h-${b.hour}`} x={x(i) - 2} y={padT} width={4} height={plotH} fill="transparent">
+          <title>
+            {b.avgMs == null
+              ? `${b.hour.replace("T", " ")}:00 — no checks`
+              : `${b.hour.replace("T", " ")}:00 — ${b.avgMs}ms typical, ${b.p95Ms ?? b.avgMs}ms slowest 5%${
+                  b.failures ? `, ${b.failures} failed` : ""
+                }`}
+          </title>
+        </rect>
+      ))}
+
+      {dayLabels
+        ? buckets.map((b, i) =>
+            i % dayEvery === 0 ? (
+              <text key={`d-${b.hour}`} x={x(i)} y={height - 8} textAnchor="middle" fontSize={11} fill="var(--muted)">
+                {new Date(`${b.hour}:00:00Z`).toLocaleDateString(undefined, { weekday: "short" })}
+              </text>
+            ) : null,
+          )
+        : null}
     </svg>
   );
 }
