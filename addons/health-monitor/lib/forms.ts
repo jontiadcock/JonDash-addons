@@ -34,6 +34,13 @@ export type KindChoice = {
   /** Whether the speed-test extras apply — upload toggle, minimum rate, payload size. */
   speedOptions?: boolean;
   /**
+   * Whether the address may be left blank.
+   * ⚠ Must agree with `parseMonitorForm()`, which accepts a blank target for `speed`. A required
+   * input here would have the browser refuse a form the server was perfectly happy with, and the
+   * help text underneath says "leave blank" — so the field would contradict itself.
+   */
+  addressOptional?: boolean;
+  /**
    * What this kind should default to when a monitor is created, overriding the global default.
    * ⚠ Exists for `speed`, whose every run costs real bandwidth — a minute would be indefensible.
    */
@@ -104,6 +111,7 @@ export const KIND_CHOICES: KindChoice[] = [
     addressHelp: "Leave blank to use Cloudflare's public speed test. Change it to point at your own.",
     port: "none",
     speedOptions: true,
+    addressOptional: true,
     // Every six hours: frequent enough to catch a real degradation, cheap enough to leave on.
     defaultIntervalSec: 21_600,
   },

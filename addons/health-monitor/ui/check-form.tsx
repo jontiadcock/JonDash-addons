@@ -112,7 +112,7 @@ export function CheckForm({
           defaultValue={monitor?.target ?? ""}
           placeholder={spec.addressPlaceholder}
           maxLength={500}
-          required
+          required={!spec.addressOptional}
         />
         <span className="text-xs" style={{ color: "var(--muted)" }}>
           {spec.addressHelp}
@@ -142,7 +142,16 @@ export function CheckForm({
 
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium">Check how often</span>
-        <select className="input" name="intervalSec" defaultValue={knownInterval ? interval : (spec.defaultIntervalSec ?? 60)}>
+        {/* ⚠ `key` on the kind, so changing the dropdown REMOUNTS this select. `defaultValue`
+            applies once at mount and never again, so without it picking the speed test left the
+            gap on "every minute" — 20MB a minute, ~28GB a day, the exact outcome the six-hour
+            default exists to prevent. Silent, and visible only on somebody's data bill. */}
+        <select
+          key={kind}
+          className="input"
+          name="intervalSec"
+          defaultValue={knownInterval ? interval : (spec.defaultIntervalSec ?? 60)}
+        >
           {INTERVAL_CHOICES.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
