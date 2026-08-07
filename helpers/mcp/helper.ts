@@ -55,7 +55,7 @@ const helper: HelperDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server — see your services, check for updates, review sign-ins — using a key you create and can revoke. It can only do what the account you pick can do.",
-  version: "0.0.4-beta.1",
+  version: "0.0.4",
   // Needs beta.2, not just beta.1's service accounts (SEC-07): `resolveBindableAccount` only
   // gained the helper-id argument it's called with on every request in beta.2.
   minAppVersion: "1.7.3-beta.2",

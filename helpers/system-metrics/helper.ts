@@ -14,7 +14,7 @@ const helper: HelperDefinition = {
   name: "System metrics",
   description:
     "Reads this server's CPU, memory, disk usage, uptime and (where available) temperatures, so a module can show them. Read-only — it changes nothing on the host.",
-  version: "0.0.5-beta.1",
+  version: "0.0.5",
   /**
    * ⚠ `label` and `risk` are optional in the type but not in practice: omitting them fails to
    * compile on a 1.7.1 clone (TS2353), and a helper compiles into the app, so an older core

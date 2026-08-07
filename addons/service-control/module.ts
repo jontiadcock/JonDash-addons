@@ -19,7 +19,7 @@ const serviceControl: ModuleDefinition = {
   name: "Service control",
   description:
     "Start, stop and restart the services you approve — a Windows service, a systemd unit — from your dashboard, without opening a terminal.",
-  version: "0.0.8-beta.1",
+  version: "0.0.8",
   /**
    * ⚠ Follows `host-services`'s own floor — that helper declares CORE-10 `scope`, which fails
    * to compile below it, so a module pulling the helper into an older install takes the whole

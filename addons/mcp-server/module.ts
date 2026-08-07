@@ -18,7 +18,7 @@ const mcpServer: ModuleDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
-  version: "0.0.4-beta.1",
+  version: "0.0.4",
   // Follows the helper's own floor: a module pulling in a helper must not install where that
   // helper cannot work — see the helper's own `minAppVersion` note for why beta.2 specifically.
   minAppVersion: "1.7.3-beta.2",

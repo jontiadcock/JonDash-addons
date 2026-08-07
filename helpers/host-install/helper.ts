@@ -20,7 +20,7 @@ const helper: HelperDefinition = {
   name: "Install software",
   description:
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-  version: "0.0.5-beta.1",
+  version: "0.0.5",
   // Raised by CORE-10's optional `label`/`risk` (an older core fails to compile, TS2353). Must
   // stay the PRE-RELEASE string — a bare "1.7.2" would be refused on every 1.7.2 beta build.
   minAppVersion: "1.7.2-beta.1",

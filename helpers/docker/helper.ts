@@ -17,7 +17,7 @@ const helper: HelperDefinition = {
   name: "Docker",
   description:
     "Lets a module see the containers on this server and start, stop, pause and restart them. It cannot run commands inside a container, create or delete one, or touch images and volumes.",
-  version: "0.0.5-beta.1",
+  version: "0.0.5",
   // Raised for CORE-10's optional `label`/`risk` (an older core fails to compile, TS2353). Must
   // stay the PRE-RELEASE string — a bare "1.7.2" would be refused on every 1.7.2 beta build.
   minAppVersion: "1.7.2-beta.1",

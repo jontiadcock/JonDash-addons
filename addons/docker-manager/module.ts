@@ -20,7 +20,7 @@ const dockerManager: ModuleDefinition = {
   name: "Docker manager",
   description:
     "See the containers on this server and start, stop, pause and restart them. Shows you how to install Docker if it isn't set up yet, and can install it for you.",
-  version: "0.0.7-beta.1",
+  version: "0.0.7",
   // Floor is host-install's need for core's package API (1.7.1-beta.7); docker alone needs only
   // 1.5.2. Must stay the PRE-RELEASE string — a bare "1.7.1" would refuse every 1.7.1 beta.
   minAppVersion: "1.7.2-beta.1",

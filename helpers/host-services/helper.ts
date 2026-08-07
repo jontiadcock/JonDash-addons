@@ -82,7 +82,7 @@ const helper: HelperDefinition = {
   name: "Host services",
   description:
     "Lets a module see and control the services you list — a Windows service, a systemd unit — so a dashboard can restart something without you opening a terminal. Only the services you add, and only start, stop and restart.",
-  version: "0.0.6-beta.1",
+  version: "0.0.6",
   /**
    * ⚠ Hard floor, not a preference — this build is the first with `SettingsPanel` /
    * `onSettingsSubmit`, and it also clears every earlier floor this helper has needed

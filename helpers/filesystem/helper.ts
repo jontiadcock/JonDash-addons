@@ -82,7 +82,7 @@ const helper: HelperDefinition = {
   name: "Files and folders",
   description:
     "Lets a module copy and archive folders to another location — a network share, an external drive — within the folders you allow. JonDash's own secrets are never copied.",
-  version: "0.0.10-beta.1",
+  version: "0.0.10",
   /* Cannot go lower: `SettingsPanel`/`onSettingsSubmit` (needed since the folder editor moved
      off the module-facing API) and `unbounded.option` (the "exclude JonDash's own data"
      switch) both require it. HELPERS-DESIGN rule 11: an optional field is optional to OMIT,

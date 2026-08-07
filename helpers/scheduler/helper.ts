@@ -17,7 +17,7 @@ const helper: HelperDefinition = {
   id: "scheduler",
   name: "Scheduler",
   description: "Runs modules' declared background work on time, starting when the server starts.",
-  version: "0.0.4-beta.1",
+  version: "0.0.4",
   /**
    * ⚠ The PRE-RELEASE tag matters, not a bare "1.5.0": semver ranks a pre-release below its
    * release, so a bare "1.5.0" would exclude every 1.5.0 beta — the builds this helper's users
