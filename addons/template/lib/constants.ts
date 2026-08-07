@@ -6,7 +6,11 @@
  * `module.ts` exactly; see the rename checklist in MODULE.md.
  */
 
+/** REFS addons/template/actions.ts · addons/template/module.ts */
 export const MODULE_ID = "template";
 
-/** Where this module's own pages live. */
+/**
+ * Where this module's own pages live.
+ * REFS addons/template/actions.ts · addons/template/widget.tsx
+ */
 export const MODULE_PATH = `/m/${MODULE_ID}`;

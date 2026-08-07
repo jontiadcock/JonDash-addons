@@ -23,6 +23,7 @@ export type KeyRow = {
 export type Account = { id: string; name: string; role: string; status: string };
 export type Refusal = { at: string; ip: string; reason: string; explained: string };
 
+/** REFS helpers/mcp/ui/settings-panel.tsx */
 export default function PanelClient({
   helperId,
   enabled,

@@ -5,8 +5,9 @@ import mcp from "@/helpers/mcp/api";
  * The page. Explains what the tile means, and — more usefully — what an assistant *cannot* do,
  * since that is the part nobody can infer from a status line.
  *
- * Display only. Every control lives on Admin → Addons → Shared capabilities, and this page says so rather than
- * pretending the module could offer them.
+ * Display only. Every control lives on Admin → Addons → Shared capabilities; this page says so
+ * rather than pretending it could offer them.
+ * REFS addons/mcp-server/module.ts
  */
 export default async function McpPage({ ctx }: ModulePageProps) {
   const s = await mcp(ctx).status();

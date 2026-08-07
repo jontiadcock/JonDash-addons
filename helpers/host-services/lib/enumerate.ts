@@ -4,17 +4,14 @@ import type { ServiceState } from "./services";
 /**
  * Every service on this machine, for the admin's picker.
  *
- * **This is admin-only and must never be re-exported from `api.ts`.** A module cannot discover
- * what runs on the host — that is both a scoping decision and a privacy one, and it is stated
- * as an absence in the API's own docblock. This file exists because CORE-10's `browse` is
- * called by CORE on an admin screen, behind `assertSameOrigin()` + `requirePermission
- * ("modules.manage")`, with no module anywhere in the path.
+ * ⚠ Admin-only, and must never be re-exported from `api.ts` — a module cannot discover what
+ * runs on the host, both a scoping and a privacy decision, stated as an absence in the API's
+ * own docblock. This file exists because CORE-10's `browse` is called by CORE on an admin
+ * screen, behind `assertSameOrigin()` + `requirePermission("modules.manage")`.
  *
- * **Needs no elevation.** Measured on Windows 11 from a non-elevated process: `Get-Service`
- * returned all 327 services with their states, and `sc query type= service state= all` exited
- * 0. Only start/stop/restart need the grant. That is what makes `browse` affordable — and
- * `browse` is what stops an admin reaching for "everything" because typing exact service names
- * is tedious.
+ * Needs no elevation — only start/stop/restart need the grant. That is what makes `browse`
+ * affordable, and `browse` is what stops an admin reaching for "everything" because typing
+ * exact service names is tedious.
  */
 
 const TIMEOUT_MS = 8000;
@@ -74,6 +71,7 @@ function parseSystemctl(out: string): HostService[] {
  *
  * Returns [] rather than throwing on any failure: core's contract says a failing `browse`
  * shows the manual add field, never an error page. An admin who cannot browse can still type.
+ * REFS helpers/host-services/api.ts · helpers/host-services/lib/scopes.ts
  */
 export async function findServices(query: string): Promise<HostService[]> {
   const q = query.trim().toLowerCase();

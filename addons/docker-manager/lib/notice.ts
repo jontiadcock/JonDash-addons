@@ -5,6 +5,7 @@ import type { ModuleContext } from "@/lib/modules/types";
 
 export type Notice = { tone: "ok" | "warn" | "bad"; text: string };
 
+/** REFS addons/docker-manager/page.tsx · addons/docker-manager/ui/settings-panel.tsx */
 export async function readNotice(ctx: ModuleContext): Promise<Notice | null> {
   const raw = (await ctx.store?.get("lastNotice")) as { tone?: unknown; text?: unknown; at?: unknown } | null;
   if (!raw || typeof raw.text !== "string" || typeof raw.at !== "string") return null;
@@ -15,6 +16,7 @@ export async function readNotice(ctx: ModuleContext): Promise<Notice | null> {
   return { tone: raw.tone === "bad" || raw.tone === "warn" ? raw.tone : "ok", text: raw.text };
 }
 
+/** REFS addons/docker-manager/page.tsx · addons/docker-manager/ui/settings-panel.tsx */
 export function noticeColour(tone: Notice["tone"]): string {
   if (tone === "bad") return "var(--danger)";
   if (tone === "warn") return "var(--warning, var(--muted))";

@@ -33,13 +33,22 @@
 const UNSAFE_RUN = /[^A-Za-z0-9._-]+/g; // for replacing
 const UNSAFE_ANY = /[^A-Za-z0-9._-]/; // for testing — no `g`, no state
 
-/** Windows caps task names well above this; 64 keeps the Task Scheduler list readable. */
+/**
+ * Windows caps task names well above this; 64 keeps the Task Scheduler list readable.
+ * REFS helpers/host-services/tests/names.test.ts
+ */
 export const MAX_BASE = 64;
 
+/**
+ * REFS helpers/host-services/api.ts · helpers/host-services/lib/grant.ts ·
+ *      helpers/host-services/lib/requests.ts
+ */
 export type Verb = "start" | "stop" | "restart";
 
+/** REFS helpers/host-services/lib/allowlist.ts */
 export const VERBS: Verb[] = ["start", "stop", "restart"];
 
+/** REFS helpers/host-services/api.ts */
 export function isVerb(v: string): v is Verb {
   return (VERBS as string[]).includes(v);
 }
@@ -51,6 +60,7 @@ export function isVerb(v: string): v is Verb {
  * about that, rather than this silently inventing a name. A generated fallback here would
  * mean a task whose name has no relationship to the service it controls, which is the
  * readability failure in a different costume.
+ * REFS helpers/host-services/tests/names.test.ts
  */
 export function sanitiseBase(serviceName: string): string {
   return serviceName
@@ -68,6 +78,7 @@ export function sanitiseBase(serviceName: string): string {
  * `My-Service`. Suffixing is the only safe resolution — reusing a base would point two
  * allowlist entries at ONE Scheduled Task, so removing either entry would silently revoke
  * the other, or worse, leave a live grant with no entry to audit it against.
+ * REFS helpers/host-services/lib/allowlist.ts · helpers/host-services/tests/names.test.ts
  */
 export function allocateBase(serviceName: string, taken: Iterable<string>): string | null {
   const base = sanitiseBase(serviceName);
@@ -85,7 +96,10 @@ export function allocateBase(serviceName: string, taken: Iterable<string>): stri
   return null;
 }
 
-/** The full task name a grant is created and run under. */
+/**
+ * The full task name a grant is created and run under.
+ * REFS helpers/host-services/tests/names.test.ts
+ */
 export function taskNameFor(taskBase: string, verb: Verb): string {
   return `JonDash\\${taskBase}-${verb}`;
 }
@@ -96,6 +110,7 @@ export function taskNameFor(taskBase: string, verb: Verb): string {
  * Belt and braces: everything reaching the OS goes through `allocateBase`, but this is
  * asserted again at the point of use. The cost is nothing and the failure it guards against
  * — a name reaching the OS by some path that skipped sanitising — is the expensive one.
+ * REFS helpers/host-services/tests/names.test.ts
  */
 export function isSafeBase(s: string): boolean {
   return s.length > 0 && s.length <= MAX_BASE && !UNSAFE_ANY.test(s) && !/^[-._]|[-._]$/.test(s);

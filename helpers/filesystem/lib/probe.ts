@@ -15,6 +15,7 @@ import { assertUsableAsSource } from "./paths";
  * because a network share will happily report rights it won't honour.
  */
 
+/** REFS helpers/filesystem/api.ts */
 export type ProbeResult = {
   ok: boolean;
   /** One sentence an admin can act on. Populated whether or not it succeeded. */
@@ -29,12 +30,9 @@ export type ProbeResult = {
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
- * Turn an OS error code into something an admin can act on.
- *
- * Added in 0.0.2 after live testing surfaced `Couldn't open that folder (UNKNOWN).` for an
- * unreachable share. `UNKNOWN` is what Windows returns when it cannot resolve a UNC host —
- * which is both the single most likely failure for a backup destination and, as a message,
- * completely useless. Anything reaching the admin should say what to check next.
+ * Turn an OS error code into something an admin can act on. `UNKNOWN` is what Windows
+ * returns when it cannot resolve a UNC host — the single most likely failure for a backup
+ * destination, and, unexplained, a useless message. Every branch here says what to check next.
  */
 export function explainCode(code: string | undefined, isNetwork: boolean, verb: "open" | "write"): string {
   switch (code) {
@@ -87,7 +85,12 @@ function timeout<T>(work: Promise<T>, ms: number): Promise<T> {
 }
 
 /**
+ * The explicit "Test this location" check (see file header) — does real I/O, only ever on
+ * demand.
+ *
  * @param wantWritable destinations must be writable; a source only needs reading.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/probe.test.ts
  */
 export async function probeLocation(
   input: string,
@@ -101,9 +104,8 @@ export async function probeLocation(
 
   const isNetwork = /^[\\/]{2}/.test(input.trim());
 
-  // Only that the path is well-formed. Since 0.0.2 a source may be anywhere, so this no
-  // longer rejects broad or system locations — it just declines to reach out on behalf of
-  // something that isn't a real path.
+  // Only that the path is well-formed — a source may be anywhere now, so this doesn't reject
+  // broad or system locations, only declines to reach out on behalf of something unreal.
   const verdict = assertUsableAsSource(input);
   if (!verdict.ok) {
     return done({ ok: false, message: verdict.reason, exists: false, writable: false });

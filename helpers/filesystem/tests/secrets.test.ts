@@ -7,17 +7,14 @@ import { loadRegistry, identityOf, contentReason, identityReason } from "../lib/
 import { runCopy } from "../lib/copy";
 
 /**
- * The heart of the 0.0.2 redesign, and the tests that justify it.
- *
- * The helper no longer refuses to look at JonDash's folder — it copies around the secrets
- * inside it. That trade is only defensible if the exclusion genuinely holds, so these tests
- * assert the OUTCOME (the secret is not at the destination) rather than the predicate.
- * A test that only checked `identityReason()` would still pass if the copy engine forgot
- * to call it.
+ * The tests that justify the redesign: the helper no longer refuses to look at JonDash's
+ * folder, it copies around the secrets inside it. That trade only holds if the exclusion
+ * genuinely works, so these tests assert the OUTCOME (the secret is not at the destination)
+ * rather than the predicate — a test that only checked `identityReason()` would still pass
+ * if the copy engine forgot to call it.
  *
  * The case that matters most is the one a path-based rule gets wrong: a secret that has
- * been MOVED. If that test ever goes green for the wrong reason, the redesign has bought
- * nothing.
+ * been MOVED. If that test ever goes green for the wrong reason, the redesign bought nothing.
  */
 
 const KEY = "a".repeat(64);
@@ -98,9 +95,8 @@ describe("a copy never carries JonDash's secrets off the machine", () => {
   });
 
   it("STILL excludes the key after it has been moved somewhere unexpected", async () => {
-    // The case a path-based deny-list gets wrong. The admin relocated the data directory;
-    // JonDash knows where it went, so the exclusion must follow it — with no code here
-    // naming the new location.
+    // The case a path-based deny-list gets wrong: the admin relocated the data directory,
+    // and the exclusion must follow it — with no code here naming the new location.
     const relocated = path.join(app, "some", "unexpected", "place");
     await fsp.mkdir(relocated, { recursive: true });
     await fsp.rename(path.join(data, "secrets.json"), path.join(relocated, "secrets.json"));

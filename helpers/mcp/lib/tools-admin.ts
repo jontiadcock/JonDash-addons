@@ -7,32 +7,16 @@ import { register } from "./tools";
 import { isShutdownAllowed } from "./keys";
 
 /**
- * Tools that act on the SERVER rather than on data inside it.
+ * Tools that act on the SERVER, not on data — recoverable in `tools-act.ts`; some here take the
+ * dashboard away. Needs `admin` mode AND `settings.manage`; the mode narrows, same as `act`.
  *
- * **Separate file because the blast radius is different, not because there are a lot of them.**
- * Everything in `tools-act.ts` can be undone by a person at the dashboard. Everything here can
- * take the dashboard away for a while — and one of them can take it away until somebody walks to
- * the machine. That difference deserves to be visible in the file layout.
- *
- * All of these require a key in `admin` mode **and** `settings.manage` on the bound account. Both,
- * every time. Promoting a key to `admin` grants nothing an account without `settings.manage` could
- * not already do; the mode narrows, exactly as it does for `act`.
- *
- * ## What is deliberately NOT here, and never will be
- *
- * Core exposes plenty more that this could reach. These are refused permanently, and the reason is
- * one sentence: **an agent must never be able to widen its own reach, or remove the record of what
- * it did.**
- *
- *  - **Granting a role or a permission** (`setUserRolesAction`, the Permissions actions). An agent
- *    that can grant a role can grant one to its own service account, and every gate in this helper
- *    becomes decoration. This is the single most important exclusion in the file.
- *  - **Credentials and MFA** — creating users, resetting access, disabling or deleting an account.
- *    The owner's absolute line is never losing access to their own install.
- *  - **Restoring a backup.** The one operation that writes old data over current data.
- *  - **Clearing the audit log.** The refusal log and the audit trail are how anyone finds out an
- *    agent misbehaved. Anti-forensics is not a feature.
- *  - **Network and HTTPS settings.** Can sever remote access to the machine it is running on.
+ * ⚠ Deliberately absent, permanently, because an agent must never widen its own reach or erase
+ * the record of what it did:
+ *  - Granting a role or permission — the single most important exclusion, or an agent could
+ *    grant one to its own account and every gate here becomes decoration.
+ *  - Credentials, MFA, account creation/deletion — the owner's absolute line.
+ *  - Restoring a backup (overwrites current data), clearing the audit log (erases the evidence),
+ *    or network/HTTPS settings (can sever remote access to the machine).
  */
 
 register({
@@ -181,8 +165,7 @@ register({
   description:
     "Write a backup of this JonDash install and report its size. Encrypt it by passing a passphrase — an unencrypted backup deliberately leaves out every secret, so it cannot restore credentials.",
   kind: "admin",
-  // Core has a dedicated permission for this; using settings.manage would have been close enough
-  // to pass review and wrong in the way that matters — an account trusted with settings is not
+  // Core has a dedicated permission for this — an account trusted with settings.manage is not
   // automatically trusted with a file containing the master key.
   permission: "backups.manage",
   inputSchema: {
@@ -251,17 +234,13 @@ register({
   },
   run: async (args, identity) => {
     /**
-     * **Off by default, behind its own switch.** (Owner's call, 2026-07-27.)
+     * ⚠ Off by default, behind its own switch. Every other tool here is recoverable — a restart
+     * returns by itself, a bad update rolls back, a channel switch reverses in one call. This one
+     * ends with the dashboard down until a person is physically at the machine.
      *
-     * Every other tool here is recoverable: a restart returns by itself, a bad update rolls back,
-     * a channel switch is one call away from being reversed. This one ends with the dashboard down
-     * until a person is physically at the machine — core's own words: *"restarting then requires
-     * running the launcher on the host."*
-     *
-     * So it is not enough that the key is `admin` and the account holds `settings.manage`. An
-     * administrator has to have turned this specific tool on, on the settings page, knowing what
-     * it does. An assistant misreading "shut down the docker container" cannot reach it by
-     * accident.
+     * So `admin` mode and `settings.manage` are not enough on their own — an administrator must
+     * also have turned this specific tool on, knowing what it does, so a misread "shut down the
+     * docker container" cannot reach it by accident.
      */
     if (!(await isShutdownAllowed())) {
       throw new Error(

@@ -43,6 +43,7 @@ function describeState(run: Run | null): { text: string; tone?: string } {
 
 const when = formatWhen;
 
+/** REFS addons/backup-manager/module.ts */
 export default async function BackupPage({ ctx, path }: ModulePageProps) {
   // /m/backup-manager/job/<id> — one backup in detail. The framework hands us the path
   // segments, so a second view costs no new plumbing.

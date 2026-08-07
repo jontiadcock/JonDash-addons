@@ -5,99 +5,75 @@ import { pluralise } from "./lib/text";
 import { MODULE_PATH } from "./lib/constants";
 
 /**
- * The dashboard widget — a card in the dashboard grid, sitting among the user's service tiles.
+ * The dashboard widget — a card among the user's other dashboard tiles.
  *
- * # THE THING TO COPY FROM THIS FILE: it adapts to its own box, not to the screen.
- *
- * Since JonDash 1.8.0 the dashboard is a grid of **square units**, a user can size a widget
- * anywhere from **1×1 to the full width**, and — the part that catches people —
- * **the frame CLIPS. It does not scroll.** Anything that does not fit is not hidden behind a
- * scrollbar, it is simply invisible, and neither you nor the user gets told.
- *
- * So a widget has exactly one job beyond its content: **fit whatever box it is given.**
- *
- * ## Use container queries, never `sm:` / `md:` / `lg:`
- *
- * Viewport breakpoints are the wrong tool here and the mistake is easy to make, because they *look*
- * like they work — you resize your browser and the widget responds. But a **1×1 widget on a 4K
- * monitor is still tiny**, and `lg:` would give it the roomy layout. The frame is a CSS container,
- * so `@[6rem]:` asks the question that actually matters: *how big am I?*
- *
- * ## Core's thresholds — use these, do not invent your own
- *
- * From `docs/MODULES-AUTHORING.md`, "The thresholds core uses". Core's own service tiles use them,
- * so a dashboard mixing tiles and add-ons changes shape at the same moments instead of raggedly:
- *
- * | Container width | What happens |
- * | --------------- | ------------ |
- * | under `@[6rem]` | the essential value only; labels hidden |
- * | `@[6rem]`+      | labels appear, `text-xs` |
- * | `@[8rem]`+      | full spacing — `gap-3`, `p-5`, `text-sm` |
- *
- * **Two thresholds, deliberately — not five.** Each one is a visible change of shape, and a widget
- * that rearranges four times while somebody drags its corner reads as a glitch.
- *
- * ## The sizing idiom worth memorising
- *
- * `w-[46%] min-w-7 max-w-16` — a **proportion** so it tracks the box, a **floor** so it never
- * vanishes, a **ceiling** so it stops growing. Fixed sizes are what made small tiles clip in the
- * first place. Apply the same shape of thinking to anything that scales.
- *
- * ## Before 1.8.2, a Tailwind class containing `(` silently did nothing in a module
- *
- * Installed modules live in a gitignored folder, so Tailwind never scans them; core mirrors the
- * class names it finds into an allowlist instead. **Up to 1.8.1 that mirror dropped every token
- * containing parentheses**, so `text-[clamp(1rem,22cqw,2rem)]`, `w-[calc(100%-2rem)]` and
- * `bg-(--brand)` produced **no CSS at all** — the class on the element, nothing styling it, and no
- * warning from the build, the linter or the verifier. **Fixed in 1.8.2.**
- *
- * **This module still floors at 1.8.0-beta.14**, so its fluid sizing stays in an inline `style`.
- * That is the right call whenever your floor is below 1.8.2: inline styles are never scanned, so
- * they work on every version, and you would already be reaching for one to use a theme token like
- * `var(--muted)`. Raise your floor to 1.8.2 first if you would rather write the class — but not
- * merely to tidy this paragraph, because that excludes installs the widget works perfectly on.
- *
- * (And note the space-less `calc(100%-2rem)` is *correct*, not a typo: a space would end the class
- * token, so that is the only way to spell it, and Tailwind normalises it to `calc(100% - 2rem)`. I
- * had this wrong and core tested it.)
- *
- * ## If your widget shows a LIST, this is the bug you will have
- *
- * Do not write `items.slice(0, 6)`. A constant row count was chosen for one box size and is wrong
- * at every other — clipped when small, half-empty when large. Show the *most important* rows and
- * let the count follow the container, exactly as the label does below.
- *
- * Styling: reuse JonDash's own tokens (`card`, `var(--muted)`, `var(--primary)`) so the module
- * looks native and follows light and dark mode for free.
+ * ⚠ THE THING TO COPY FROM THIS FILE: since JonDash 1.8.0 a user can size a widget from 1×1 to
+ * full width, and the frame CLIPS rather than scrolls — anything that doesn't fit is simply
+ * invisible, with no warning to you or them. So a widget has exactly one job beyond its
+ * content: adapt to whatever box it is given, using container queries (below), never a
+ * viewport breakpoint. Reuse JonDash's own tokens (`card`, `var(--muted)`, `var(--primary)`)
+ * so the module looks native in light and dark mode for free.
  */
+
 /**
- * Makes THIS WIDGET its own size container, which is what lets the figure below be capped against
- * the card height as well as its width.
+ * Use container queries, never a viewport breakpoint: a 1×1 widget on a 4K monitor is still
+ * tiny, and a viewport breakpoint would give it the roomy layout anyway, since it answers the
+ * wrong question. The frame is a CSS container, so a container-width query asks the one that
+ * matters. Core's own two thresholds (`docs/MODULES-AUTHORING.md`) — use these, do not invent
+ * your own, so a dashboard mixing core tiles and add-ons changes shape at the same moments:
+ *   under the smaller one   → the essential value only, no label
+ *   at the smaller one+     → label appears, small text
+ *   at the larger one+      → full spacing
+ * Two thresholds, deliberately — each is a visible change of shape, and rearranging four times
+ * while somebody drags a corner reads as a glitch.
+ */
+
+/**
+ * If your own widget shows a LIST instead of one figure: never `items.slice(0, N)`. A constant
+ * row count is right for one box size and wrong at every other — clipped when small, half-empty
+ * when large. Show the most important rows and let the count follow the container.
+ */
+
+/**
+ * The sizing idiom worth memorising for anything that scales: a WIDTH as a proportion of the
+ * box, bounded by a floor so it never vanishes and a ceiling so it stops growing — three
+ * separate utility classes, never a fixed size (fixed sizes are what made small tiles clip in
+ * the first place). The figure below uses the same shape, expressed for type instead of width.
  *
- * Core deliberately leaves the dashboard frame on `container-type: inline-size`, so `cqh` there
- * would silently resolve against the viewport. Declaring size containment on the widget root fixes
- * that for our own subtree only: the root is `h-full` inside a sized grid cell, so its height is
- * definite, and if the assumption were ever wrong the damage is confined to this one tile rather
- * than the whole dashboard — which is exactly why core would not make the same change globally.
+ * ⚠ A class built from `clamp()`, `calc()` or a CSS-variable arbitrary value silently produced
+ * NO CSS at all in an installed module before JonDash 1.8.2 — no warning from the build, the
+ * linter or the verifier. Fixed in 1.8.2; this module still floors below that, so its fluid
+ * sizing stays in inline `style` throughout, which works on every version this module supports.
+ */
+
+/**
+ * Makes THIS WIDGET its own size container, which is what lets the figure below be capped
+ * against the card's height as well as its width.
  *
- * `@[6rem]:` classes on children now resolve against this element instead of the frame. Same
- * width, so nothing changes.
+ * Core deliberately leaves the dashboard frame width-only, so a height-based unit there would
+ * silently resolve against the viewport. Declaring full containment on the widget root fixes
+ * that for this subtree only — confined to one tile if the assumption is ever wrong, rather
+ * than the whole dashboard, which is why core would not do this globally. Width-based queries
+ * on children are unaffected either way.
  */
 const SIZE_CONTAINER = { containerType: "size" } as const;
 
+/**
+ * The entry point core renders on the dashboard.
+ * REFS addons/template/module.ts › DashboardWidget
+ */
 export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
   const heading = String((await ctx.settings.get("heading")) ?? "Items");
   const count = ctx.db ? await countItems(ctx.db) : 0;
 
   return (
     /**
-     * `h-full` because the frame pins the widget root to the full height of its cell, and
-     * `overflow-hidden` because content that escapes is invisible rather than scrollable — stating
-     * it here means a mistake shows up as clipped content in *your* card during development, not as
-     * something odd-looking on somebody's dashboard.
+     * Pinned to its cell's full height (the frame sizing) with overflow hidden (content that
+     * escapes is invisible, not scrollable) — stating both here means a mistake shows up as
+     * clipped content in *your* card during development, not as something odd on a dashboard.
      *
-     * `min-w-0` looks pointless and is not: without it a long word inside a flex child refuses to
-     * shrink below its own width and pushes the card wider than its cell.
+     * The minimum-width reset looks pointless and is not: without it a long word inside a flex
+     * child refuses to shrink below its own width and pushes the card wider than its cell.
      */
     <div
       className="card flex h-full min-w-0 flex-col justify-center overflow-hidden p-2 @[8rem]:p-5"
@@ -111,13 +87,13 @@ export default async function TemplateWidget({ ctx }: ModuleWidgetProps) {
       <p className="hidden min-w-0 truncate text-xs font-medium @[6rem]:block @[8rem]:text-sm">{heading}</p>
 
       {/*
-        The value scales with the box between a floor and a ceiling — the same shape as core's
-        `w-[46%] min-w-7 max-w-16`, expressed for type. `cqw` is a percentage of the *container*,
-        so this tracks the card rather than the window. `tabular-nums` stops the width jittering as
-        the number changes, which is very visible in a small card.
+        The value scales with the box between a floor and a ceiling — the same shape as the
+        sizing idiom above, expressed for type. `cqw` is a percentage of the *container*, so
+        this tracks the card rather than the window. `tabular-nums` stops the width jittering
+        as the number changes, which is very visible in a small card.
 
-        Inline rather than a `text-[clamp(...)]` class — see the note above: below 1.8.2 the class
-        form produces nothing at all, and this module supports those releases.
+        Inline rather than a class, per the note above: below 1.8.2 a class built this way
+        produces nothing at all, and this module supports those releases.
       */}
       {/*
         A tile with a LIST fills a big card by showing more rows. A tile with a single figure has

@@ -12,6 +12,7 @@ import type { AlertEvent, ChannelRow, MonitorRow } from "./types";
 
 const SEND_TIMEOUT_MS = 10_000;
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export type Alert = {
   event: AlertEvent;
   monitor: Pick<MonitorRow, "id" | "name" | "kind" | "target" | "runbook">;
@@ -106,6 +107,8 @@ async function post(
 /**
  * Deliver one alert through one channel. Never throws: a channel that is misconfigured
  * or unreachable returns an error that gets logged, and the other channels still fire.
+ *
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/engine.ts
  */
 export async function sendAlert(
   ctx: ModuleContext,
@@ -121,9 +124,8 @@ export async function sendAlert(
 
   switch (channel.kind) {
     case "email": {
-      // ctx.email exists only with `email:send`, and it throws rather than failing
-      // quietly — so a mailer that isn't set up becomes a logged channel failure here,
-      // leaving any webhook channels to deliver the alert regardless.
+      // ctx.email exists only with `email:send`, and throws rather than failing quietly — so
+      // a mailer that isn't set up becomes a logged failure here, other channels unaffected.
       if (!ctx.email) return { ok: false, error: "email permission not granted" };
       const recipients = Array.isArray(cfg.to) ? (cfg.to as string[]) : fallbackEmails;
       if (recipients.length === 0) return { ok: false, error: "no recipients configured" };

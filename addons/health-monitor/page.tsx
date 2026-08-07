@@ -4,6 +4,7 @@ import {
   getMonitor,
   hourlyBuckets,
   listIncidents,
+  latencyBuckets,
   listMonitors,
   recentResults,
   uptimeWindow,
@@ -12,7 +13,7 @@ import {
 import { formatAgo, formatDuration, formatMs, formatUptime, stateColour, STATE_LABEL, worstState } from "./lib/format";
 import { KIND_CHOICES } from "./lib/forms";
 import { ADMIN_PATH, MODULE_PATH, type MonitorRow } from "./lib/types";
-import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/parts";
+import { HealthStyles, LatencyChart, SpeedChart, Stat, StatusDot, StatusStrip } from "./ui/parts";
 
 /**
  * The module's pages, split so that looking and changing are different places:
@@ -22,6 +23,8 @@ import { HealthStyles, Sparkline, Stat, StatusDot, StatusStrip } from "./ui/part
  *
  * Nothing on a display page changes anything, so a dashboard can be left open without a
  * misplaced click reconfiguring the monitoring.
+ *
+ * REFS addons/health-monitor/module.ts
  */
 export default async function HealthPage({ ctx, path }: ModulePageProps) {
   const db = ctx.db;
@@ -32,7 +35,9 @@ export default async function HealthPage({ ctx, path }: ModulePageProps) {
   if (path[0] === "monitor" && path[1]) {
     const monitor = await getMonitor(db, path[1]);
     if (!monitor) return <NotFound />;
-    return <MonitorDetail ctx={ctx} monitor={monitor} />;
+    // A page gets path segments and no query string, so the chart range is a segment.
+    // Anything but "30" means 7 days, so a hand-typed URL can never ask for an unbounded read.
+    return <MonitorDetail ctx={ctx} monitor={monitor} days={path[2] === "30" ? 30 : 7} />;
   }
 
   return <Overview ctx={ctx} />;
@@ -162,7 +167,15 @@ function kindLabel(m: MonitorRow): string {
 
 /* ------------------------------------------------------------ display: detail */
 
-async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; monitor: MonitorRow }) {
+async function MonitorDetail({
+  ctx,
+  monitor,
+  days,
+}: {
+  ctx: ModulePageProps["ctx"];
+  monitor: MonitorRow;
+  days: number;
+}) {
   const db = ctx.db!;
   const [day, week, month] = await Promise.all([
     uptimeWindow(db, monitor.id, 24),
@@ -172,12 +185,7 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
   const buckets = await hourlyBuckets(db, monitor.id, 24);
   const recent = await recentResults(db, monitor.id, 60);
   const incidents = await listIncidents(db, monitor.id, 10);
-  const trend = recent
-    .slice()
-    .reverse()
-    .filter((r) => r.latencyMs !== null && r.latencyMs !== undefined)
-    .map((r) => Number(r.latencyMs))
-    .filter((v) => Number.isFinite(v));
+  const latency = await latencyBuckets(db, monitor.id, days * 24);
 
   return (
     <div className="hm flex flex-col gap-6">
@@ -219,11 +227,27 @@ async function MonitorDetail({ ctx, monitor }: { ctx: ModulePageProps["ctx"]; mo
             Last 24 hours, one bar per hour
           </p>
         </div>
-        <div className="mt-4">
-          <Sparkline values={trend} />
-          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
-            Response time over the last {trend.length} checks
-          </p>
+        <div className="mt-5">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
+              {monitor.kind === "speed"
+                ? "Speed · dashed is upload, amber bars are latency, red bars jitter"
+                : "Response time · the band is the slowest 5%, red marks failed checks"}
+            </p>
+            <span className="flex gap-1 text-xs">
+              {[7, 30].map((d) => (
+                <Link
+                  key={d}
+                  href={`${MODULE_PATH}/monitor/${monitor.id}${d === 30 ? "/30" : ""}`}
+                  className="btn btn-xs"
+                  style={days === d ? undefined : { color: "var(--muted)" }}
+                >
+                  {d} days
+                </Link>
+              ))}
+            </span>
+          </div>
+          {monitor.kind === "speed" ? <SpeedChart buckets={latency} /> : <LatencyChart buckets={latency} />}
         </div>
       </section>
 

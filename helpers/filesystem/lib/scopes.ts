@@ -132,12 +132,11 @@ const WARNINGS: Record<Verb, string> = {
 };
 
 /**
- * One scope per capability, sharing one folder list.
+ * One scope per capability, sharing one folder list — see the file header for why. `list`,
+ * `browse`, `add` and `remove` are identical across all three; only `unbounded` (the
+ * "everything" switch) and its shared `option` (below) differ per verb.
  *
- * A folder is not approved "for reading" — the same roots back all three — so `list`, `browse`,
- * `add` and `remove` are identical and core draws the list against each capability. What
- * differs is the switch: read, write and delete each carry their own "everything", so an admin
- * can let a module read anywhere without letting it delete anywhere.
+ * REFS helpers/filesystem/helper.ts
  */
 export function rootScopeFor(verb: Verb): HelperCapabilityScope {
   return {
@@ -169,13 +168,12 @@ export function rootScopeFor(verb: Verb): HelperCapabilityScope {
       },
 
       /**
-       * The protection, in the slot core added for it (1.7.2-beta.2).
+       * The protection. Defaults to ON and is shared by all three verbs, because it names a
+       * set of FILES rather than a verb — protecting JonDash's data from reading but not
+       * deletion would be a distinction with no safe reading. Core confirms the OFF
+       * direction here, the widening one, where the rest of the page confirms switching ON.
        *
-       * **Defaults to ON and is shared by all three verbs**, because it names a set of FILES
-       * rather than a verb — protecting JonDash's data from reading but not from deletion
-       * would be a distinction with no safe reading. Core renders it only while the grant is
-       * on, and confirms the OFF direction, which is the widening one here: the rest of the
-       * page confirms switching things on, and this is the exception.
+       * REFS helpers/filesystem/helper.ts
        */
       option: {
         label: "Exclude JonDash's own data",

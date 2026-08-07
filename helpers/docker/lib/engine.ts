@@ -4,18 +4,19 @@ import { platform } from "node:os";
 /**
  * The only place that talks to the Docker engine.
  *
- * **The socket is root-equivalent.** Anything that can reach it can start a container mounting
- * the host filesystem as root, so this file exposes *operations* and never the socket. Two
- * rules follow, and neither may be relaxed:
+ * ⚠ The socket is root-equivalent — anything that can reach it can start a container mounting
+ * the host filesystem as root. Two rules follow, and neither may be relaxed:
  *
- * 1. **The path is fixed here, never supplied by a caller.** A caller-chosen socket is a
- *    caller-chosen daemon — including one they just started themselves.
- * 2. **Every request is built here from an allowed endpoint and a validated id.** No module
- *    can name a path, a method or a body, so there is no shape in which "just this once" can
- *    be smuggled through.
+ * 1. The path is fixed here, never supplied by a caller — a caller-chosen socket is a
+ *    caller-chosen daemon, including one they just started themselves.
+ * 2. Every request is built here from an allowed endpoint and a validated id — no module can
+ *    name a path, a method or a body, leaving no shape for "just this once" to be smuggled in.
  */
 
-/** Where the engine listens. Windows named pipe, or the Unix socket. */
+/**
+ * Where the engine listens. Windows named pipe, or the Unix socket.
+ * REFS helpers/docker/api.ts
+ */
 export function socketPath(): string {
   return platform() === "win32" ? "\\\\.\\pipe\\docker_engine" : "/var/run/docker.sock";
 }
@@ -26,6 +27,7 @@ export function socketPath(): string {
  */
 const ID = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
 
+/** REFS helpers/docker/api.ts · helpers/docker/tests/shape.test.ts */
 export function isValidId(id: string): boolean {
   return ID.test(id);
 }
@@ -71,9 +73,8 @@ function call(path: string, method: "GET" | "POST", speed: Speed = "read"): Prom
 
     req.on("timeout", () => {
       req.destroy();
-      // Worded carefully: giving up on waiting is not the same as the action failing, and on
-      // a slow stop the container usually does go down a moment later. Telling someone it
-      // failed when it did not is worse than telling them it is taking a while.
+      // Worded carefully: giving up on waiting isn't the same as the action failing — a slow
+      // stop usually does complete a moment later, and a false "failed" is worse than a wait.
       resolve({
         ok: false,
         error: {
@@ -134,10 +135,12 @@ function engineMessage(body: Buffer): string {
 
 export type RawVersion = { Version: string; ApiVersion: string };
 
+/** REFS helpers/docker/api.ts */
 export async function version(): Promise<Result<RawVersion>> {
   return json<RawVersion>("/version");
 }
 
+/** REFS helpers/docker/lib/shape.ts · helpers/docker/tests/shape.test.ts */
 export type RawContainer = {
   Id: string;
   Names: string[];
@@ -149,16 +152,19 @@ export type RawContainer = {
   Ports: { PrivatePort: number; PublicPort?: number; Type: string }[];
 };
 
+/** REFS helpers/docker/api.ts */
 export async function containers(): Promise<Result<RawContainer[]>> {
   return json<RawContainer[]>("/containers/json?all=1");
 }
 
+/** REFS helpers/docker/lib/shape.ts · helpers/docker/tests/shape.test.ts */
 export type RawStats = {
   cpu_stats: { cpu_usage: { total_usage: number }; system_cpu_usage?: number; online_cpus?: number };
   precpu_stats: { cpu_usage: { total_usage: number }; system_cpu_usage?: number };
   memory_stats: { usage?: number; limit?: number };
 };
 
+/** REFS helpers/docker/api.ts */
 export async function stats(id: string): Promise<Result<RawStats>> {
   if (!isValidId(id)) return { ok: false, error: { reason: "failed", detail: "Bad container id." } };
   return json<RawStats>(`/containers/${id}/stats?stream=0&one-shot=false`, "slow");
@@ -170,6 +176,7 @@ export async function stats(id: string): Promise<Result<RawStats>> {
  * A non-TTY container's log stream is framed: an 8-byte header per chunk, where byte 0 is the
  * stream and bytes 4-7 are a big-endian length. Returning it raw shows control bytes in the
  * middle of lines — it looks like corruption and gets reported as one.
+ * REFS helpers/docker/api.ts
  */
 export async function logs(id: string, tail: number): Promise<Result<string>> {
   if (!isValidId(id)) return { ok: false, error: { reason: "failed", detail: "Bad container id." } };
@@ -180,6 +187,7 @@ export async function logs(id: string, tail: number): Promise<Result<string>> {
   return { ok: true, value: demux(r.value.body) };
 }
 
+/** REFS helpers/docker/tests/shape.test.ts */
 export function demux(body: Buffer): string {
   // A TTY container's stream has no framing at all, so a buffer that doesn't start with a
   // plausible header is passed through rather than mangled.
@@ -198,12 +206,15 @@ export function demux(body: Buffer): string {
   return out.length > 0 ? Buffer.concat(out).toString("utf8") : body.toString("utf8");
 }
 
+/** REFS helpers/docker/api.ts */
 export type Verb = "start" | "stop" | "restart" | "pause" | "unpause";
 
 /** The complete set of things that may be done to a container. There is no `exec`, no
  *  `create`, no `remove`, and no image or volume endpoint — those calls do not exist here. */
+/** REFS helpers/docker/api.ts · helpers/docker/tests/shape.test.ts */
 export const VERBS: Verb[] = ["start", "stop", "restart", "pause", "unpause"];
 
+/** REFS helpers/docker/api.ts */
 export async function act(id: string, verb: Verb): Promise<Result<true>> {
   if (!isValidId(id)) return { ok: false, error: { reason: "failed", detail: "Bad container id." } };
   if (!VERBS.includes(verb)) return { ok: false, error: { reason: "failed", detail: "Unknown action." } };

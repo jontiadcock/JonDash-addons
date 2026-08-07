@@ -25,16 +25,14 @@ import {
 /**
  * The whole surface a module may reach.
  *
- * **A module can ask. Only an administrator can install.** Two gates stand between a module's
- * request and software arriving: an admin approving it in JonDash, where the package id is
- * shown verbatim, and then Windows asking again. The second is the unforgeable one, but the
- * first is where the actual understanding happens — the UAC dialog names
- * `jondash-elevate.exe` and says nothing at all about what is being installed.
- *
- * **Be honest about the bound.** This is weaker than the `host-services` grant model and no
- * amount of engineering changes that. An installer runs the vendor's code as administrator by
- * definition, so what this is bounded to is "anything in the winget catalogue" — not "nothing
- * bad". Any UI built on it must show the package id and not imply more safety than exists.
+ * ⚠ A module can ask; only an administrator can install. Two gates stand between a request and
+ * software arriving: JonDash's own approval (package id shown verbatim), then Windows asking
+ * again. The second is unforgeable; the UAC dialog itself names only `jondash-elevate.exe` and
+ * says nothing about what's installed — the first gate is where real understanding happens.
+ * ⚠ Be honest about the bound: this is weaker than the `host-services` grant model, and no
+ * engineering changes that. An installer runs the vendor's code as administrator over "anything
+ * in the winget catalogue," not "nothing bad" — any UI built on this must show the package id
+ * and never imply more safety than exists.
  */
 
 export type { PackageState } from "@/lib/elevation";
@@ -77,7 +75,7 @@ export type HostInstallApi = {
   isInstalled(packageId: string): Promise<boolean | null>;
   /** Ask an administrator to install something. Inert. Needs `host-install:manage`. */
   requestInstall(packageId: string, reason: string): Promise<RequestResult>;
-  /** Ask to remove something **JonDash installed**. Refused otherwise. Needs `host-install:manage`. */
+  /** Ask to remove what JonDash installed. Refused otherwise. Needs `host-install:manage`. */
   requestUninstall(packageId: string, reason: string): Promise<RequestResult>;
   /** What happened to a request THIS module raised. Needs `host-install:manage`. */
   requestStatus(requestId: string): Promise<RequestOutcome | null>;
@@ -145,9 +143,8 @@ const api: HelperApiFor<HostInstallApi> = (ctx: ModuleContext) => ({
   },
 
   async requestUninstall(packageId: string, reason: string) {
-    // The uninstall rule, enforced at the point a module asks rather than at approval:
-    // clean up what you created, never what you found. Software the admin installed
-    // themselves is not ours to offer to remove.
+    // The uninstall rule, enforced when a module asks rather than at approval: clean up what
+    // you created, never what you found — software the admin installed themselves isn't ours.
     if (!granted(ctx, "host-install:manage")) return { ok: false, reason: "not permitted" };
     const v = validatePackageId(packageId);
     if (!v.ok) return { ok: false, reason: v.reason };
@@ -213,9 +210,8 @@ const api: HelperApiFor<HostInstallApi> = (ctx: ModuleContext) => ({
         r.action === "install" ? await installPackage(v.id, { userId }) : await uninstallPackage(v.id, { userId });
 
       if (result.ok) {
-        // Recorded only on success, and only for installs — the record is what later
-        // authorises removal, so writing it optimistically would let JonDash offer to
-        // uninstall something it never managed to install.
+        // Recorded only on success and only for installs — this record is what later
+        // authorises removal, so writing it early could offer to uninstall a failed install.
         if (r.action === "install") {
           await recordInstalled({ packageId: v.id, manager: "winget", installedBy: userId, forModule: r.moduleId });
         } else {
@@ -273,4 +269,8 @@ async function raise(
   return { ok: true, requestId };
 }
 
+/**
+ * REFS addons/docker-manager/actions.ts · addons/docker-manager/page.tsx ·
+ *      addons/docker-manager/ui/settings-panel.tsx
+ */
 export default api;

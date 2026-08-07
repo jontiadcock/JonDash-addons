@@ -7,18 +7,15 @@ import { DEFAULT_RETENTION, pruneLogs, type RetentionPolicy } from "./logfile";
 
 /**
  * Everything that CHANGES what this helper allows — and therefore nothing a module may call.
+ * `api.ts` is the only path a module has, the verifier refuses any deeper import, and
+ * nothing here is re-exported from it: a module cannot approve a folder, forget one, or
+ * shorten log retention, even by mistake.
  *
- * This file exists to make that boundary physical rather than promised. `api.ts` is the only
- * path a module has, the verifier refuses any deeper import, and nothing here is re-exported
- * from it. So a module cannot approve a folder, forget one, or shorten log retention, even
- * by mistake.
+ * ⚠ This is the boundary HELPERS-DESIGN rule 8 exists for — these operations must never move
+ * back onto the module-facing API. See the note on `api.ts › suggestRoot()` for why.
  *
- * These functions previously lived on the module-facing API, which meant a module confined to
- * approved folders could approve its own — the consent wording held only until the module
- * decided otherwise. See HELPERS-DESIGN rule 8 and the same fix in `host-services` 0.0.2.
- *
- * Callers: `helper.ts`'s `onSettingsSubmit`, reached from Admin → Permissions, where `ctx.user`
- * is resolved from the session.
+ * REFS helpers/filesystem/helper.ts › onSettingsSubmit — the only caller, reached from
+ *      Admin → Permissions where `ctx.user` is resolved from the session
  */
 
 const ROOTS = helperTableName("filesystem", "roots");
@@ -42,10 +39,12 @@ export type PendingSuggestion = {
   createdAt: string;
 };
 
+/** REFS helpers/filesystem/lib/scopes.ts · helpers/filesystem/ui/settings-panel.tsx */
 export async function listRoots(): Promise<AdminRoot[]> {
   return prisma.$queryRawUnsafe<AdminRoot[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} ORDER BY label`);
 }
 
+/** REFS helpers/filesystem/ui/settings-panel.tsx */
 export async function openSuggestions(): Promise<PendingSuggestion[]> {
   return prisma.$queryRawUnsafe<PendingSuggestion[]>(
     `SELECT id, moduleId, path, reason, createdAt FROM ${SUGGESTIONS}
@@ -58,12 +57,12 @@ export type AddOutcome =
   | { ok: false; reason: string };
 
 /**
- * Approve a folder.
+ * Approve a folder. Breadth is warned about, never blocked: `C:\` is a legitimate thing to
+ * back up, and the protection that matters lives on the files themselves — every entry is
+ * checked against the secret registry by identity before it is read. Refusing broad roots
+ * would be security theatre that also breaks the real use case.
  *
- * Breadth is warned about, never blocked: `C:\` is a legitimate thing to back up, and the
- * protection that matters lives on the files themselves — every entry is checked against the
- * secret registry by identity before it is read. Refusing broad roots would be security
- * theatre that also breaks the real use case.
+ * REFS helpers/filesystem/helper.ts · helpers/filesystem/lib/scopes.ts
  */
 export async function addRoot(input: { path: string; label: string; addedBy?: string | null }): Promise<AddOutcome> {
   const verdict = assertUsableAsSource(input.path);
@@ -91,14 +90,20 @@ export async function addRoot(input: { path: string; label: string; addedBy?: st
   return { ok: true, root, risk: risk.level === "none" ? null : note };
 }
 
-/** Forget a folder. Touches no files — only this helper's permission to reach them. */
+/**
+ * Forget a folder. Touches no files — only this helper's permission to reach them.
+ * REFS helpers/filesystem/helper.ts · helpers/filesystem/lib/scopes.ts
+ */
 export async function removeRoot(rootId: string): Promise<AdminRoot | null> {
   const rows = await prisma.$queryRawUnsafe<AdminRoot[]>(`SELECT ${ROOT_COLS} FROM ${ROOTS} WHERE id = ?`, rootId);
   await prisma.$executeRawUnsafe(`DELETE FROM ${ROOTS} WHERE id = ?`, rootId);
   return rows[0] ?? null;
 }
 
-/** Approve what a module asked for. The admin's canonicalised path wins, not the module's string. */
+/**
+ * Approve what a module asked for. The admin's canonicalised path wins, not the module's
+ * string. REFS helpers/filesystem/helper.ts
+ */
 export async function acceptSuggestion(id: string, label?: string): Promise<AddOutcome> {
   const rows = await prisma.$queryRawUnsafe<{ path: string; moduleId: string }[]>(
     `SELECT path, moduleId FROM ${SUGGESTIONS} WHERE id = ? AND state = 'open'`,
@@ -117,7 +122,10 @@ export async function acceptSuggestion(id: string, label?: string): Promise<AddO
   return added;
 }
 
-/** Refuse it, and remember the refusal — see the habituation note in 003_root_suggestions.sql. */
+/**
+ * Refuse it, and remember the refusal — see the habituation note in 003_root_suggestions.sql.
+ * REFS helpers/filesystem/helper.ts
+ */
 export async function declineSuggestion(id: string): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE ${SUGGESTIONS} SET state = 'declined', decidedAt = ? WHERE id = ? AND state = 'open'`,
@@ -128,13 +136,11 @@ export async function declineSuggestion(id: string): Promise<void> {
 /* --------------------------------------------------------------- the switches */
 
 /**
- * "Everything" is **per verb**, not one switch for the helper.
+ * "Everything" is per verb, not one switch for the helper — owner's rule: *"ensure with all
+ * of it, there is a read only and full options."* A single switch would force read-anywhere
+ * to imply delete-anywhere; three capabilities get three switches instead.
  *
- * Owner's rule: *"ensure with all of it, there is a read only and full options."* A single
- * unbounded switch would force somebody who wants a module to read anywhere into also letting
- * it delete anywhere — which is the "useless or too much" choice the pairing rule exists to
- * prevent. `scope` being per-capability makes this fall out naturally: three capabilities,
- * three switches, one shared folder list.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/scopes.ts
  */
 export type Verb = "read" | "write" | "delete";
 const UNBOUNDED = (v: Verb) => `roots.unbounded.${v}`;
@@ -163,23 +169,28 @@ async function setFlagRow(key: string, on: boolean): Promise<void> {
   );
 }
 
+/** REFS helpers/filesystem/api.ts · helpers/filesystem/lib/scopes.ts */
 export const isUnbounded = (v: Verb) => flag(UNBOUNDED(v), false);
+/** REFS helpers/filesystem/lib/scopes.ts */
 export const setUnbounded = (v: Verb, on: boolean) => setFlagRow(UNBOUNDED(v), on);
 
 /**
- * **Defaults to protected, and stays protected until an administrator says otherwise.**
+ * Defaults to protected, and stays protected until an administrator says otherwise. The
+ * second half of the owner's decision: "everything" is offered honestly, but the carve-out
+ * is a switch of its own rather than a silent assumption either way.
  *
- * This is the second half of the owner's decision: "everything" is offered honestly rather
- * than quietly carved out, but the carve-out is a switch of its own rather than a silent
- * assumption either way. Turning protection off is what actually exposes `.data/secrets.json`
- * — the AES master key that decrypts every TOTP secret and every backup — plus the database
- * and the elevation binaries.
+ * ⚠ Turning protection off is what exposes `.data/secrets.json` — the AES master key that
+ * decrypts every TOTP secret and every backup — plus the database and the elevation
+ * binaries. Absent means protected: a missing row must never read as consent. The warning
+ * text an admin actually sees is `lib/scopes.ts`'s `option.warning`.
  *
- * Absent means protected: a missing row must never read as consent.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/scopes.ts
  */
 export const jondashProtected = () => flag(PROTECT, true);
+/** REFS helpers/filesystem/lib/scopes.ts */
 export const setJondashProtected = (on: boolean) => setFlagRow(PROTECT, on);
 
+/** REFS helpers/filesystem/ui/settings-panel.tsx */
 export async function readRetention(): Promise<RetentionPolicy> {
   const rows = await prisma.$queryRawUnsafe<{ key: string; value: string }[]>(
     `SELECT key, value FROM ${SETTINGS} WHERE key IN ('log.keepDays', 'log.keepRuns')`,
@@ -198,7 +209,10 @@ export async function readRetention(): Promise<RetentionPolicy> {
   };
 }
 
-/** Change retention and apply it at once. Global, which is why no module may call it. */
+/**
+ * Change retention and apply it at once. Global, which is why no module may call it.
+ * REFS helpers/filesystem/helper.ts
+ */
 export async function setRetention(policy: RetentionPolicy): Promise<{ policy: RetentionPolicy; removed: number }> {
   const clamp = (n: number, max: number) => (Number.isFinite(n) && n >= 0 ? Math.min(Math.trunc(n), max) : 0);
   const next: RetentionPolicy = {

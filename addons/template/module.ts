@@ -24,7 +24,7 @@ const template: ModuleDefinition = {
     "FOR DEVELOPERS — a working example to copy when building your own module. Installs to modules/template; open MODULE.md in that folder for a full guide, and AI-PROMPT.md to have an AI build one for you. Safe to install, and safe to uninstall when you're done.",
 
   /** Bump this to publish an update. Semver; use X.Y.Z-beta.N on the beta channel. */
-  version: "0.0.9",
+  version: "0.0.10",
 
   /**
    * The oldest JonDash this module works on. Declare the oldest that genuinely works,
@@ -41,15 +41,11 @@ const template: ModuleDefinition = {
   minAppVersion: "1.4.1-beta.1",
 
   /**
-   * Ask for NOTHING you don't use — every entry becomes a warning the admin reads before
-   * they enable you, and the installer refuses a module that reaches for a capability it
-   * didn't declare.
-   *
-   * A module already gets its own settings, its own key/value store and its own
-   * `mod_<id>_*` tables without asking for anything. This one declares exactly one
-   * permission, `audit:write`, because `actions.ts` records added and deleted items in
-   * JonDash's audit log — and that is the only reason to declare it. Remove the audit
-   * calls and this list should go back to being empty.
+   * Ask for NOTHING you don't use: every entry is a warning the admin reads before enabling
+   * you, and the installer refuses a module that reaches for a capability it didn't declare.
+   * A module already gets its own settings, key/value store and `mod_<id>_*` tables for free.
+   * This one declares `audit:write` only because `actions.ts` writes to JonDash's audit log —
+   * remove those calls and this list should go back to empty.
    *
    * The four that exist, and what each puts on `ctx`:
    *   "network:outbound" → ctx.fetch, ctx.net       "crypto:use"  → ctx.crypto
@@ -82,19 +78,17 @@ const template: ModuleDefinition = {
   /** Optional. Point at a folder of NNN_name.sql files to get your own tables. */
   migrations: "./migrations",
 
-  // This template deliberately depends on NOTHING beyond the core framework: no shared
-  // capability, no background work. Copy it and you get a module that installs alone.
-  //
-  // If you need periodic work, JonDash has a scheduler you can depend on. You *declare*
-  // the work rather than starting it, because a module's code only runs when something
-  // renders it — a timer started from a widget dies the moment nobody is looking.
-  // MODULE.md and AI-PROMPT.md show the exact fields; adding them raises minAppVersion
-  // to 1.5.0-beta.1. Full contract: helpers/scheduler/HELPER.md in the addons repo.
-  //
-  // Do NOT paste those field names into a comment here to remind yourself. The installer
-  // parses this file with a regex that does not skip comments, so a commented-out
-  // example is read as a REAL dependency — the module then silently pulls in a helper it
-  // never uses. (Found exactly that way while writing this file.)
+  /**
+   * Deliberately depends on NOTHING beyond the core framework — no shared capability, no
+   * background work — so copying this folder gets you a module that installs alone.
+   * For periodic work, JonDash has a scheduler you can depend on: you *declare* the work
+   * rather than starting it, since a module's code only runs when something renders it.
+   * MODULE.md/AI-PROMPT.md show the fields; adding them raises minAppVersion to 1.5.0-beta.1.
+   * REFS helpers/scheduler/HELPER.md — the full contract.
+   * ⚠ Do NOT paste those field names into a comment here "to remind yourself": the installer
+   * parses this file with a regex that does not skip comments, so a commented-out example is
+   * read as a REAL dependency, and the module silently pulls in a helper it never uses.
+   */
 
   /**
    * Optional lifecycle hooks. Migrations have already run before onEnable.

@@ -1,81 +1,37 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { ModuleWidgetProps } from "@/lib/modules/types";
+// This widget's only host access: the system-metrics helper's read-only surface. Its shape
+// (`Snapshot`) drives every row below — see helpers/system-metrics/api.ts.
 import systemMetrics, { type Snapshot } from "@/helpers/system-metrics/api";
 import { bytes, pct, rate, uptime, levelFor, METER, TONE, type Level } from "../lib/format";
 import { collectFor } from "../lib/groups";
 
 /**
- * The dashboard tile — "is my box OK" at a glance.
- *
- * It draws its OWN card: the dashboard gives a widget a grid cell and nothing else, so
- * without `card` and a title it would render as loose text with no name. It leads with a
- * verdict, pessimistically: a full disk or tight memory is what you need to see, not "3
- * disks". Admin-only, like the module — the paths and hostname never reach a normal user.
- *
- * # Sizing (JonDash 1.8.0 B5/B6) — this is the hard case
- *
- * Since 1.8.0 the user can size this anywhere from **1×1 to full width**, and the frame
- * **clips rather than scrolls**. This widget has up to ten rows of detail, so it had the worst
- * version of the problem in the whole add-on set: at 1×1 nearly all of it simply vanished.
- *
- * Three things fix it, and only the first is a breakpoint:
- *
- * 1. **Core's two container thresholds** (`@[6rem]`, `@[8rem]`) decide how much *kind* of
- *    content appears — verdict alone, then the header, then the detail list.
- * 2. **The `FILL_GRID` below.** The frame is `container-type: inline-size`, so a container query
- *    can ask how WIDE this widget is but never how TALL — and a 12×1 widget is both very wide and
- *    very short. The grid needs no query: `1fr` rows stretch to use whatever height there is, and
- *    flow into another column only once that height is spent. Tall and narrow gives one long
- *    list; short and wide gives several columns. See its own comment for the two mechanisms that
- *    were tried first and why each was wrong.
- * 3. **Priority order.** Whatever still doesn't fit is clipped, so the order is the design:
- *    verdict, CPU, memory, then disks **fullest first** — not mount order, because the disk
- *    that matters is the full one. Uptime is last because it is the least urgent thing here.
- *
- * There is no `.slice(0, 3)` any more. A constant row count was chosen for one box size and
- * was wrong at every other — clipped when small, half-empty when large.
- *
- * ## The one limitation, stated rather than hidden
- *
- * The detail list needs `@[8rem]`, so a **1-wide × 6-tall** widget shows only the title and the
- * verdict even though it has plenty of height going spare. That is not an oversight: with
- * `inline-size` containment, 1×1 and 1×6 are *the same width* and therefore indistinguishable,
- * and the tie has to be broken one way. It is broken in favour of 1×1 — the floor the spec names,
- * and the size at which showing a label/value list would overflow the card. A one-unit column is
- * an odd shape for a stats tile; a 1×1 that spills is a bug on every dashboard.
- *
- * **Careful with Tailwind arbitrary values here:** a class containing parentheses generates no
- * CSS in a module (see MODULE.md), so fluid sizing is written as an inline `style`.
+ * The dashboard tile — "is my box OK" at a glance. Draws its OWN card (the dashboard supplies
+ * only a grid cell), leads with a verdict pessimistically, admin-only like the module.
+ * ⚠ Resizable 1×1 to full width (JonDash 1.8.0 B5/B6), and the frame CLIPS rather than scrolls,
+ * so every size has to degrade on purpose. Three mechanisms do it: core's two container-size
+ * breakpoints gate how much detail shows; `FILL_GRID` below fills both width and height (see
+ * its own comment); and whatever doesn't fit is cut in priority order — verdict, CPU, memory,
+ * disks fullest-first, uptime last (see the sort below).
+ * ⚠ A 1-wide tile shows only the title and verdict even at full height: under container
+ * `inline-size` a 1×1 and a 1×6 are the same WIDTH and so indistinguishable, and the tie is
+ * broken toward the floor the spec names — not a bug to "fix" with a height rule.
  */
 
 const MODULE_PATH = "/m/host-vitals";
 
 /**
  * The layout that makes a list **fill** its tile instead of huddling in the top-left corner.
- *
- * Two earlier attempts were both wrong, and for opposite reasons:
- *
- * - **Flex `flex-wrap`** starts a new column whenever it runs out of HEIGHT, without caring
- *   whether any WIDTH is left — so columns ran off the side of the card and text was sliced.
- * - **CSS `columns`** fixed the slicing but *balances* by default, so five rows in a large tile
- *   spread themselves one-per-column across the top and left the other 90% of the card empty.
- *   It never occurred to me to check that, because I was measuring for overflow and an empty
- *   card overflows nothing. The screenshot was the thing that showed it.
- *
- * A grid does both jobs at once:
- *
- * - `gridTemplateRows: repeat(auto-fit, minmax(1.5rem, 1fr))` — as many rows as the tile's height
- *   can hold at a readable minimum, each taking an equal share of it. **`1fr` is what fills the
- *   card**: rows stretch to use the height rather than stacking at 16px and stopping.
- * - `gridAutoFlow: column` — fill downward first, then start another column. So a tall tile is
- *   one long list, and a wide short one flows sideways.
- * - `gridAutoColumns: minmax(11rem, 1fr)` — columns share the width, never narrower than legible.
- *
- * It has to be an inline style: `minmax()` and `repeat()` contain parentheses, and on the
- * versions this module supports a Tailwind class containing `(` generates no CSS at all. (Fixed
- * in JonDash 1.8.2 — but the floor here is 1.8.0-beta.14, so the class form would silently do
- * nothing for most of the people who install this.)
+ * ⚠ Not flex with wrapping (runs a new column on height alone, ignoring width, so columns ran
+ * off the card) and not CSS `columns` either (it *balances* by default, so five rows in a large
+ * tile bunch across the top and leave most of the card empty — invisible to an overflow check,
+ * since an empty card overflows nothing).
+ * A grid does both jobs: `repeat(auto-fit, minmax(1rem, 1fr))` rows fill the height instead of
+ * stacking and stopping, `gridAutoFlow: column` goes downward before sideways, and
+ * `gridAutoColumns` keeps columns legible. Inline style, not a class — `minmax()`/`repeat()`
+ * contain `(`, which generates no CSS on this module's 1.8.0 floor (fixed in 1.8.2).
  */
 const FILL_GRID = {
   display: "grid",
@@ -85,28 +41,22 @@ const FILL_GRID = {
   columnGap: "1.25rem",
   overflow: "hidden",
   /*
-   * The type has to scale with the tile, and this took a second pass to get right. `1fr` rows
-   * share the whole height between however many readings there are, so six readings in a tall
-   * card get a row each of well over 100px — and 12px text stranded in a 117px row does not look
-   * generous, it looks stretched, like a table someone dragged the corner of. The row height is
-   * doing the filling; the type has to keep up with it or the card reads as broken.
-   *
-   * `4.5cqw` ties it to the card's width, and `min(…, 5cqh)` to its height — which is the term
-   * that matters, because row height comes from height, and because a very wide, very short tile
-   * would otherwise compute a headline-sized font for a row 16px tall. Both units mean the card
-   * only because the root declares size containment.
+   * Row height varies a lot — six readings in a tall card get 100px+ rows each, and 12px text
+   * stranded in one looks stretched, not generous, so type has to scale with the row height.
+   * `4.5cqw` ties it to the card's width, `min(…, 5cqh)` to its height — the term that matters,
+   * since row height comes from height — and both resolve against the card because the root
+   * declares size containment.
+   * ⚠ The outer `max()` is a floor and is NOT optional: `min(…, 5cqh)` alone has nothing to
+   * hold it up, and a one-row-tall tile computed an unreadable ~3.45px font without it.
    */
-  // The outer max() is a floor and is NOT optional: min(..., 5cqh) alone has nothing holding it
-  // up, so a one-unit-high tile computed a 3.45px font — technically unclipped and completely
-  // unreadable. A cap needs a floor underneath it or it is just a smaller bug.
   fontSize: "max(0.6875rem, min(clamp(0.75rem, 4.5cqw, 2rem), 5cqh))",
 } as const;
 
 /**
  * The worst thing currently true about the host, or "healthy" if nothing is wrong.
  *
- * `short` is the 1×1 form. Below `@[6rem]` there is no room for a sentence, and truncating the
- * long one to "Memory is ti…" tells you less than "94%" does.
+ * `short` is the 1×1 form. Below the smaller container breakpoint there is no room for a
+ * sentence, and truncating the long one to "Memory is ti…" tells you less than "94%" does.
  */
 function verdict(m: Snapshot): { text: string; short: string; level: Level } {
   const fullest = m.disks.reduce<number>((max, d) => Math.max(max, d.usedPct), 0);
@@ -153,25 +103,14 @@ function totalNet(m: Snapshot): { rx: number; tx: number } | null {
 
 /**
  * One reading: a muted label, the figure in the card's own text colour, and — where the reading
- * is a proportion — a slim meter along the bottom edge of the row.
- *
- * **The meter has been through three shapes and the middle one was genuinely ugly.** It began as a
- * 6px bar on its own line, which doubled the row height and pushed rows out of short tiles. So it
- * moved to a translucent fill *behind* the text, which fixed the height and looked bad: a partial
- * block at 18% opacity starting under the label reads as a stray selection highlight, not as a
- * measurement, and on a wide row it is a grey smudge with a hard edge in the middle of nowhere.
- *
- * It is now a **track and fill pinned to the bottom of the row** — the shape everyone already
- * recognises as a meter. It is absolutely positioned, so like the background fill it still costs no
- * height and short tiles stay correct; but it has a visible track, so the empty part reads as
- * "space remaining" rather than as an edge, and the label sits on plain card background where it
- * belongs.
- *
- * `min(1.5px, var(--radius-control))` rather than a hardcoded radius: the token runs from 999px on
- * Crystal to 0px on Terminal, Brutalist and Paper, which are square-cornered on purpose. A fixed
- * radius leaves rounded bars inside hard-edged cards on exactly the styles whose whole point is
- * that nothing is rounded. `min` keeps it proportional where the style is round and collapses it to
- * square where the style says square.
+ * is a proportion — a slim meter pinned to the bottom edge of the row.
+ * ⚠ Absolutely positioned on purpose: on the row's own line a meter doubles the row height and
+ * pushes rows out of short tiles; behind the text it reads as a stray selection highlight, not a
+ * measurement. Pinned to the bottom it costs no height, still shows a visible track (so empty
+ * space reads as "remaining", not an edge), and leaves the label on plain card background.
+ * `min(1.5px, var(--radius-control))`, not a hardcoded radius: the token runs 999px on Crystal to
+ * 0px on Terminal/Brutalist/Paper, which are square by design — `min` stays proportional where
+ * the style is round and collapses to square where it says square.
  */
 function Row({
   label,
@@ -223,6 +162,10 @@ function Row({
   );
 }
 
+/**
+ * The entry point core renders on the dashboard.
+ * REFS addons/host-vitals/module.ts › DashboardWidget · addons/host-vitals/tests/widget.test.ts
+ */
 export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
   // Only gather what the admin left switched on — a metric turned off is never sampled.
   const settings = await ctx.settings.all();
@@ -246,11 +189,14 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
   const disks = [...m.disks].sort((a, b) => b.usedPct - a.usedPct);
 
   return (
-    // `containerType: size` makes THIS TILE the container the `cqh` units below resolve against.
-    // Core keeps the dashboard frame on `inline-size` on purpose, so without this a height unit
-    // would quietly measure the browser window instead of the card. Declaring it on our own root
-    // confines the risk to this one widget: the root is `h-full` inside a sized grid cell, so its
-    // height is definite, and if that ever stopped being true only this tile would suffer.
+    /*
+     * `containerType: size` makes THIS TILE the container the `cqh` units below resolve
+     * against. Core keeps the dashboard frame on `inline-size` on purpose, so without this a
+     * height unit would quietly measure the browser window instead of the card. Declared on our
+     * own root, the risk is confined to this one widget: the root fills its grid cell's full
+     * height, so the height is definite, and if that ever stopped being true only this tile
+     * would suffer.
+     */
     <div
       className="card flex h-full min-w-0 flex-col overflow-hidden p-2 @[8rem]:p-4"
       style={{ containerType: "size" }}
@@ -286,8 +232,8 @@ export default async function HostVitalsWidget({ ctx }: ModuleWidgetProps) {
       {/*
         The wrapper owns the conditional display, the grid owns the layout. They have to be two
         elements: the grid needs `minmax()`/`repeat()`, which only an inline style can express on
-        the versions this module supports, and an inline `display:grid` would override the
-        `@[8rem]:block` that hides the list on a tiny tile.
+        the versions this module supports, and an inline `display:grid` would override the class
+        that hides the list below the larger breakpoint.
       */}
       <div className="mt-2 hidden min-h-0 flex-1 @[8rem]:block">
         <dl className="h-full" style={{ ...FILL_GRID, color: "var(--muted)" }}>

@@ -1,4 +1,6 @@
 import type { ModulePageProps } from "@/lib/modules/types";
+// This page's only host access: the system-metrics helper's read-only surface. Its shape
+// (`Snapshot`) is rendered field-for-field below — see helpers/system-metrics/api.ts.
 import systemMetrics, { type Snapshot } from "@/helpers/system-metrics/api";
 import { bytes, clock, pct, rate, uptime, levelFor, TONE } from "./lib/format";
 import { collectFor } from "./lib/groups";
@@ -237,6 +239,10 @@ function Body({ m }: { m: Snapshot }) {
   );
 }
 
+/**
+ * The entry point core renders at /m/host-vitals.
+ * REFS addons/host-vitals/module.ts › Page
+ */
 export default async function HostVitalsPage({ ctx }: ModulePageProps) {
   // Only gather what the admin left switched on — a metric turned off is never sampled.
   const settings = await ctx.settings.all();

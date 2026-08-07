@@ -11,36 +11,19 @@ import {
 import type { RunLog } from "./logfile";
 
 /**
- * The copy engine.
+ * The copy engine — deliberately plain Node, no `robocopy`/`rsync`/shell: no command string
+ * to get quoting wrong in, identical behaviour on every platform, and it stays reviewable.
  *
- * Deliberately plain Node — no `robocopy`, no `rsync`, no shell. There is no command
- * string to get quoting wrong in, behaviour is identical on every platform, and the whole
- * thing stays reviewable.
+ * Two modes ship, neither deletes anything: `sync` copies what's new or changed (the
+ * destination only grows); `snapshot` copies into a dated folder of its own. `mirror`,
+ * which deletes, stays absent until its guards are tested against real failures rather
+ * than unit tests — see HELPER.md.
  *
- * Two modes ship, neither of which deletes anything:
- *
- *   sync      — copy what's new or changed. The destination only ever grows.
- *   snapshot  — copy into a dated folder of its own, leaving previous ones alone.
- *
- * `mirror`, which deletes, is deliberately absent until the guards it needs have been
- * tested against real failures rather than unit tests. See HELPER.md.
- *
- * ## Since 0.0.2: the source may be anything
- *
- * Broad sources like `C:\` used to be refused outright. They are now allowed, and the
- * protection moved onto the files themselves — every entry is checked against the secret
- * registry (`secrets.ts`) by file identity before it is read, and small files are checked
- * again by content before they are written. That means two things for this file:
- *
- *  - **The walk streams.** A generator, not an array: `C:\` has millions of entries and
- *    materialising them all before copying the first one is both slow to start and
- *    needlessly large in memory.
- *  - **Failures are counted, not accumulated.** A drive-wide run produces a lot of
- *    "permission denied" — locked files, other users' profiles, `System Volume
- *    Information`. Keeping every one in memory is how a backup tool runs the server out
- *    of it. A capped sample is kept for the UI; the full record goes to the log file.
+ * ⚠ The source may be ANYTHING, including `C:\` — protection lives on the files
+ * (`secrets.ts`), not on which sources are allowed. See `walkFiles` and `CopyResult` below.
  */
 
+/** REFS helpers/filesystem/api.ts */
 export type CopyMode = "sync" | "snapshot";
 
 export type CopyOptions = {
@@ -64,6 +47,7 @@ export type Progress = { filesDone: number; bytesDone: number; currentPath: stri
 /** How many individual errors/skips to hand back for display. The log file has them all. */
 export const MAX_RECORDED = 1000;
 
+/** REFS helpers/filesystem/api.ts */
 export type CopyPlan = {
   /** Files that would be created at the destination. */
   toCreate: string[];
@@ -78,12 +62,15 @@ export type CopyPlan = {
   destination: string;
 };
 
+/** REFS helpers/filesystem/api.ts */
 export type CopyResult = {
   state: "done" | "cancelled" | "failed";
   filesCopied: number;
   bytesCopied: number;
   destination: string;
-  /** A capped sample of per-file failures. One unreadable file must not abandon the backup. */
+  /** A capped sample of per-file failures — a drive-wide run can produce thousands
+   *  ("permission denied" on locked files, other users' profiles), and keeping them all
+   *  in memory is how a backup tool runs the server out of it. Full record in the log. */
   errors: { path: string; reason: string }[];
   /** The true total, which may exceed `errors.length`. */
   errorCount: number;
@@ -102,9 +89,11 @@ type Found = { rel: string; abs: string; st: Stats };
 type SkipSink = (rel: string, reason: string) => void;
 
 /**
- * Every file beneath `dir`, streamed. Symlinks are never followed, and anything the
- * registry recognises is stepped over — a protected DIRECTORY is skipped whole, so
- * `.data` costs one comparison rather than one per file inside it.
+ * Every file beneath `dir`, streamed — a generator, not an array, because a source like
+ * `C:\` can hold millions of entries and materialising them all before copying the first
+ * would be slow to start and needlessly large in memory. Symlinks are never followed, and
+ * anything the registry recognises is stepped over — a protected DIRECTORY is skipped
+ * whole, so `.data` costs one comparison rather than one per file inside it.
  *
  * The `stat` taken here is handed to the caller, so identity checking adds no I/O the
  * copy did not already need.
@@ -151,7 +140,10 @@ async function* walkFiles(
   }
 }
 
-/** Where a run will write. `snapshot` gets its own dated folder; `sync` writes in place. */
+/**
+ * Where a run will write. `snapshot` gets its own dated folder; `sync` writes in place.
+ * REFS helpers/filesystem/tests/copy.test.ts
+ */
 export function resolveDestination(dest: string, mode: CopyMode, now = new Date()): string {
   if (mode !== "snapshot") return dest;
   const stamp = now.toISOString().slice(0, 19).replace(/[:T]/g, "-");
@@ -161,6 +153,8 @@ export function resolveDestination(dest: string, mode: CopyMode, now = new Date(
 /**
  * A dry run: exactly what a real run would do, without doing any of it. This is what the
  * admin sees before pressing the button, and what makes a surprise impossible.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/copy.test.ts
  */
 export async function planCopy(
   source: string,
@@ -202,6 +196,9 @@ export async function planCopy(
 /**
  * Run the copy. Returns rather than throws for per-file problems: a single locked file
  * must not cost you the other ten thousand.
+ *
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/tests/copy.test.ts ·
+ *      helpers/filesystem/tests/secrets.test.ts
  */
 export async function runCopy(source: string, dest: string, opts: CopyOptions): Promise<CopyResult> {
   const destination = resolveDestination(dest, opts.mode);
@@ -223,9 +220,8 @@ export async function runCopy(source: string, dest: string, opts: CopyOptions): 
     errorCount: 1,
   });
 
-  // Re-check against the RESOLVED destination. A caller could have passed a pair that
-  // only overlaps once the dated subfolder is appended. Note the asymmetry: the source is
-  // checked only for being well-formed, the destination for where it is allowed to write.
+  // Re-checked against the RESOLVED destination — a pair can overlap only once the dated
+  // subfolder is appended. Asymmetric on purpose: source checked for well-formed only.
   const src = assertUsableAsSource(source);
   if (!src.ok) return fail(source, src.reason);
   const dst = assertUsableAsDestination(destination);
@@ -268,10 +264,8 @@ export async function runCopy(source: string, dest: string, opts: CopyOptions): 
         }
       }
 
-      // Tier 2, paid for only on files actually about to be written. A verbatim copy of a
-      // secret has its own identity, so tier 1 cannot see it — but its BYTES give it away.
-      // Checking here rather than during the walk means an unchanged file already sitting
-      // at the destination costs nothing.
+      // Tier 2, paid only for files about to be written — a copy's bytes give it away even
+      // though tier 1 cannot see it. Checked here, not the walk, so unchanged files cost nothing.
       if (opts.registry && st.size <= CONTENT_CHECK_MAX_BYTES) {
         let buf: Buffer | null = null;
         try {

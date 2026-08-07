@@ -27,10 +27,16 @@ function n(v: unknown): number {
   return typeof v === "bigint" ? Number(v) : Number(v ?? 0);
 }
 
+/** REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/engine.ts */
 export function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Bad JSON becomes {} rather than throwing, so no caller needs its own try/catch.
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/engine.ts ·
+ *      addons/health-monitor/ui/settings-panel.tsx
+ */
 export function parseConfig(row: Pick<MonitorRow, "configJson">): MonitorConfig {
   try {
     const parsed: unknown = JSON.parse(row.configJson || "{}");
@@ -42,18 +48,29 @@ export function parseConfig(row: Pick<MonitorRow, "configJson">): MonitorConfig 
 
 /* ---------------------------------------------------------------- monitors */
 
+/**
+ * REFS addons/health-monitor/module.ts · addons/health-monitor/page.tsx ·
+ *      addons/health-monitor/ui/settings-panel.tsx · addons/health-monitor/widget.tsx
+ */
 export async function listMonitors(db: Db): Promise<MonitorRow[]> {
   return db.query<MonitorRow>(
     `SELECT * FROM ${db.table("monitors")} ORDER BY sortOrder ASC, name ASC`,
   );
 }
 
+/**
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/engine.ts ·
+ *      addons/health-monitor/page.tsx
+ */
 export async function getMonitor(db: Db, id: string): Promise<MonitorRow | null> {
   const rows = await db.query<MonitorRow>(`SELECT * FROM ${db.table("monitors")} WHERE id = ?`, id);
   return rows[0] ?? null;
 }
 
-/** Monitors that are enabled and due (or have never run), oldest due first. */
+/**
+ * Monitors that are enabled and due (or have never run), oldest due first.
+ * REFS addons/health-monitor/lib/scheduler.ts
+ */
 export async function dueMonitors(db: Db, limit: number): Promise<MonitorRow[]> {
   return db.query<MonitorRow>(
     `SELECT * FROM ${db.table("monitors")}
@@ -65,6 +82,10 @@ export async function dueMonitors(db: Db, limit: number): Promise<MonitorRow[]> 
   );
 }
 
+/**
+ * Insert-or-update by id — the caller doesn't need to know which.
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/config.ts
+ */
 export async function upsertMonitor(
   db: Db,
   m: {
@@ -101,13 +122,19 @@ export async function upsertMonitor(
   );
 }
 
-/** Every monitor id in use — for generating a unique id for a new one. */
+/**
+ * Every monitor id in use — for generating a unique id for a new one.
+ * REFS addons/health-monitor/actions.ts
+ */
 export async function monitorIds(db: Db): Promise<string[]> {
   const rows = await db.query<{ id: string }>(`SELECT id FROM ${db.table("monitors")}`);
   return rows.map((r) => r.id);
 }
 
-/** Delete one monitor and everything recorded about it. */
+/**
+ * Delete one monitor and everything recorded about it.
+ * REFS addons/health-monitor/actions.ts
+ */
 export async function deleteMonitor(db: Db, id: string): Promise<void> {
   for (const table of ["results", "rollups", "incidents", "routes", "notifications"]) {
     await db.run(`DELETE FROM ${db.table(table)} WHERE monitorId = ?`, id);
@@ -115,7 +142,10 @@ export async function deleteMonitor(db: Db, id: string): Promise<void> {
   await db.run(`DELETE FROM ${db.table("monitors")} WHERE id = ?`, id);
 }
 
-/** Make a monitor due immediately, so the next tick picks it up. */
+/**
+ * Make a monitor due immediately, so the next tick picks it up.
+ * REFS addons/health-monitor/actions.ts
+ */
 export async function markDue(db: Db, id: string): Promise<void> {
   await db.run(`UPDATE ${db.table("monitors")} SET nextCheckAt = NULL WHERE id = ?`, id);
 }
@@ -134,6 +164,7 @@ export async function deleteMonitorsExcept(db: Db, keepIds: string[]): Promise<n
   return gone.length;
 }
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function saveCheckState(
   db: Db,
   id: string,
@@ -159,6 +190,7 @@ export async function saveCheckState(
 
 /* ----------------------------------------------------------------- results */
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function recordResult(
   db: Db,
   monitorId: string,
@@ -179,6 +211,7 @@ export async function recordResult(
   );
 }
 
+/** Newest first. REFS addons/health-monitor/page.tsx */
 export async function recentResults(db: Db, monitorId: string, limit: number): Promise<ResultRow[]> {
   return db.query<ResultRow>(
     `SELECT * FROM ${db.table("results")} WHERE monitorId = ? ORDER BY ts DESC LIMIT ?`,
@@ -202,6 +235,8 @@ export type UptimeStats = { checks: number; failures: number; degraded: number; 
  * hourly summaries that replaced older raw rows — so a 30-day figure stays correct after
  * a rollup. The window is resolved here rather than by the caller so that components
  * never have to read the clock during render.
+ *
+ * REFS addons/health-monitor/page.tsx
  */
 export async function uptimeWindow(db: Db, monitorId: string, hoursBack: number): Promise<UptimeStats> {
   return uptimeSince(db, monitorId, new Date(Date.now() - hoursBack * 3_600_000).toISOString());
@@ -252,12 +287,18 @@ async function uptimeSince(db: Db, monitorId: string, sinceIso: string): Promise
   };
 }
 
+/**
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/ui/parts.tsx ·
+ *      addons/health-monitor/widget.tsx
+ */
 export type HourBucket = { hour: string; checks: number; failures: number; degraded: number };
 
 /**
  * One bucket per hour for the last `hours`, merging raw results with rollups so the
  * strip keeps its shape after old results have been summarised. Hours with no data come
  * back with zero checks, which the UI draws as "no data" rather than as healthy.
+ *
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/widget.tsx
  */
 export async function hourlyBuckets(db: Db, monitorId: string, hours: number): Promise<HourBucket[]> {
   const since = new Date(Date.now() - hours * 3_600_000).toISOString();
@@ -294,11 +335,107 @@ export async function hourlyBuckets(db: Db, monitorId: string, hours: number): P
   return out;
 }
 
+/** REFS addons/health-monitor/ui/parts.tsx › LatencyChart() · SpeedChart() */
+export type LatencyBucket = {
+  hour: string;
+  /** null when no check ran in this hour — a gap, which is not the same as 0ms. */
+  avgMs: number | null;
+  p95Ms: number | null;
+  checks: number;
+  failures: number;
+  /** Speed readings, present only for a `speed` monitor. Averaged over the hour's samples. */
+  downMbps?: number;
+  upMbps?: number;
+  jitterMs?: number;
+};
+
+/**
+ * Hourly latency for the last `hours`, merging raw results with rollups the same way
+ * `hourlyBuckets` does, so the shape survives old results being summarised.
+ *
+ * ⚠ An hour with no checks comes back `null`, never 0 — zero reads as "instant", which is the
+ * opposite of what happened. The chart draws null as a break in the line.
+ * ⚠ p95 for a raw hour is computed from the actual samples, never derived from the average: a
+ * percentile guessed as a multiple of the mean is not a percentile. Rollups store a real one.
+ *
+ * REFS addons/health-monitor/page.tsx › MonitorDetail() ·
+ *      addons/health-monitor/lib/store.ts › rollupAndPrune() — the fold this must agree with
+ */
+export async function latencyBuckets(db: Db, monitorId: string, hours: number): Promise<LatencyBucket[]> {
+  const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+  const samples = await db.query<{ h: string; state: string; latencyMs: unknown; phasesJson: string | null }>(
+    `SELECT substr(ts, 1, 13) AS h, state, latencyMs, phasesJson
+       FROM ${db.table("results")} WHERE monitorId = ? AND ts >= ?`,
+    monitorId,
+    since,
+  );
+  const rolled = await db.query<{ h: string; c: unknown; f: unknown; a: unknown; p: unknown }>(
+    `SELECT substr(hourStart, 1, 13) AS h, checks AS c, failures AS f, avgMs AS a, p95Ms AS p
+       FROM ${db.table("rollups")} WHERE monitorId = ? AND hourStart >= ?`,
+    monitorId,
+    since,
+  );
+
+  // Raw wins where both exist: it is the finer record, and rollup only covers hours old
+  // enough to have been folded, so an overlap means the fold is mid-flight.
+  const byHour = new Map<string, LatencyBucket>();
+  for (const r of rolled) {
+    byHour.set(r.h, { hour: r.h, avgMs: r.a == null ? null : n(r.a), p95Ms: r.p == null ? null : n(r.p), checks: n(r.c), failures: n(r.f) });
+  }
+
+  const mean = (v: number[]) => (v.length ? Math.round((v.reduce((t, x) => t + x, 0) / v.length) * 10) / 10 : undefined);
+
+  type Group = { lat: number[]; down: number[]; up: number[]; jit: number[]; checks: number; failures: number };
+  const grouped = new Map<string, Group>();
+  for (const s of samples) {
+    const g = grouped.get(s.h) ?? { lat: [], down: [], up: [], jit: [], checks: 0, failures: 0 };
+    g.checks++;
+    if (s.state === "down") g.failures++;
+    if (s.latencyMs != null) g.lat.push(n(s.latencyMs));
+    // Speed readings ride in phasesJson. Bad JSON is ignored rather than thrown — one unreadable
+    // row must not blank an hour that has perfectly good samples beside it.
+    if (s.phasesJson) {
+      try {
+        const p = JSON.parse(s.phasesJson) as { downMbps?: number; upMbps?: number; jitterMs?: number };
+        if (typeof p.downMbps === "number") g.down.push(p.downMbps);
+        if (typeof p.upMbps === "number") g.up.push(p.upMbps);
+        if (typeof p.jitterMs === "number") g.jit.push(p.jitterMs);
+      } catch { /* not speed data, or truncated */ }
+    }
+    grouped.set(s.h, g);
+  }
+  for (const [h, g] of grouped) {
+    const sorted = g.lat.sort((a, b) => a - b);
+    const avg = sorted.length ? Math.round(sorted.reduce((t, v) => t + v, 0) / sorted.length) : null;
+    // Nearest-rank: the smallest sample at or above the 95th percentile position.
+    const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.95) - 1)] : null;
+    byHour.set(h, {
+      hour: h,
+      avgMs: avg,
+      p95Ms: p95,
+      checks: g.checks,
+      failures: g.failures,
+      downMbps: mean(g.down),
+      upMbps: mean(g.up),
+      jitterMs: mean(g.jit),
+    });
+  }
+
+  const out: LatencyBucket[] = [];
+  for (let i = hours - 1; i >= 0; i--) {
+    const h = new Date(Date.now() - i * 3_600_000).toISOString().slice(0, 13);
+    out.push(byHour.get(h) ?? { hour: h, avgMs: null, p95Ms: null, checks: 0, failures: 0 });
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- retention */
 
 /**
  * Fold raw results older than `afterDays` into one row per hour, then delete them, and
  * drop summaries past the retention limit. Keeps the table bounded without losing shape.
+ *
+ * REFS addons/health-monitor/lib/scheduler.ts
  */
 export async function rollupAndPrune(db: Db, afterDays: number, retentionDays: number): Promise<void> {
   const cutoff = new Date(Date.now() - afterDays * 86_400_000).toISOString();
@@ -342,6 +479,7 @@ export async function rollupAndPrune(db: Db, afterDays: number, retentionDays: n
 
 /* --------------------------------------------------------------- incidents */
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function openIncident(db: Db, monitorId: string, state: string, reason: string): Promise<IncidentRow | null> {
   await db.run(
     `INSERT INTO ${db.table("incidents")} (monitorId, state, startedAt, reason, notifyCount)
@@ -354,6 +492,7 @@ export async function openIncident(db: Db, monitorId: string, state: string, rea
   return currentIncident(db, monitorId);
 }
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function currentIncident(db: Db, monitorId: string): Promise<IncidentRow | null> {
   const rows = await db.query<IncidentRow>(
     `SELECT * FROM ${db.table("incidents")} WHERE monitorId = ? AND endedAt IS NULL ORDER BY startedAt DESC LIMIT 1`,
@@ -362,6 +501,7 @@ export async function currentIncident(db: Db, monitorId: string): Promise<Incide
   return rows[0] ?? null;
 }
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function closeIncident(db: Db, id: number, startedAt: string): Promise<void> {
   const ended = nowIso();
   const durationSec = Math.max(0, Math.round((Date.parse(ended) - Date.parse(startedAt)) / 1000));
@@ -373,6 +513,7 @@ export async function closeIncident(db: Db, id: number, startedAt: string): Prom
   );
 }
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function markIncidentNotified(db: Db, id: number): Promise<void> {
   await db.run(
     `UPDATE ${db.table("incidents")} SET lastNotifiedAt = ?, notifyCount = notifyCount + 1 WHERE id = ?`,
@@ -381,6 +522,7 @@ export async function markIncidentNotified(db: Db, id: number): Promise<void> {
   );
 }
 
+/** REFS addons/health-monitor/page.tsx */
 export async function listIncidents(db: Db, monitorId: string, limit: number): Promise<IncidentRow[]> {
   return db.query<IncidentRow>(
     `SELECT * FROM ${db.table("incidents")} WHERE monitorId = ? ORDER BY startedAt DESC LIMIT ?`,
@@ -389,6 +531,7 @@ export async function listIncidents(db: Db, monitorId: string, limit: number): P
   );
 }
 
+/** REFS addons/health-monitor/widget.tsx */
 export async function openIncidentCount(db: Db): Promise<number> {
   const rows = await db.query<{ c: unknown }>(
     `SELECT COUNT(*) AS c FROM ${db.table("incidents")} WHERE endedAt IS NULL`,
@@ -398,10 +541,12 @@ export async function openIncidentCount(db: Db): Promise<number> {
 
 /* ---------------------------------------------------------------- channels */
 
+/** REFS addons/health-monitor/actions.ts · addons/health-monitor/ui/settings-panel.tsx */
 export async function listChannels(db: Db): Promise<ChannelRow[]> {
   return db.query<ChannelRow>(`SELECT * FROM ${db.table("channels")} ORDER BY name ASC`);
 }
 
+/** REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/config.ts */
 export async function upsertChannel(
   db: Db,
   c: { id: string; name: string; kind: string; configEnc: string; enabled: number },
@@ -427,18 +572,25 @@ export async function deleteChannelsExcept(db: Db, keepIds: string[]): Promise<v
   }
 }
 
-/** Delete one channel and any monitor routings that pointed at it. */
+/**
+ * Delete one channel and any monitor routings that pointed at it.
+ * REFS addons/health-monitor/actions.ts
+ */
 export async function deleteChannel(db: Db, id: string): Promise<void> {
   await db.run(`DELETE FROM ${db.table("routes")} WHERE channelId = ?`, id);
   await db.run(`DELETE FROM ${db.table("channels")} WHERE id = ?`, id);
 }
 
+/** REFS addons/health-monitor/actions.ts */
 export async function getChannel(db: Db, id: string): Promise<ChannelRow | null> {
   const rows = await db.query<ChannelRow>(`SELECT * FROM ${db.table("channels")} WHERE id = ?`, id);
   return rows[0] ?? null;
 }
 
-/** The channel ids a monitor currently alerts through, for ticking the right boxes. */
+/**
+ * The channel ids a monitor currently alerts through, for ticking the right boxes.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export async function routeIdsFor(db: Db, monitorId: string): Promise<string[]> {
   const rows = await db.query<{ channelId: string }>(
     `SELECT channelId FROM ${db.table("routes")} WHERE monitorId = ?`,
@@ -447,6 +599,11 @@ export async function routeIdsFor(db: Db, monitorId: string): Promise<string[]> 
   return rows.map((r) => r.channelId);
 }
 
+/**
+ * Replaces the full set for this monitor — deletes its existing routes first, so this
+ * is not an incremental add.
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/lib/config.ts
+ */
 export async function setRoutes(db: Db, monitorId: string, channelIds: string[]): Promise<void> {
   await db.run(`DELETE FROM ${db.table("routes")} WHERE monitorId = ?`, monitorId);
   for (const channelId of channelIds) {
@@ -458,7 +615,10 @@ export async function setRoutes(db: Db, monitorId: string, channelIds: string[])
   }
 }
 
-/** The enabled channels a monitor alerts through. */
+/**
+ * The enabled channels a monitor alerts through.
+ * REFS addons/health-monitor/lib/engine.ts
+ */
 export async function channelsForMonitor(db: Db, monitorId: string): Promise<ChannelRow[]> {
   return db.query<ChannelRow>(
     `SELECT c.* FROM ${db.table("channels")} c
@@ -470,6 +630,7 @@ export async function channelsForMonitor(db: Db, monitorId: string): Promise<Cha
 
 /* ----------------------------------------------------------- notifications */
 
+/** REFS addons/health-monitor/lib/engine.ts */
 export async function logNotification(
   db: Db,
   entry: { monitorId: string; channelId: string; incidentId: number | null; event: string; ok: boolean; error?: string },
@@ -482,6 +643,10 @@ export async function logNotification(
   );
 }
 
+/**
+ * Excludes `event = 'test'` so a manual test-send never counts toward the real rate limit.
+ * REFS addons/health-monitor/lib/engine.ts
+ */
 export async function alertsInLastHour(db: Db): Promise<number> {
   const since = new Date(Date.now() - 3_600_000).toISOString();
   const rows = await db.query<{ c: unknown }>(
@@ -509,6 +674,8 @@ type MaintenanceRow = {
  * Whether a monitor is inside a quiet window right now — either a one-off range or a
  * weekly slot. Weekly windows are evaluated in the server's local time, which is the
  * time the person configuring them is thinking in.
+ *
+ * REFS addons/health-monitor/lib/engine.ts
  */
 export async function inMaintenance(db: Db, monitorId: string, at = new Date()): Promise<boolean> {
   const rows = await db.query<MaintenanceRow>(
@@ -533,6 +700,7 @@ export async function inMaintenance(db: Db, monitorId: string, at = new Date()):
   });
 }
 
+/** REFS addons/health-monitor/lib/config.ts */
 export async function upsertMaintenance(
   db: Db,
   w: {

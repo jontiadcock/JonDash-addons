@@ -7,6 +7,7 @@ import {
   upsertMaintenance,
   upsertMonitor,
 } from "./store";
+import { MAX_INTERVAL_SEC, MIN_INTERVAL_SEC } from "./types";
 
 /**
  * Bulk import.
@@ -27,10 +28,10 @@ const idSchema = z
 const monitorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(80),
-  kind: z.enum(["http", "tcp", "ping", "dns", "tls"]),
+  kind: z.enum(["http", "tcp", "ping", "dns", "tls", "speed"]),
   target: z.string().min(1).max(500),
   port: z.number().int().min(1).max(65535).optional(),
-  intervalSec: z.number().int().min(10).max(86_400).optional(),
+  intervalSec: z.number().int().min(MIN_INTERVAL_SEC).max(MAX_INTERVAL_SEC).optional(),
   timeoutMs: z.number().int().min(500).max(120_000).optional(),
   retries: z.number().int().min(0).max(10).optional(),
   degradedMs: z.number().int().min(1).max(120_000).optional(),
@@ -110,6 +111,8 @@ export type SyncOutcome = { applied: boolean; monitors: number; channels: number
  * would quietly delete everything someone had just created. So it now runs only when
  * asked, and it **only adds and updates — it never deletes**. Removing something is
  * done in the interface, where it can be confirmed.
+ *
+ * REFS addons/health-monitor/actions.ts · addons/health-monitor/module.ts
  */
 export async function importConfigJson(ctx: ModuleContext): Promise<SyncOutcome> {
   const db = ctx.db;
@@ -183,7 +186,10 @@ export async function importConfigJson(ctx: ModuleContext): Promise<SyncOutcome>
   return { applied: true, monitors: monitors.length, channels: channels.length, removed };
 }
 
-/** The last configuration error, for showing in the UI. */
+/**
+ * The last configuration error, for showing in the UI.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export async function lastConfigError(ctx: ModuleContext): Promise<string | null> {
   const v = await ctx.store.get("configError");
   return typeof v === "string" && v ? v : null;

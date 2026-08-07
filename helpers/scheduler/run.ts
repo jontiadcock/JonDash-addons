@@ -77,11 +77,13 @@ async function runJob(ctx: HelperBootContext, job: Job): Promise<void> {
   // A long run must not overlap itself; skip this tick instead of piling up.
   if (running.has(id)) return;
 
-  // Disabling a module does NOT restart the server, so its timer outlives it. Checked
-  // per tick rather than trusting the boot-time snapshot: otherwise a disabled module's
-  // job throws inside systemModuleContext on every tick and the isolated-failure
-  // handling faithfully logs it forever. Silent skip — a switched-off module doing
-  // nothing is correct, not an error. Re-enabling resumes it with no restart needed.
+  /*
+   * Disabling a module does NOT restart the server, so its timer outlives it. Checked per
+   * tick rather than trusting the boot-time snapshot: otherwise a disabled module's job
+   * throws inside systemModuleContext on every tick, and the isolated-failure handling
+   * faithfully logs it forever. Silent skip — a switched-off module doing nothing is
+   * correct, not an error; re-enabling resumes it with no restart needed.
+   */
   if (!(await isEnabled(job.moduleId))) return;
 
   running.add(id);
@@ -160,6 +162,7 @@ async function reconcile(ctx: HelperBootContext): Promise<void> {
  * Note there is no early return when nothing is scheduled yet: on a fresh install no
  * module declares a schedule, and giving up would leave this process unable to ever run
  * one — the first module enabled afterwards would sit idle until the next restart.
+ * REFS helpers/scheduler/helper.ts
  */
 export async function startScheduler(ctx: HelperBootContext): Promise<void> {
   const jobs = await currentJobs();

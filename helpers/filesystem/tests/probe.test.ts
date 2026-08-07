@@ -13,9 +13,8 @@ function scratch(): string {
 
 describe("validation never touches the network", () => {
   it("judges an unreachable UNC path instantly and identically every time", () => {
-    // The bug: `realpath` on a UNC path makes Windows try to reach the server, so the
-    // same call took 187ms or 5s depending on DNS caching — and changed its answer.
-    // Validation must be textual. 20 iterations well inside one network timeout.
+    // `realpath` on a UNC path makes Windows try to reach the server — validation must be
+    // textual and deterministic instead. 20 iterations, well inside one network timeout.
     if (!WIN) return;
     const p = String.raw`\\nas-that-does-not-exist-42\backups`;
     const started = Date.now();
@@ -74,10 +73,8 @@ describe("probeLocation — the explicit Test button", () => {
   });
 
   it("refuses a malformed path without ever touching the disk", async () => {
-    // Narrowed in 0.0.2. This used to assert that a SYSTEM directory was refused before
-    // any I/O — but a source may now be anywhere, so probing `C:\Windows` and reporting
-    // that it exists is the correct new answer. What must still short-circuit is a path
-    // that isn't a path: there is nothing to reach out to on its behalf.
+    // ⚠ A system directory is NOT refused — a source may be anywhere, so reporting that it
+    // exists is correct. What must short-circuit is a path that isn't one: nothing to reach for.
     for (const bad of ["not-absolute", "", "  "]) {
       const r = await probeLocation(bad);
       expect(r.ok, bad).toBe(false);

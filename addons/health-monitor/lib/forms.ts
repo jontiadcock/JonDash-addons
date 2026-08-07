@@ -1,4 +1,4 @@
-import type { ChannelKind, MonitorKind } from "./types";
+import { MAX_INTERVAL_SEC, MIN_INTERVAL_SEC, SPEED_ENDPOINT, type ChannelKind, type MonitorKind } from "./types";
 
 /**
  * Turning form fields into validated values, and the choices the forms offer.
@@ -31,8 +31,26 @@ export type KindChoice = {
   httpOptions?: boolean;
   /** Whether the self-signed certificate option is worth offering. */
   tlsOptions?: boolean;
+  /** Whether the speed-test extras apply — upload toggle, minimum rate, payload size. */
+  speedOptions?: boolean;
+  /**
+   * Whether the address may be left blank.
+   * ⚠ Must agree with `parseMonitorForm()`, which accepts a blank target for `speed`. A required
+   * input here would have the browser refuse a form the server was perfectly happy with, and the
+   * help text underneath says "leave blank" — so the field would contradict itself.
+   */
+  addressOptional?: boolean;
+  /**
+   * What this kind should default to when a monitor is created, overriding the global default.
+   * ⚠ Exists for `speed`, whose every run costs real bandwidth — a minute would be indefensible.
+   */
+  defaultIntervalSec?: number;
 };
 
+/**
+ * REFS addons/health-monitor/page.tsx · addons/health-monitor/ui/check-form.tsx ·
+ *      addons/health-monitor/ui/settings-panel.tsx
+ */
 export const KIND_CHOICES: KindChoice[] = [
   {
     value: "http",
@@ -84,19 +102,43 @@ export const KIND_CHOICES: KindChoice[] = [
     portHelp: "Leave blank for 443, the normal HTTPS port.",
     tlsOptions: true,
   },
+  {
+    value: "speed",
+    label: "Internet speed test",
+    hint: "Measures your download and upload speed, plus latency and jitter. Uses real data each run — about 20MB with upload on, 10MB without.",
+    addressLabel: "Test server",
+    addressPlaceholder: SPEED_ENDPOINT,
+    addressHelp: "Leave blank to use Cloudflare's public speed test. Change it to point at your own.",
+    port: "none",
+    speedOptions: true,
+    addressOptional: true,
+    // Every six hours: frequent enough to catch a real degradation, cheap enough to leave on.
+    defaultIntervalSec: 21_600,
+  },
 ];
 
-/** Intervals worth offering. Seconds under the hood, sentences on screen. */
+/**
+ * Intervals worth offering. Seconds under the hood, sentences on screen.
+ * REFS addons/health-monitor/ui/check-form.tsx
+ */
 export const INTERVAL_CHOICES: { value: number; label: string }[] = [
   { value: 30, label: "Every 30 seconds" },
   { value: 60, label: "Every minute" },
   { value: 300, label: "Every 5 minutes" },
   { value: 900, label: "Every 15 minutes" },
+  { value: 1800, label: "Every 30 minutes" },
   { value: 3600, label: "Every hour" },
+  { value: 10800, label: "Every 3 hours" },
   { value: 21600, label: "Every 6 hours" },
+  { value: 43200, label: "Every 12 hours" },
   { value: 86400, label: "Once a day" },
+  { value: 172800, label: "Every 2 days" },
+  { value: 259200, label: "Every 3 days" },
+  { value: 604800, label: "Once a week" },
 ];
 
+
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export const CHANNEL_CHOICES: { value: ChannelKind; label: string; needs: string }[] = [
   { value: "email", label: "Email", needs: "Uses the email account set up in Admin → Email. Leave the boxes empty to use the module's recipient list." },
   { value: "webhook", label: "Webhook (any service)", needs: "Needs the URL to POST to. The secret is sent as an Authorization header if you set one." },
@@ -113,7 +155,10 @@ const CHANNEL_KINDS = new Set(CHANNEL_CHOICES.map((c) => c.value));
 
 export type FormResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
-/** A readable id derived from the name, e.g. "My NAS box" → "my-nas-box". */
+/**
+ * A readable id derived from the name, e.g. "My NAS box" → "my-nas-box".
+ * REFS addons/health-monitor/actions.ts
+ */
 export function slugify(name: string): string {
   const slug = name
     .toLowerCase()
@@ -123,7 +168,10 @@ export function slugify(name: string): string {
   return slug || "monitor";
 }
 
-/** Make a slug unique against ids already in use, by appending -2, -3, … */
+/**
+ * Make a slug unique against ids already in use, by appending -2, -3, …
+ * REFS addons/health-monitor/actions.ts
+ */
 export function uniqueId(base: string, taken: Iterable<string>): string {
   const used = new Set(taken);
   if (!used.has(base)) return base;
@@ -161,6 +209,12 @@ export type MonitorInput = {
   insecureTls: boolean;
   expectStatus: string;
   channelIds: string[];
+  /** speed: leave the upload leg out, halving what a run costs. */
+  skipUpload: boolean;
+  /** speed: report `degraded` below this download rate. Blank or 0 never degrades. */
+  minMbps: number | null;
+  /** speed: megabytes to transfer per leg. */
+  payloadMb: number | null;
 };
 
 /**
@@ -168,6 +222,7 @@ export type MonitorInput = {
  *
  * The messages are the point: they say what to do, not what went wrong internally,
  * because this is the only feedback the person gets.
+ * REFS addons/health-monitor/actions.ts
  */
 export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   const name = text(fd, "name");
@@ -178,10 +233,16 @@ export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   if (!KINDS.has(kind)) return { ok: false, error: "Choose what to check." };
 
   const target = text(fd, "target");
-  if (!target) return { ok: false, error: "Enter an address to check." };
+  // A speed check is the one kind whose address may be blank — it falls back to the public
+  // endpoint, and demanding a URL for the common case would be pointless friction.
+  if (!target && kind !== "speed") return { ok: false, error: "Enter an address to check." };
   if (target.length > 500) return { ok: false, error: "That address is too long." };
 
-  if (kind === "http") {
+  if (kind === "speed") {
+    if (target && !/^https?:\/\//i.test(target)) {
+      return { ok: false, error: "A speed test server must start with http:// or https://" };
+    }
+  } else if (kind === "http") {
     if (!/^https?:\/\//i.test(target)) {
       return { ok: false, error: "A website address must start with http:// or https://" };
     }
@@ -203,7 +264,7 @@ export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   }
 
   const intervalSec = number(fd, "intervalSec");
-  if (intervalSec !== null && (intervalSec < 10 || intervalSec > 86_400)) {
+  if (intervalSec !== null && (intervalSec < MIN_INTERVAL_SEC || intervalSec > MAX_INTERVAL_SEC)) {
     return { ok: false, error: "Choose how often to check from the list." };
   }
 
@@ -225,6 +286,15 @@ export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
   const runbook = text(fd, "runbook");
   if (runbook.length > 500) return { ok: false, error: "That note is too long — keep it under 500 characters." };
 
+  const minMbps = number(fd, "minMbps");
+  if (minMbps !== null && (minMbps < 0 || minMbps > 100_000)) {
+    return { ok: false, error: "The minimum speed must be between 0 and 100000 Mbps." };
+  }
+  const payloadMb = number(fd, "payloadMb");
+  if (payloadMb !== null && (payloadMb < 1 || payloadMb > 100)) {
+    return { ok: false, error: "The amount to transfer must be between 1 and 100 MB." };
+  }
+
   return {
     ok: true,
     value: {
@@ -243,11 +313,17 @@ export function parseMonitorForm(fd: FormData): FormResult<MonitorInput> {
       insecureTls: text(fd, "insecureTls") === "on",
       expectStatus: text(fd, "expectStatus"),
       channelIds: fd.getAll("channelIds").filter((v): v is string => typeof v === "string" && v.length > 0),
+      skipUpload: text(fd, "skipUpload") === "on",
+      minMbps,
+      payloadMb,
     },
   };
 }
 
-/** Build the per-kind `config` blob from the validated form values. */
+/**
+ * Build the per-kind `config` blob from the validated form values.
+ * REFS addons/health-monitor/actions.ts
+ */
 export function monitorConfigFrom(input: MonitorInput): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   if (input.kind === "http") {
@@ -255,6 +331,13 @@ export function monitorConfigFrom(input: MonitorInput): Record<string, unknown> 
     if (input.insecureTls) config.insecureTls = true;
   }
   if (input.kind === "tls" && input.insecureTls) config.insecureTls = true;
+  if (input.kind === "speed") {
+    if (input.skipUpload) config.skipUpload = true;
+    if (input.minMbps) config.minMbps = input.minMbps;
+    // Stored as bytes because that is what the transfer works in; shown as MB because that is
+    // what a person thinks in.
+    if (input.payloadMb) config.payloadBytes = input.payloadMb * 1024 * 1024;
+  }
   return config;
 }
 
@@ -264,6 +347,10 @@ export type ChannelInput = {
   config: Record<string, unknown>;
 };
 
+/**
+ * Same validation shape as `parseMonitorForm` — see its note.
+ * REFS addons/health-monitor/actions.ts
+ */
 export function parseChannelForm(fd: FormData): FormResult<ChannelInput> {
   const name = text(fd, "name");
   if (!name) return { ok: false, error: "Give the channel a name." };

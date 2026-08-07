@@ -5,24 +5,19 @@ import net from "node:net";
 import tls from "node:tls";
 import dns from "node:dns";
 import type { ModuleContext } from "@/lib/modules/types";
-import type { CheckOutcome, MonitorConfig, MonitorKind, Phases } from "./types";
+import { SPEED_ENDPOINT, type CheckOutcome, type MonitorConfig, type MonitorKind, type Phases } from "./types";
 
 /**
- * The check runners. One function per monitor kind; each returns a CheckOutcome and
- * never throws — a failure is a result, not an exception, so one unreachable host can't
- * take down the scheduler.
+ * The check runners. One function per monitor kind; each returns a CheckOutcome and never
+ * throws, so one down host can't take down the scheduler.
  *
- * Why Node's clients rather than `ctx.fetch`: `fetch` can't report where the time went
- * (DNS vs connect vs TLS vs first byte), and can't speak TCP, ICMP, DNS or read a
- * certificate at all. So the checks use node:http(s)/net/tls/dns directly — but every
- * one of them is gated on `ctx.fetch` being present, i.e. on the admin having granted
- * `network:outbound`. Without that grant this module makes no outbound contact.
+ * Node's http(s)/net/tls/dns run directly, not `ctx.fetch` — it can't report per-phase
+ * timing or speak TCP/ICMP/DNS/certificates. Every runner still needs `ctx.fetch` to exist,
+ * so without `network:outbound` granted this module makes no outbound contact.
  *
- * Targets are admin-configured and private/LAN addresses are expected (that is the
- * point of a self-hosted dashboard), so there is no address blocklist. The guarantees
- * that do apply: http/https only, a hard deadline on every check, capped redirects, no
- * cookies or credentials, a capped response read, and a strict host pattern before any
- * hostname reaches the operating system.
+ * ⚠ Targets are admin-configured; LAN/private addresses are expected, so there is
+ * deliberately no address blocklist. Each guarantee (deadline, redirect/body caps, host
+ * pattern, no credentials) lives with its own code below instead of being promised here.
  */
 
 const MAX_REDIRECTS = 5;
@@ -92,6 +87,7 @@ function httpOnce(
     let tlsAt: number | undefined;
     let settled = false;
 
+    // No cookie jar or credentials beyond `cfg.headers` — a check observes, never authenticates.
     const options: https.RequestOptions = {
       method: (cfg.method ?? "GET").toUpperCase(),
       headers: { "user-agent": "JonDash-health-monitor", accept: "*/*", ...(cfg.headers ?? {}) },
@@ -158,9 +154,8 @@ async function runHttp(target: string, cfg: MonitorConfig, timeoutMs: number): P
       const remaining = Math.max(250, timeoutMs - Math.round(ms(startedAt)));
       const res = await httpOnce(url, cfg, remaining, startedAt);
 
-      // Follow redirects by default and judge the destination — a 302 is not an answer.
-      // The exception is a monitor that explicitly expects this 3xx, i.e. someone
-      // checking that a redirect is in place; then the redirect *is* the result.
+      // Redirects are followed unless the monitor explicitly expects this 3xx status — then
+      // the redirect itself is the result, not something to chase.
       const explicit = cfg.expectStatus !== undefined && cfg.expectStatus !== "";
       const wantsThisRedirect = explicit && statusMatches(res.status, cfg.expectStatus);
       const redirecting = res.status >= 300 && res.status < 400 && res.location;
@@ -331,6 +326,114 @@ async function runDns(host: string, cfg: MonitorConfig, timeoutMs: number): Prom
   return wantsSpecificAnswer ? runDnsQuery(host, cfg, timeoutMs) : runDnsLookup(host, timeoutMs);
 }
 
+const SPEED_DEFAULT_BYTES = 10 * 1024 * 1024;
+const SPEED_MAX_BYTES = 100 * 1024 * 1024;
+/** Latency samples per run. Enough for jitter to mean something, cheap enough to be free. */
+const JITTER_SAMPLES = 5;
+
+function mbps(bytes: number, elapsedMs: number): number {
+  if (elapsedMs <= 0) return 0;
+  return Math.round(((bytes * 8) / (elapsedMs / 1000) / 1e6) * 10) / 10;
+}
+
+/**
+ * Time a small request `JITTER_SAMPLES` times, sequentially.
+ *
+ * ⚠ Sequential on purpose. Run in parallel these would contend for the same link and measure
+ * each other rather than the connection, which is exactly the number jitter is supposed to expose.
+ */
+async function latencyAndJitter(base: string, timeoutMs: number): Promise<{ latencyMs: number; jitterMs: number } | null> {
+  const samples: number[] = [];
+  for (let i = 0; i < JITTER_SAMPLES; i++) {
+    const started = process.hrtime.bigint();
+    try {
+      const res = await fetch(`${base}/__down?bytes=0&n=${i}`, {
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: "no-store",
+      });
+      await res.arrayBuffer();
+      samples.push(ms(started));
+    } catch {
+      // One lost sample is not a failed check — the transfer legs decide that.
+    }
+  }
+  if (!samples.length) return null;
+  const mean = samples.reduce((t, v) => t + v, 0) / samples.length;
+  // Mean absolute deviation, not standard deviation: it is the average wobble in milliseconds,
+  // which is the thing a person reading "jitter" expects.
+  const jitter = samples.reduce((t, v) => t + Math.abs(v - mean), 0) / samples.length;
+  return { latencyMs: Math.round(mean), jitterMs: Math.round(jitter * 10) / 10 };
+}
+
+/**
+ * Measure the connection: download, optionally upload, plus latency and jitter.
+ *
+ * ⚠ SPENDS REAL BANDWIDTH on every run — the only check here that costs the user something to
+ * execute. `payloadBytes` is capped and the default interval is hours, not the usual minute.
+ * Treat raising either as a change to somebody's data bill.
+ *
+ * `down` means the transfer genuinely failed; a slow-but-working line is `degraded`.
+ *
+ * REFS addons/health-monitor/lib/forms.ts › KIND_CHOICES — the per-run cost shown to the user
+ */
+async function runSpeed(target: string, cfg: MonitorConfig, timeoutMs: number): Promise<CheckOutcome> {
+  const base = (target?.trim() || SPEED_ENDPOINT).replace(/\/+$/, "");
+  if (!parseHttpUrl(base)) return down("invalid endpoint");
+  const bytes = Math.min(Math.max(cfg.payloadBytes ?? SPEED_DEFAULT_BYTES, 64 * 1024), SPEED_MAX_BYTES);
+
+  const latency = await latencyAndJitter(base, timeoutMs);
+
+  let downMbps: number;
+  const dlStart = process.hrtime.bigint();
+  try {
+    const res = await fetch(`${base}/__down?bytes=${bytes}`, {
+      signal: AbortSignal.timeout(timeoutMs),
+      cache: "no-store",
+    });
+    if (!res.ok) return down(`download failed`, String(res.status));
+    const body = await res.arrayBuffer();
+    downMbps = mbps(body.byteLength, ms(dlStart));
+  } catch (e) {
+    return down(e instanceof Error ? e.message : "download failed");
+  }
+
+  let upMbps: number | undefined;
+  if (!cfg.skipUpload) {
+    const upStart = process.hrtime.bigint();
+    try {
+      const res = await fetch(`${base}/__up`, {
+        method: "POST",
+        body: new Uint8Array(bytes),
+        signal: AbortSignal.timeout(timeoutMs),
+        cache: "no-store",
+      });
+      // An endpoint that refuses uploads is not a broken connection. Report the download and
+      // leave `upMbps` absent, which the chart draws as "not measured" rather than as zero.
+      if (res.ok) upMbps = mbps(bytes, ms(upStart));
+    } catch {
+      // Same reasoning: the download already proved the link works.
+    }
+  }
+
+  const floor = cfg.minMbps ?? 0;
+  const parts = [`${downMbps} Mbps down`];
+  if (upMbps !== undefined) parts.push(`${upMbps} up`);
+  if (latency) parts.push(`${latency.latencyMs}ms, ${latency.jitterMs}ms jitter`);
+
+  return {
+    state: floor > 0 && downMbps < floor ? "degraded" : "up",
+    latencyMs: latency?.latencyMs,
+    code: `${downMbps}`,
+    message: parts.join(" · "),
+    phases: {
+      totalMs: latency?.latencyMs ?? 0,
+      downMbps,
+      upMbps,
+      jitterMs: latency?.jitterMs,
+    },
+  };
+}
+
 /**
  * Read the certificate a host presents. Validation is deliberately not enforced here —
  * an expired or self-signed certificate is exactly what we want to report on, and a
@@ -404,6 +507,8 @@ const MAX_CODE = 64;
  * certificate's issuer field and a socket error message all end up in the UI, in an
  * email and in a webhook body. So every outcome is length-capped and stripped of control
  * characters at this one boundary, rather than trusting each runner to behave.
+ *
+ * REFS addons/health-monitor/tests/checks.test.ts
  */
 export function sanitise(outcome: CheckOutcome): CheckOutcome {
   const clean = (s: string | undefined, max: number) => {
@@ -420,6 +525,8 @@ export function sanitise(outcome: CheckOutcome): CheckOutcome {
 /**
  * Run one check. `ctx.fetch` is the permission gate: it exists only when the admin
  * granted `network:outbound`, so without it nothing reaches the network.
+ *
+ * REFS addons/health-monitor/lib/engine.ts · addons/health-monitor/tests/checks.test.ts
  */
 export async function runCheck(
   ctx: ModuleContext,
@@ -442,6 +549,10 @@ export async function runCheck(
       return sanitise(await runDns(monitor.target, cfg, timeoutMs));
     case "tls":
       return sanitise(await runTls(monitor.target, monitor.port ?? 443, cfg, timeoutMs, certWarnDays));
+    case "speed":
+      // A transfer needs far longer than a liveness probe: 10MB on a slow line is minutes, and the
+      // usual 10s timeout would report a working connection as down.
+      return sanitise(await runSpeed(monitor.target, cfg, Math.max(timeoutMs, 120_000)));
     default:
       return down(`unknown check type: ${String(monitor.kind)}`);
   }

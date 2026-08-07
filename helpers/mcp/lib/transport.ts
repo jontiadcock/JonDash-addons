@@ -7,38 +7,16 @@ import { rateLimit } from "@/lib/security/rate-limit";
 import { getPort, isEnabled, isNetworkExposed, type RefusalReason } from "./keys";
 
 /**
- * The MCP endpoint. **Streamable HTTP, protocol revision 2025-11-25.**
+ * The MCP endpoint — Streamable HTTP, protocol revision 2025-11-25 (`PROTOCOL_VERSION`; re-read
+ * the spec if it moves, don't assume the diff is cosmetic).
  *
- * Built against the spec text, read at build time rather than from memory — and that mattered: the
- * revision in my training data (2025-06-18) is superseded, and the current one adds a normative
- * `MUST` to answer **403** on a bad `Origin`, plus a rename of the session header.
- * `PROTOCOL_VERSION` below records exactly what this was written against; when it moves, re-read
- * the spec rather than assuming the difference is cosmetic.
+ * Single POST+GET endpoint, nothing streamed (POST returns JSON, GET is 405 — spec-legal for a
+ * server with no SSE), no session management — the key already IS the identity.
  *
- * ## What this implements, and what it deliberately does not
- *
- * A single endpoint on POST and GET, as required. Nothing here streams — every tool returns a value
- * and returns it now — so POST answers `application/json` rather than opening SSE, and **GET
- * answers 405**, which the spec explicitly permits for a server that offers no SSE stream. That
- * removes resumability, event IDs and stream correlation from the surface entirely: three sources
- * of bugs bought for no capability we need.
- *
- * No session management either. `MCP-Session-Id` is a MAY, and sessions would be a second identity
- * mechanism sitting beside the key — the key already *is* the identity, and one is safer than two.
- *
- * ## The security requirements are the spec's own
- *
- * From the Streamable HTTP security warning, verbatim in force here:
- *
- *   1. Servers **MUST** validate `Origin` on all incoming connections — and answer **403** when it
- *      is present and invalid. This is the DNS-rebinding defence: a web page the operator visits can
- *      make their browser POST to 127.0.0.1, and no amount of TLS prevents it.
- *   2. When local, servers **SHOULD** bind only to 127.0.0.1.
- *   3. Servers **SHOULD** implement proper authentication.
- *
- * This helper treats all three as hard requirements, and adds one of its own: **an unauthenticated
- * caller learns nothing** — not the tool list, not whether a key was close, not whether an account
- * exists. Every rejection is the same status, the same body, and the same shape.
+ * ⚠ Spec's security requirements, treated as hard requirements, plus one of ours: MUST validate
+ * `Origin` and 403 an invalid one (DNS-rebinding defence); SHOULD bind only to 127.0.0.1 when
+ * local; SHOULD authenticate properly; and (ours) an unauthenticated caller learns NOTHING — same
+ * status, body and shape for every rejection, whether there's no key, a bad one, or no account.
  */
 
 const PROTOCOL_VERSION = "2025-11-25";
@@ -50,20 +28,15 @@ const MCP_PATH = "/mcp";
 const MAX_BODY_BYTES = 256 * 1024;
 
 /**
- * **The listener is held on `globalThis`, not in a module variable. (AB-01.)**
+ * ⚠ The listener lives on `globalThis`, never a module variable — a plain `let server` is per
+ * *module instance*, and Next.js loads this file more than once. The boot instance (holding the
+ * real socket) and a server-action instance (still `null`) would each believe themselves
+ * authoritative: `stopListener()` finds nothing to close, `startListener()` binds again, and the
+ * machine ends up with two live listeners neither instance knows about — changing the port would
+ * leave the old one serving, and `isListening()` would lie to the settings page.
  *
- * A plain `let server` is per *module instance*, and Next.js loads this file more than once — the
- * copy `instrumentation.ts` uses at boot is not the copy a server action gets. So the boot instance
- * held the socket while `onSettingsSubmit` ran against a second instance whose `server` was still
- * `null`: `stopListener()` saw nothing to close and returned immediately, `startListener()` bound
- * the new port, and the machine ended up with **two live listeners neither instance knew about**.
- *
- * That is why changing the port left the old one serving, and why it survived a fix aimed at
- * keep-alive connections — the close was never reached at all. The same duplication would also make
- * `isListening()` lie to the settings page.
- *
- * A `globalThis` singleton is the standard answer to this in Next (it is what the Prisma client
- * does here) and the only one that makes "is there a listener?" a question with one answer.
+ * `globalThis` is the standard fix in Next (Prisma's client does the same here) and the only way
+ * to make "is there a listener?" a question with one answer.
  */
 const HANDLE = Symbol.for("jondash.helper.mcp.listener");
 type Holder = { server: Server | null };
@@ -85,19 +58,12 @@ async function recordRefusal(ip: string, reason: RefusalReason): Promise<void> {
 }
 
 /**
- * **Per-source backoff, then a temporary block.** (Pentest finding F1, 2026-07-27.)
+ * Per-source backoff, then a temporary block, via core's `rateLimit()` — the same sliding window
+ * already used for login, setup and account actions, rather than a second implementation living
+ * in an add-on.
  *
- * This was documented and surfaced in the UI — the `blocked` refusal reason and its
- * "Too many attempts — temporarily blocked" label both existed — and **nothing ever set it**. A
- * control that is described, typed, given a label, and never written is worse than one that was
- * never claimed: 500 concurrent bad keys were answered instantly, while the settings page implied
- * they would not be.
- *
- * Counting is core's `rateLimit()` — the same sliding window it already uses for login, setup and
- * account actions — rather than a second implementation of the same idea living in an add-on.
- *
- * **Only FAILURES are counted.** A client holding a correct key never fails, so a legitimate
- * assistant can never throttle itself no matter how busy it is. Twenty failures in a minute from
+ * ⚠ Only FAILURES are counted. A client holding a correct key never fails, so a legitimate
+ * assistant can never throttle itself no matter how busy it is — twenty failures in a minute from
  * one source is not a busy client, it is someone trying keys.
  */
 const AUTH_FAILURE_LIMIT = 20;
@@ -131,9 +97,8 @@ function isBlocked(ip: string): boolean {
 function reject(res: ServerResponse, status: number, ip: string, reason: RefusalReason): void {
   void recordRefusal(ip, reason);
 
-  // `blocked` is the block being served; counting it would extend the block for free every time a
-  // blocked caller retries, which is a self-inflicted denial of service on a legitimate client
-  // that has merely misconfigured its key.
+  // `blocked` is the block already being served; counting it would extend it for free on every
+  // retry — a self-inflicted DoS on a client that merely misconfigured its key.
   if (reason !== "blocked") {
     const verdict = rateLimit(`mcp:auth:${ip}`, AUTH_FAILURE_LIMIT, AUTH_FAILURE_WINDOW_MS);
     if (!verdict.allowed) blockedUntil.set(ip, Date.now() + verdict.retryAfterSec * 1000);
@@ -197,6 +162,7 @@ function readBody(req: IncomingMessage): Promise<string | null> {
   });
 }
 
+/** REFS helpers/mcp/lib/dispatch.ts */
 export type Dispatch = (
   message: { method?: string; id?: unknown; params?: unknown },
   auth: { presentedKey: string | undefined; ip: string },
@@ -208,6 +174,7 @@ export type Dispatch = (
  * **Returns without starting when disabled or when no key exists.** "Installed" and "listening" are
  * different states — a fresh install binds no port at all, and a port with no key behind it is a
  * surface with nothing to protect but every reason to be probed.
+ * REFS helpers/mcp/helper.ts
  */
 export async function startListener(dispatch: Dispatch): Promise<{ started: boolean; port?: number }> {
   if (holder.server) {
@@ -223,27 +190,16 @@ export async function startListener(dispatch: Dispatch): Promise<{ started: bool
   if (Number(keyCount[0]?.n ?? 0) === 0) return { started: false };
 
   /**
-   * **A disabled add-on must not leave a live endpoint behind.**
+   * ⚠ A disabled add-on must not leave a live endpoint behind — unlike most helpers, this one
+   * listens whether any module calls it or not, so "AI assistant access" off in Addons must
+   * actually mean off.
    *
-   * `bootHelpers()` used to ignore module state — a helper is not its carrier — and for every other
-   * helper that is right, because they only act when a module calls them. This one is different: it
-   * listens on a port whether any module ever calls it or not. Without this check, an admin who
-   * switched "AI assistant access" off in Addons had done nothing at all, and the screen they used
-   * said nothing to the contrary. Someone reasonably believes they closed the door.
-   *
-   * **Core fixed this centrally in 1.7.3-beta.4** and this check stays anyway, per HELPERS-DESIGN
-   * rule 12: fail closed yourself rather than assume core got there first. They cannot conflict —
-   * both only ever refuse to open a socket — and this helper's floor is 1.7.3-beta.2, so it must
-   * still hold on a core that predates the fix.
-   *
-   * Phrased over dependents rather than the id `mcp-server`, so it stays true if this helper is
-   * ever carried by something else, and so it means what it says: nothing enabled needs this, so
-   * nothing listens. It can only ever refuse to start — no arrangement of module state can cause
-   * an endpoint that `isEnabled()` and the key count would not already have allowed.
-   *
-   * The switch in the helper's own settings remains the real control, and stays reachable: the
-   * Shared capabilities section lists a helper by whether a module *depends* on it, not by whether
-   * that module is enabled. So this is recoverable from the same screen that shows it.
+   * Core fixed this centrally in 1.7.3-beta.4; this stays too, per HELPERS-DESIGN rule 12 (fail
+   * closed yourself) — the two cannot conflict, since both only ever refuse to open a socket.
+   * Phrased over dependents, not the id `mcp-server`, so it can only ever refuse to start, never
+   * open something `isEnabled()` and the key count would not already allow. The real, recoverable
+   * control is still the settings switch, reachable via Shared capabilities regardless of enabled
+   * state.
    */
   const dependents = dependentsOf("mcp");
   const liveDependents = await prisma.module.count({
@@ -267,24 +223,18 @@ export async function startListener(dispatch: Dispatch): Promise<{ started: bool
 }
 
 /**
- * Stop listening, and **actually release the port**. (AB-01.)
- *
- * `server.close()` alone is not enough, and the way it fails is quiet. It stops *accepting* new
- * connections and resolves only once every existing one has ended — so a single held keep-alive
- * socket keeps the old port bound indefinitely. Changing the port then opened the new one and left
- * the old one listening, on the same process, until the next restart.
- *
- * **That is the ordinary state of a connected MCP client, not an edge case.** Which is why every
- * earlier port test passed: they changed the port with nothing connected, the socket closed
- * instantly, and the bug could not appear.
+ * Stop listening, and ⚠ actually release the port. `server.close()` alone is not enough, and
+ * fails quietly: it only stops *accepting* new connections and resolves once every existing one
+ * has ended, so a single held keep-alive socket keeps the old port bound indefinitely — changing
+ * the port then leaves the old one listening until the next restart.
  *
  * So: end the connections rather than wait for them, and bound the close so a stuck socket can
- * never leave this function hanging — an admin switching the port off a exposed interface must not
- * depend on a client behaving well. The reference is dropped either way, because a `server` that
+ * never leave this function hanging. The reference is dropped either way, because a `server` that
  * cannot be closed must still never be reused.
  */
 const CLOSE_TIMEOUT_MS = 3_000;
 
+/** REFS helpers/mcp/helper.ts */
 export async function stopListener(): Promise<void> {
   if (!holder.server) return;
   const s = holder.server;
@@ -301,6 +251,7 @@ export async function stopListener(): Promise<void> {
   ]);
 }
 
+/** REFS helpers/mcp/api.ts · helpers/mcp/ui/settings-panel.tsx */
 export const isListening = () => holder.server !== null;
 
 async function handle(
@@ -312,12 +263,8 @@ async function handle(
 ): Promise<void> {
   const ip = req.socket.remoteAddress ?? "unknown";
 
-  // --- a source serving a block does no work at all --------------------------
-  //
-  // Before parsing, before the Origin check, before any database access: the whole point is that a
-  // caller who has already failed twenty times in a minute stops being able to spend this server's
-  // time. Answered 429 rather than the standard 401 — that is the honest status, and it reveals
-  // nothing about keys, only about a request count the caller already knows.
+  // A blocked source does no work at all — before parsing, the Origin check, or any DB access.
+  // Answered 429, not 401: the honest status, revealing only a request count the caller knows.
   if (isBlocked(ip)) {
     return reject(res, 429, ip, "blocked");
   }
@@ -358,11 +305,8 @@ async function handle(
     return;
   }
 
-  // --- authentication, before the body is even read --------------------------
-  //
-  // A caller with no key does not get to submit JSON for us to parse, and does not get to learn
-  // that `tools/list` exists. The tool list is behind auth deliberately: an unauthenticated caller
-  // must not be able to enumerate what this install can do.
+  // Authenticated before the body is even read — no key means no JSON parsed, and no learning
+  // that `tools/list` exists: the list sits behind auth so a caller cannot enumerate this install.
   const authHeader = (req.headers.authorization as string | undefined) ?? "";
   const presentedKey = authHeader.toLowerCase().startsWith("bearer ")
     ? authHeader.slice(7).trim()

@@ -90,10 +90,8 @@ describe("isSafeBase", () => {
   });
 
   it("gives the same answer every time it is asked", () => {
-    // Regression: `isSafeBase` shared a `g`-flagged regex with `sanitiseBase`, and `.test()`
-    // on a global regex resumes from `lastIndex` — so repeated calls ALTERNATED between
-    // true and false. A backstop check that lapses on every other call is worse than none,
-    // because it passes whenever you look at it.
+    // Regression: `isSafeBase` shared a `g`-flagged regex with `sanitiseBase`; `.test()` on a
+    // global regex resumes from `lastIndex`, so repeated calls ALTERNATED true and false.
     for (let i = 0; i < 5; i++) {
       expect(isSafeBase("a b")).toBe(false);
       expect(isSafeBase("Plex")).toBe(true);

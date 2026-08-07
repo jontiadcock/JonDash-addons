@@ -5,24 +5,16 @@ import { isListening } from "./lib/transport";
 import { allTools } from "./lib/tools";
 
 /**
- * The ENTIRE surface a module may reach — status, and nothing else.
+ * The ENTIRE surface a module may reach — status, and nothing else. No mutator here, ever.
  *
- * > **A module can see that an assistant has access. It can never grant, change or revoke it.**
+ * ⚠ HELPERS-DESIGN rule 8 — `host-services` and `filesystem` both once let a bounded module edit
+ * its own confinement. Minting a key is worse: it hands out a credential.
  *
- * There is no mutator here and there must never be one. HELPERS-DESIGN rule 8, learned twice the
- * hard way: `host-services` and `filesystem` both once exposed their own editors to the modules
- * they bounded, which let the thing being confined edit its own confinement. Minting a key is
- * strictly more dangerous than either — it hands out a credential — so this file exists to be
- * deliberately, permanently boring.
- *
- * ## Absent, and must stay absent
- *
- *  - **Anything that mints, revokes or re-modes a key.** Admin → Addons → Shared capabilities, where `ctx.user`
- *    comes from the session.
- *  - **The key itself, or its hash.** `keyCount` is a number. Even the display hint stays out — a
- *    module has no use for it and it is one step closer to a credential than a count is.
- *  - **Switching the endpoint on, or changing where it listens.**
- *  - **Anything an assistant read.** Tool output goes to the agent that asked, never into a module.
+ * Absent, and must stay absent:
+ *  - Minting, revoking or re-moding a key — that is Admin → Addons → Shared capabilities.
+ *  - The key itself or its hash — `keyCount` is a number; even the display hint stays out.
+ *  - Switching the endpoint on, or changing where it listens.
+ *  - Anything an assistant read — tool output goes to the agent that asked, never a module.
  */
 
 export type McpStatus = {
@@ -98,4 +90,5 @@ const api: HelperApiFor<McpApi> = (ctx: ModuleContext) => ({
   },
 });
 
+/** REFS addons/mcp-server/page.tsx · addons/mcp-server/ui/widget.tsx */
 export default api;

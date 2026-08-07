@@ -7,54 +7,38 @@ import { uninstallPackage } from "@/lib/elevation";
  * Host install helper — installs and removes software, with the administrator approving every
  * single time.
  *
- * **Why this is a separate helper from `host-services`, and must stay separate:** a module
- * inherits every capability of every helper it declares. Folding installing into
- * `host-services` would make `service-control`'s consent screen say "can install software on
- * your machine" for a module that only restarts Plex — permanently, and for every future
- * consumer. A genuinely different power needs a different helper, not a wider one.
- *
- * The elevation models differ too, and that difference is the rule in `../ELEVATION.md`:
- * a service action is FIXED, so it can be granted once; a package name is VARIABLE, so there
- * is nothing to bake into a grant and every install must be approved as it happens.
- *
- * **This is weaker than grants, and the docs must not pretend otherwise.** A grant runs one
- * fixed command that cannot take arguments. An installer runs the vendor's code as
- * administrator by definition. The bound here is "anything in the winget catalogue" — real,
- * but far broader — so JonDash's own screen, showing the package id verbatim, is the only
- * place the admin can actually see what they are agreeing to. UAC names
- * `jondash-elevate.exe` and nothing else.
+ * ⚠ Kept separate from `host-services`, permanently — a module inherits every capability of
+ * every helper it declares, so merging them would give `service-control` "can install
+ * software" forever. Elevation differs too: a service action is FIXED and grantable once; a
+ * package name is VARIABLE and approved live every time (`../ELEVATION.md`).
+ * ⚠ Weaker than a grant — say so, don't pretend otherwise. An installer runs the vendor's code
+ * as administrator over the whole winget catalogue; JonDash's own screen, showing the package
+ * id verbatim, is the only place the admin actually sees what they're agreeing to.
  */
 const helper: HelperDefinition = {
   id: "host-install",
   name: "Install software",
   description:
     "Installs and removes software on this server using Windows' own package manager, with your permission each time. JonDash only ever offers to remove software it installed itself.",
-  version: "0.0.4",
-  // The package API arrived in 1.7.1-beta.7, but CORE-10's `label` / `risk` raise the floor
-  // again: optional to omit, not to declare — on a 1.7.1 clone they fail to compile (TS2353),
-  // and a helper compiles into the app, so that is a failed build rather than a plainer screen.
-  //
-  // The PRE-RELEASE, not a bare "1.7.2": semver ranks a pre-release below its release, so
-  // "1.7.2" would be refused on every 1.7.2 beta — the builds beta users run.
+  version: "0.0.5",
+  // Raised by CORE-10's optional `label`/`risk` (an older core fails to compile, TS2353). Must
+  // stay the PRE-RELEASE string — a bare "1.7.2" would be refused on every 1.7.2 beta build.
   minAppVersion: "1.7.2-beta.1",
 
   /**
-   * Two capabilities, split for honesty. Checking whether something is installed is a
-   * read; installing it is running a vendor's code as administrator. They do not belong in
-   * one sentence, and a consumer that only needs the first should not have to disclose the
-   * second.
-   *
-   * The manage label deliberately says "with your permission each time" — unlike
-   * `host-services`, that is a property of the capability rather than a setting, because
-   * there is no grant model here to switch off.
+   * Two capabilities, split for honesty: checking whether something is installed is a read,
+   * installing it is running a vendor's code as administrator, and a consumer that only needs
+   * the first shouldn't have to disclose the second. The manage label says "with your
+   * permission each time" as a property of the capability, not a setting — unlike
+   * `host-services`, there is no grant model here to switch off.
    */
+
   /**
-   * No `scope`, and no `unbounded`, for the same structural reason `host-services:control` has
-   * no unbounded: there is nothing to make one out of. Every install is approved individually
-   * at the moment it runs, with the package name on screen and a UAC prompt behind it — the
-   * bound is the per-request approval, not a stored list, so there is no set for core to render
-   * and no "allow everything" that would mean anything. Adding a package allowlist here would
-   * describe a gate that the request flow already applies one request at a time.
+   * ⚠ No `scope`, no `unbounded` — same reason `host-services:control` has no unbounded: there
+   * is nothing to make one out of. Every install is approved individually as it runs, package
+   * name on screen with a UAC prompt behind it; the bound IS the per-request approval, not a
+   * stored list. A package allowlist here would just describe a gate the request flow already
+   * applies one request at a time.
    */
   provides: [
     {

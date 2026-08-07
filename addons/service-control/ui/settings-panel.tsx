@@ -7,14 +7,11 @@ import { noticeColour, readNotice } from "../lib/notice";
  * What this module can honestly show about its own use of the helper: the approved services,
  * and the requests it has raised.
  *
- * **The allowlist editor is not here, and must never come back.** It lived here for one
- * release, which meant this module supplied the service name being approved — so it could
- * display "Add Plex" and submit `sshd`, and the Windows prompt names JonDash rather than the
- * service. The thing being bounded could edit its own boundary.
- *
- * Editing now happens on **Admin → Permissions**, rendered by JonDash itself with
- * no module in the path. That is HELPERS-DESIGN rule 8: a helper's module-facing API carries
- * read and request, never add, remove or approve.
+ * ⚠ The allowlist editor is not here, and must never come back — it lived here for one release,
+ * so this module supplied the service name being approved and could display "Add Plex" while
+ * submitting `sshd`. Editing now happens on Admin → Permissions, rendered by JonDash itself
+ * with no module in the path (HELPERS-DESIGN rule 8: read and request, never add/remove/approve).
+ * REFS addons/service-control/module.ts
  */
 export default async function ServiceControlSettings({ ctx }: ModuleSettingsPanelProps) {
   const api = hostServices(ctx);

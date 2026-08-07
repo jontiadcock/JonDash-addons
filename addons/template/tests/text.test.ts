@@ -4,19 +4,14 @@ import { normaliseItemText, pluralise, MAX_ITEM_LENGTH } from "../lib/text";
 /**
  * Tests ship with the module, and the installer's verifier scans them like any other file.
  *
- * So a test may NOT import `prisma`, `@/lib/db`, `@/lib/crypto` or the framework's
- * internals, may not touch `node:fs`, and may not read `process.env` — even though a test
- * feels like a safe place for all of them.
+ * ⚠ A test may NOT import `prisma`, `@/lib/db`, `@/lib/crypto` or the framework's internals,
+ * touch `node:fs`, or read `process.env` — even though a test feels like a safe place for all
+ * of them. One offending line fails the WHOLE MODULE'S verification and blocks install, even
+ * though it still typechecks, lints, builds and passes under Vitest — nothing else models the
+ * verifier. Already cost one published release (`backup-manager@0.1.1-beta.1`).
  *
- * **The consequence is the whole module, not the test.** One offending line and the module
- * fails verification and cannot be installed at all — while still typechecking, linting,
- * building and passing under Vitest. Nothing you normally run models the verifier. This has
- * already cost one published release (`backup-manager@0.1.1-beta.1`), so it is worth taking
- * literally.
- *
- * Test your own pure logic here. Anything needing a real database or the app's internals is
- * a maintainer's test of JonDash, not part of your module, and belongs outside the module
- * folder entirely.
+ * Test your own pure logic here; anything needing a real database or the app's internals is a
+ * maintainer's test of JonDash, not part of your module, and belongs outside the module folder.
  */
 
 describe("normaliseItemText", () => {

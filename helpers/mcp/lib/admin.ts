@@ -24,6 +24,7 @@ export type KeyRow = StoredKey & {
  * **`orphaned` is shown rather than hidden.** A key whose account has gone still exists in the
  * table and still fails closed on every call — but an admin should see that it is there and revoke
  * it, not discover it later. Hiding it would make the list a comforting lie.
+ * REFS helpers/mcp/ui/settings-panel.tsx
  */
 export async function keyRows(): Promise<KeyRow[]> {
   const keys = await listKeys();
@@ -42,6 +43,7 @@ export async function keyRows(): Promise<KeyRow[]> {
 /** Recent refusals — the tripwire an admin actually reads. */
 export type Refusal = { at: string; ip: string; reason: string };
 
+/** REFS helpers/mcp/ui/settings-panel.tsx */
 export async function recentRefusals(limit = 20): Promise<Refusal[]> {
   try {
     return await prisma.$queryRawUnsafe<Refusal[]>(
@@ -59,6 +61,7 @@ export async function recentRefusals(limit = 20): Promise<Refusal[]> {
  * The log is the one place the distinctions ARE shown — the caller got a single identical answer,
  * but an admin reading their own tripwire needs to tell "somebody is guessing keys" from "a key I
  * revoked is still being used" from "something in a browser reached this".
+ * REFS helpers/mcp/ui/settings-panel.tsx
  */
 export function explainRefusal(reason: string): string {
   switch (reason) {
@@ -81,25 +84,22 @@ export function explainRefusal(reason: string): string {
   }
 }
 
-/** Accounts an admin may bind a new key to. Service accounts only — core guarantees that. */
+/**
+ * Accounts an admin may bind a new key to. Service accounts only — core guarantees that.
+ * REFS helpers/mcp/ui/settings-panel.tsx
+ */
 export async function bindableAccounts(): Promise<BindableAccount[]> {
   const { listBindableAccounts } = await import("@/lib/auth/service-accounts");
   return listBindableAccounts();
 }
 
 /**
- * Is any add-on that depends on this helper actually enabled?
- *
- * `startListener` refuses to bind when nothing is, so the settings page has to be able to say so —
- * otherwise an admin reads "switched on", sees no endpoint, and has no way to find out why. The
- * same condition, asked in the same terms, rather than a second rule that could drift from it.
- */
-/**
  * Is HTTPS configured on this install?
  *
  * The settings page needs this to warn *before* an admin opens the endpoint to the network, rather
  * than refusing afterwards. The refusal in `onSettingsSubmit` is still the real gate — this only
  * decides whether the page asks first, because a form is a suggestion and the server is the check.
+ * REFS helpers/mcp/ui/settings-panel.tsx
  */
 export async function httpsEnabled(): Promise<boolean> {
   try {
@@ -112,6 +112,14 @@ export async function httpsEnabled(): Promise<boolean> {
   }
 }
 
+/**
+ * Is any add-on that depends on this helper actually enabled?
+ *
+ * `startListener` refuses to bind when nothing is, so the settings page has to be able to say so —
+ * otherwise an admin reads "switched on", sees no endpoint, and has no way to find out why. The
+ * same condition, asked in the same terms, rather than a second rule that could drift from it.
+ * REFS helpers/mcp/ui/settings-panel.tsx
+ */
 export async function carrierEnabled(): Promise<boolean> {
   const { dependentsOf } = await import("@/lib/helpers/registry");
   const ids = dependentsOf("mcp").map((d) => d.id);

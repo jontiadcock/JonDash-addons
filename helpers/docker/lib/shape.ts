@@ -7,8 +7,10 @@ import type { RawContainer, RawStats } from "./engine";
  * case below was met in real output rather than imagined.
  */
 
+/** REFS helpers/docker/api.ts */
 export type ContainerState = "running" | "exited" | "paused" | "restarting" | "created" | "dead" | "removing";
 
+/** REFS helpers/docker/api.ts */
 export type Container = {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export type Container = {
   service: string | null;
 };
 
+/** REFS helpers/docker/api.ts */
 export type ContainerStats = {
   cpuPct: number;
   memoryBytes: number;
@@ -31,6 +34,7 @@ export type ContainerStats = {
 
 const STATES: ContainerState[] = ["running", "exited", "paused", "restarting", "created", "dead", "removing"];
 
+/** REFS helpers/docker/api.ts · helpers/docker/tests/shape.test.ts */
 export function toContainer(r: RawContainer): Container {
   return {
     id: r.Id,
@@ -40,9 +44,8 @@ export function toContainer(r: RawContainer): Container {
     image: r.Image ?? "",
     state: STATES.includes(r.State as ContainerState) ? (r.State as ContainerState) : "dead",
     status: r.Status ?? "",
-    // Health lives inside the status string — "Up 3 days (healthy)" — because the list
-    // endpoint has no health field. Parsing prose is unpleasant, but the alternative is an
-    // inspect call per container on every render.
+    // Health lives inside the status string ("Up 3 days (healthy)") since the list endpoint has
+    // no health field — parsing prose beats an inspect call per container on every render.
     health: /\(healthy\)/i.test(r.Status ?? "")
       ? "healthy"
       : /\(unhealthy\)/i.test(r.Status ?? "")
@@ -67,6 +70,7 @@ export function toContainer(r: RawContainer): Container {
  *
  * Returns 0 rather than NaN when there is no previous sample — a container that started a
  * moment ago has no delta, and `NaN%` on a dashboard reads as a bug.
+ * REFS helpers/docker/api.ts · helpers/docker/tests/shape.test.ts
  */
 export function toStats(r: RawStats): ContainerStats {
   const cpuDelta = (r.cpu_stats?.cpu_usage?.total_usage ?? 0) - (r.precpu_stats?.cpu_usage?.total_usage ?? 0);
@@ -88,7 +92,10 @@ export function toStats(r: RawStats): ContainerStats {
   };
 }
 
-/** Trailing blank lines are the norm in log output and add nothing but scroll. */
+/**
+ * Trailing blank lines are the norm in log output and add nothing but scroll.
+ * REFS helpers/docker/api.ts · helpers/docker/tests/shape.test.ts
+ */
 export function toLines(text: string, tail: number): string[] {
   const lines = text.split(/\r?\n/);
   while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop();

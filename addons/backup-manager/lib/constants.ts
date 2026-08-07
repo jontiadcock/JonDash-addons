@@ -7,15 +7,36 @@
  * exactly the mistake health-monitor's `ui/form.tsx` calls out in its own header.
  */
 
-/** Must match the folder name. Changing it later orphans the module's data. */
+/**
+ * Must match the folder name. Changing it later orphans the module's data.
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/module.ts
+ */
 export const MODULE_ID = "backup-manager";
+/**
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/ui/job-detail.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ */
 export const MODULE_PATH = `/m/${MODULE_ID}`;
+/**
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx
+ */
 export const ADMIN_PATH = `/admin/modules/${MODULE_ID}`;
 
-/** A job's own page, e.g. /m/backup-manager/job/<id>. */
+/**
+ * A job's own page, e.g. /m/backup-manager/job/<id>.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/settings-panel.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ */
 export const jobPath = (jobId: string) => `${MODULE_PATH}/job/${jobId}`;
 
-/** Bytes → something a person reads. */
+/**
+ * Bytes → something a person reads.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/ui/activity.tsx · addons/backup-manager/ui/folder-picker.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/settings-panel.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ */
 export function formatBytes(n: number): string {
   if (!n) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -23,14 +44,21 @@ export function formatBytes(n: number): string {
   return `${(n / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
-/** Minutes past midnight → "02:00". */
+/**
+ * Minutes past midnight → "02:00".
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/job-detail.tsx ·
+ *      addons/backup-manager/ui/settings-panel.tsx
+ */
 export function formatTime(minute: number): string {
   const h = Math.floor(minute / 60) % 24;
   const m = minute % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** A span in ms → "1m 20s". Rounded, because nobody needs the milliseconds. */
+/**
+ * A span in ms → "1m 20s". Rounded, because nobody needs the milliseconds.
+ * REFS addons/backup-manager/ui/job-detail.tsx
+ */
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
   const s = Math.round(ms / 1000);
@@ -47,6 +75,8 @@ export function formatDuration(ms: number): string {
  * Relative rather than absolute because the question people actually ask a backup tool is
  * "is this recent?", not "what was the timestamp?". The exact time is still shown on the
  * job's own page, where you've gone looking for detail.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/activity.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/widget.tsx
  */
 export function formatRelative(iso: string | null | undefined, now = Date.now()): string {
   if (!iso) return "never";
@@ -68,14 +98,20 @@ export function formatRelative(iso: string | null | undefined, now = Date.now())
   return say(s / 86400, "day");
 }
 
-/** An absolute timestamp, for the places detail matters. */
+/**
+ * An absolute timestamp, for the places detail matters.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/job-detail.tsx
+ */
 export function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "—";
   const t = Date.parse(iso);
   return Number.isFinite(t) ? new Date(t).toLocaleString() : "—";
 }
 
-/** How long a run took, from its two timestamps. Null while it is still going. */
+/**
+ * How long a run took, from its two timestamps. Null while it is still going.
+ * REFS addons/backup-manager/ui/job-detail.tsx
+ */
 export function runDuration(startedAt: string, finishedAt: string | null): number | null {
   if (!finishedAt) return null;
   const a = Date.parse(startedAt);
@@ -83,9 +119,16 @@ export function runDuration(startedAt: string, finishedAt: string | null): numbe
   return Number.isFinite(a) && Number.isFinite(b) ? b - a : null;
 }
 
-/** The health of a job in one word, for a widget that has room for very little. */
+/**
+ * The health of a job in one word, for a widget that has room for very little.
+ * REFS addons/backup-manager/ui/widget.tsx
+ */
 export type Health = "ok" | "warn" | "bad" | "running" | "idle";
 
+/**
+ * REFS addons/backup-manager/ui/activity.tsx · addons/backup-manager/ui/job-detail.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ */
 export const HEALTH_TONE: Record<Health, string> = {
   ok: "var(--success, inherit)",
   warn: "var(--warning, var(--muted))",

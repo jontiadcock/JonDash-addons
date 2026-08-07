@@ -8,16 +8,13 @@ import { assessRisk, type Risk } from "./risk";
 /**
  * The allowlist — the complete set of services any module can ever touch.
  *
- * > A module can name a service. It can never add one.
+ * ⚠ A module can name a service. It can never add one. Entries live in this helper's own
+ * table, edited only by an administrator on JonDash's own settings screen — the dangerous
+ * surface is configuration the admin owns, never an argument the caller supplies, which is
+ * what lets the consent line say "the services you listed" and mean it literally.
  *
- * Entries live in the HELPER's own table, edited only by an administrator on JonDash's own
- * settings screen. That is the same shape as the `filesystem` helper's approved roots,
- * which has held up: the dangerous surface is *configuration the admin owns*, not an
- * argument the caller supplies. It is also what lets the consent line say "the services you
- * listed" and mean it literally.
- *
- * **Being on this list is what grants the privilege.** Adding a row is the moment elevation
- * is requested, and what the grant covers is fixed at that instant.
+ * Being on this list is what grants the privilege: adding a row is the moment elevation is
+ * requested, and what the grant covers is fixed at that instant.
  */
 
 const T = {
@@ -25,6 +22,7 @@ const T = {
   suggestions: () => helperTableName("host-services", "suggestions"),
 };
 
+/** REFS helpers/host-services/lib/scopes.ts */
 export type Entry = {
   id: string;
   serviceName: string;
@@ -66,6 +64,10 @@ function toEntry(r: Row): Entry {
   };
 }
 
+/**
+ * REFS helpers/host-services/api.ts · helpers/host-services/lib/scopes.ts ·
+ *      helpers/host-services/ui/settings-panel.tsx
+ */
 export async function listEntries(): Promise<Entry[]> {
   const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM ${T.entries()} ORDER BY label`);
   return rows.map(toEntry);
@@ -74,6 +76,10 @@ export async function listEntries(): Promise<Entry[]> {
 /** Resolve an entry by the id a module supplied. Returns null rather than throwing — a
  *  module asking about something not on the list gets "not in the list", never an error
  *  that would reveal whether the service exists on this machine. */
+/**
+ * REFS helpers/host-services/api.ts · helpers/host-services/lib/requests.ts ·
+ *      helpers/host-services/lib/scopes.ts
+ */
 export async function findEntry(id: string): Promise<Entry | null> {
   if (!id) return null;
   const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM ${T.entries()} WHERE id = ? LIMIT 1`, id);
@@ -93,6 +99,8 @@ export type AddResult =
  * FIRST, and only a successful grant writes the row. A failed or declined elevation leaves
  * nothing behind. The reverse order would leave an entry claiming a privilege it never got,
  * which is worse than failing.
+ * REFS helpers/host-services/helper.ts · helpers/host-services/lib/scopes.ts ·
+ *      helpers/host-services/lib/wording.ts
  */
 export async function addEntry(input: {
   serviceName: string;
@@ -114,21 +122,15 @@ export async function addEntry(input: {
   if (!allocateBase(serviceName, [])) return { ok: false, reason: "unusable-name" };
 
   /**
-   * THE BINARY DECIDES THE NAME, AND A CLASH IS REFUSED RATHER THAN SUFFIXED.
+   * ⚠ The binary decides the name, and a clash is refused rather than suffixed.
    *
    * Our sanitiser and the binary's disagree — we turn a space into `-`, it deletes the
-   * character — so "My Service" and "MyService" are two names to us and **one task name to
-   * Windows**. Checking collisions on our own answer let two entries point at a single
-   * Scheduled Task, where removing either silently revoked the other. Measured, not imagined.
+   * character — so "My Service" and "MyService" are two names to us but ONE task name to
+   * Windows, where removing either entry silently revoked the other.
    *
-   * The first fix was to suffix the binary's answer. Core then found the deeper problem and
-   * changed its own behaviour: a suffixed grant has **ambiguous removal**, which is what
-   * caused the accumulation in the first place. So suffixing is gone. Two different services
-   * that reduce to the same task name are now refused, with wording that tells the admin
-   * what to do — the same call core made, for the same reason.
-   *
-   * Refusing is worse UX than a silent suffix and better behaviour: the alternative is a
-   * permission whose removal cannot be reasoned about.
+   * ⚠ A suffixed name was tried and rejected — ambiguous removal caused the very collision this
+   * now guards against. Two services reducing to one task name are refused instead, worse UX
+   * than a silent suffix but reasoned-about removal wins.
    */
   const canonical = (await resolveTaskBase(serviceName)) ?? allocateBase(serviceName, [])!;
   const clash = existing.find((e) => e.taskBase.toLowerCase() === canonical.toLowerCase());
@@ -181,6 +183,8 @@ export async function addEntry(input: {
  * If the grant removal fails the row stays, deliberately. A row with a stale grant is
  * visible and fixable; a removed row with a live grant is an orphan nobody will ever audit,
  * because nothing in JonDash still refers to it.
+ * REFS helpers/host-services/helper.ts · helpers/host-services/lib/scopes.ts ·
+ *      helpers/host-services/lib/wording.ts
  */
 export async function removeEntry(id: string): Promise<{ ok: boolean; outcome?: GrantOutcome }> {
   const entry = await findEntry(id);
@@ -197,6 +201,7 @@ export async function removeEntry(id: string): Promise<{ ok: boolean; outcome?: 
 
 /** Change whether a module may act on this entry without an admin click. Admin-only, and
  *  never reachable from a module — see api.ts, which exposes no setter at all. */
+/** REFS helpers/host-services/helper.ts · helpers/host-services/lib/scopes.ts */
 export async function setUnattended(id: string, unattended: boolean): Promise<void> {
   await prisma.$executeRawUnsafe(
     `UPDATE ${T.entries()} SET unattended = ? WHERE id = ?`,
@@ -211,6 +216,7 @@ export async function setUnattended(id: string, unattended: boolean): Promise<vo
  * Only the labels of allowlisted services — not who added them, not the request history,
  * not the task names. The one question a consent screen answers is "which services would
  * this let a module touch?", so that is the only thing that travels.
+ * REFS helpers/host-services/helper.ts
  */
 export async function readConfig(): Promise<Record<string, unknown>> {
   try {
@@ -225,7 +231,10 @@ export async function readConfig(): Promise<Record<string, unknown>> {
   }
 }
 
-/** Service names for the consent sentence. */
+/**
+ * Service names for the consent sentence.
+ * REFS helpers/host-services/helper.ts
+ */
 export function listServiceLabels(config: Record<string, unknown>): string[] {
   const raw = config?.services;
   return Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string" && s.length > 0) : [];

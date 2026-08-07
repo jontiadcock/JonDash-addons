@@ -1,3 +1,5 @@
+// Must match `helpers/system-metrics/lib/collect.ts › MetricGroup` exactly, or `collectFor()`
+// below hands the helper a group name it doesn't recognise.
 import type { MetricGroup } from "@/helpers/system-metrics/api";
 
 /**
@@ -22,6 +24,7 @@ export type Toggle = {
   default: boolean;
 };
 
+/** REFS addons/host-vitals/module.ts — declares these as the module's configurable settings. */
 export const TOGGLES: Toggle[] = [
   {
     key: "showSwap",
@@ -89,6 +92,8 @@ const ALWAYS: MetricGroup[] = ["cpu", "memory", "disks"];
  *
  * A setting that has never been saved falls back to its declared default, so a fresh install
  * shows something sensible rather than an empty card.
+ * REFS addons/host-vitals/page.tsx · addons/host-vitals/tests/widget.test.ts ·
+ *      addons/host-vitals/ui/widget.tsx
  */
 export function collectFor(values: Record<string, unknown>): MetricGroup[] {
   const on = TOGGLES.filter((t) => {

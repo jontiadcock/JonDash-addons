@@ -4,21 +4,15 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * The only client-side code in this module: refresh the server-rendered page while a
- * backup is actually running.
+ * The only client-side code in this module: refreshes the server-rendered page on a timer
+ * while a backup is running, so a long copy doesn't sit showing a frozen "Running now" while
+ * the helper publishes live progress nobody's watching. Mount only when something is in
+ * flight — an idle page should do no polling at all.
  *
- * Everything here is server components and plain forms, which is the right default — no
- * state to fall out of step with the database. But a backup that takes ten minutes and
- * shows a frozen "Running now" until you press F5 reads as broken, and the helper has been
- * publishing live progress the whole time with nobody watching it.
- *
- * So this asks Next to re-render the server component on a timer. It holds no state of its
- * own and renders nothing — the numbers still come from the server, which is what keeps
- * them honest. Mount it only when something is in flight, so an idle page does no polling
- * at all.
- *
- * It imports nothing from the module's data layer, deliberately. Anything server-side
- * pulled in here would be bundled for the browser.
+ * ⚠ Holds no state, renders nothing, and imports nothing from the module's data layer,
+ * deliberately: anything server-side pulled in here would bundle for the browser.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/job-detail.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
  */
 export default function LiveRefresh({ everyMs = 3000 }: { everyMs?: number }) {
   const router = useRouter();

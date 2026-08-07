@@ -15,15 +15,14 @@ import {
 } from "./lib/collect";
 
 /**
- * The ONLY surface a consuming module may import — `@/helpers/system-metrics/api`. The
- * verifier permits that import solely for a module that declared
- * `helpers: ["system-metrics"]`, and refuses any deeper path, so the internals below are
- * free to change without breaking a consumer.
+ * The ONLY surface a consuming module may import — `@/helpers/system-metrics/api`. The verifier
+ * permits it solely for a module that declared `helpers: ["system-metrics"]` and refuses any
+ * deeper path, so the internals below are free to change without breaking a consumer.
  *
- * There is one call, and it is read-only. It returns *numbers gathered from the host* —
- * never a path's contents, never a handle to the machine. That is what keeps the consent
- * line ("see CPU, memory, disks…") honest and stops this becoming a way to read
- * `.data/secrets.json`.
+ * ⚠ There is one call, and it is read-only. It returns *numbers gathered from the host* — never
+ * a path's contents, never a handle to the machine. That is what keeps the consent line honest
+ * and stops this becoming a way to read `.data/secrets.json`.
+ * REFS helpers/system-metrics/HELPER.md — the guarantees this file must keep.
  */
 
 // Re-exported so a module gets every type from the entry point it is allowed to import,
@@ -71,4 +70,12 @@ const api = (ctx: ModuleContext): SystemMetricsApi => ({
   },
 });
 
+/**
+ * The factory every consumer calls as `systemMetrics(ctx)`.
+ *
+ * ⚠ Widening this surface widens what every consumer can read from the host — update the
+ * capability label in `helper.ts` in the same commit so the consent screen stays honest.
+ * REFS addons/host-vitals/page.tsx · addons/host-vitals/ui/widget.tsx
+ *      helpers/system-metrics/helper.ts › provides — the label that must track this surface.
+ */
 export default api;

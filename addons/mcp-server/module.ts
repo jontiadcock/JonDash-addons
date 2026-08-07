@@ -6,9 +6,9 @@ import McpPage from "./page";
  * AI assistant access — the carrier for the `mcp` helper.
  *
  * **Thin on purpose.** A helper cannot be installed directly (the installer auto-installs them as
- * dependencies and offers no control to add one), so a module has to exist for the helper to arrive
- * at all. Everything that matters — the endpoint, the keys, the tools, the settings — belongs to the
- * helper, where no module can reach it.
+ * dependencies and offers no control to add one), so a module has to exist for the helper to
+ * arrive at all. Everything that matters — the endpoint, the keys, the tools, the settings —
+ * belongs to the helper, where no module can reach it.
  *
  * What this module earns its place with is visibility: a tile and a page answering "is an assistant
  * connected to my server, and what has it been doing", without being able to change any of it.
@@ -18,10 +18,9 @@ const mcpServer: ModuleDefinition = {
   name: "AI assistant access",
   description:
     "Lets an AI assistant read and manage this server using a key you create. Shows whether it is switched on and which keys exist; the keys themselves are managed under Admin → Addons → Shared capabilities.",
-  version: "0.0.3",
-  // Follows the helper's floor — a module that pulls a helper in must not install where that
-  // helper cannot work. The helper needs service accounts (1.7.3-beta.1) and passes its id to
-  // `resolveBindableAccount` (1.7.3-beta.2).
+  version: "0.0.4",
+  // Follows the helper's own floor: a module pulling in a helper must not install where that
+  // helper cannot work — see the helper's own `minAppVersion` note for why beta.2 specifically.
   minAppVersion: "1.7.3-beta.2",
 
   /**

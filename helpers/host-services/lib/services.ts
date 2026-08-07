@@ -13,6 +13,7 @@ import { platform } from "node:os";
  * would turn a read-only query into arbitrary execution.
  */
 
+/** REFS helpers/host-services/api.ts · helpers/host-services/lib/enumerate.ts */
 export type ServiceState = "running" | "stopped" | "starting" | "stopping" | "unknown";
 
 /** Long enough for a slow SCM, short enough that a hung query can't wedge a page. */
@@ -21,9 +22,8 @@ const TIMEOUT_MS = 5000;
 function run(file: string, args: string[]): Promise<{ ok: boolean; out: string }> {
   return new Promise((resolve) => {
     execFile(file, args, { timeout: TIMEOUT_MS, windowsHide: true }, (err, stdout, stderr) => {
-      // A non-zero exit is normal here — `sc query` on a missing service and `systemctl
-      // is-active` on a stopped one both exit non-zero with useful output. So the output is
-      // parsed either way and the exit code only decides the fallback.
+      // Non-zero exit is normal here — `sc query` on a missing service and `systemctl is-active`
+      // on a stopped one both exit non-zero with useful output — exit code picks the fallback.
       resolve({ ok: !err, out: `${stdout ?? ""}${stderr ?? ""}` });
     });
   });
@@ -90,7 +90,11 @@ export async function readState(serviceName: string): Promise<ServiceState> {
   return "unknown";
 }
 
-/** States for several services at once. Failures degrade to `unknown`, never throw. */
+/**
+ * States for several services at once. Failures degrade to `unknown`, never throw.
+ * REFS helpers/host-services/api.ts · helpers/host-services/lib/scopes.ts ·
+ *      helpers/host-services/ui/settings-panel.tsx
+ */
 export async function readStates(serviceNames: string[]): Promise<Map<string, ServiceState>> {
   const pairs = await Promise.all(
     serviceNames.map(async (n) => {

@@ -3,45 +3,34 @@ import type { ModuleWidgetProps } from "@/lib/modules/types";
 import mcp from "@/helpers/mcp/api";
 
 /**
- * The dashboard tile. One question: **is an assistant able to reach this server right now?**
+ * The dashboard tile — one question: is an assistant able to reach this server right now? Leads
+ * with the answer, not a count: "3 keys" while open to the LAN would be technically true and
+ * useless.
+ * ⚠ Draws its OWN card and title — the dashboard hands a widget only a bare grid cell.
+ * Resizes per core's two thresholds (JonDash 1.8.0 B5/B6): lines drop bottom-up as the tile
+ * shrinks; at 1×1, the verdict alone, in its own colour.
  *
- * Leads with the answer rather than a count, and is deliberately loudest in the state that
- * deserves it — reachable from the network. A tile reading "3 keys" while the endpoint is open to
- * the LAN would be technically true and useless.
- *
- * **It draws its OWN card and title.** The dashboard hands a widget a bare grid cell and nothing
- * else. Without this the tile rendered as loose text reading "Off / No assistant can reach this
- * server" — no name saying what was off, and no way to click through. Found by loading the
- * dashboard; a build says nothing about it.
- *
- * # Sizing (JonDash 1.8.0 B5/B6)
- *
- * Four short lines, so this one mostly survived being resized — but "mostly" is not the bar when
- * the frame **clips rather than scrolls**. Core's two thresholds now decide what appears, and the
- * lines drop from the bottom up: at 1×1 the verdict alone, in its own colour.
- *
- * **The one that matters here is `exposed`.** If the endpoint is open to the network, that must be
- * legible at *every* size — a security state the user shrank into invisibility is the worst
- * possible failure for this particular tile. So the 1×1 form is not a neutral "on": it is the word
- * `LAN`, in the danger colour.
+ * ⚠ `exposed` is the one that matters: reachable-from-network must stay legible at EVERY size — a
+ * security state shrunk into invisibility is the worst failure this tile could have. So 1×1 is
+ * never a neutral "on": it is the word `LAN`, in the danger colour.
  */
 
 /**
- * Makes THIS WIDGET its own size container, which is what lets the figure below be capped against
- * the card height as well as its width.
+ * Makes THIS WIDGET its own size container, so the figure below can be capped against card HEIGHT
+ * as well as width.
  *
- * Core deliberately leaves the dashboard frame on `container-type: inline-size`, so `cqh` there
- * would silently resolve against the viewport. Declaring size containment on the widget root fixes
- * that for our own subtree only: the root is `h-full` inside a sized grid cell, so its height is
- * definite, and if the assumption were ever wrong the damage is confined to this one tile rather
- * than the whole dashboard — which is exactly why core would not make the same change globally.
+ * Core leaves the dashboard frame on `container-type: inline-size`, so `cqh` there would silently
+ * resolve against the viewport. Size containment on the widget root fixes that for our subtree
+ * only — root is full-height inside a sized grid cell, so its height is definite, and any damage
+ * from that assumption being wrong stays confined to this one tile, not the whole dashboard.
  *
- * `@[6rem]:` classes on children now resolve against this element instead of the frame. Same
- * width, so nothing changes.
+ * Child container-query classes now resolve against this element instead of the frame; same
+ * width, so nothing else changes.
  */
 const SIZE_CONTAINER = { containerType: "size" } as const;
 
 const MODULE_PATH = "/m/mcp-server";
+/** REFS addons/mcp-server/module.ts */
 export default async function McpWidget({ ctx }: ModuleWidgetProps) {
   const s = await mcp(ctx).status();
 

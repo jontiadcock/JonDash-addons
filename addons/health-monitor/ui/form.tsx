@@ -27,6 +27,7 @@ type Props = {
   className?: string;
 };
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export function ActionForm({
   action,
   submitLabel,
@@ -77,7 +78,10 @@ export function ActionForm({
   );
 }
 
-/** A labelled field. Keeps every form in the module laid out the same way. */
+/**
+ * A labelled field. Keeps every form in the module laid out the same way.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export function Field({
   label,
   help,

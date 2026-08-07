@@ -36,14 +36,16 @@ async function render(granted: boolean, settings: Record<string, unknown> = {}):
 describe("host vitals tile", () => {
   it("draws its own card and names itself, even when metrics are unavailable", async () => {
     const html = await render(false); // capability not granted → read() returns null
-    expect(html).toMatch(/class="card p-4"/);
+    // ⚠ Match the `card` class ALONE, never the full class string — the rest is layout and
+    // changes. Asserting `card p-4` broke on the B5/B6 resize while the tile was still correct.
+    expect(html).toMatch(/class="card[ "]/);
     expect(html).toContain("Host vitals");
     expect(html).toContain("not available");
   });
 
   it("draws a card, a verdict and a link when metrics are available", async () => {
     const html = await render(true); // real read of this host
-    expect(html).toMatch(/class="card p-4"/);
+    expect(html).toMatch(/class="card[ "]/);
     expect(html).toContain("Host vitals");
     expect(html).toContain('href="/m/host-vitals"');
     // The verdict line is always one of these.

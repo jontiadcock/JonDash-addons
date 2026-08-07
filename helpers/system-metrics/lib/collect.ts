@@ -2,29 +2,24 @@ import os from "node:os";
 import fsp from "node:fs/promises";
 
 /**
- * Host telemetry collection — the whole privileged surface of this helper, and deliberately
- * small. Everything here reads sizes, counts, rates and times from `node:os`, `fs.statfs` and
- * (on Linux) `/proc` & `/sys`. Nothing reads a file's *contents* for its content, so this can
- * never become a way to reach `.data/secrets.json`. Dependency-free on purpose — no
- * `systeminformation`, no native module.
+ * Host telemetry collection — the whole privileged surface of this helper, deliberately small.
+ * Reads sizes, counts, rates and times from `node:os`, `fs.statfs` and (Linux) `/proc` & `/sys`.
+ * Dependency-free on purpose — no `systeminformation`, no native module.
  *
- * Cross-platform is the real work: the API is identical everywhere, the implementation
- * branches on `os.platform()`. Where a platform cannot answer, the field degrades to
- * `null`/`[]`/absent rather than throwing or inventing a zero.
- *
- * ## Collecting only what was asked for (0.0.2)
- *
- * Several groups cost real time: anything rate-based has to sample, wait, and sample again.
- * `collect` lets a consumer skip the ones it will not show, so a metric a user switched off
- * is never gathered rather than gathered and hidden. **All the rate-based groups share ONE
- * wait** — the "before" readings are taken together, then a single sleep, then the "after"
- * readings — so asking for CPU, network and disk rates costs the same wall-clock as asking
- * for CPU alone.
+ * ⚠ Nothing here reads a file's contents for its content, so this can never become a way to
+ * reach `.data/secrets.json`. A platform that cannot answer degrades a field to `null`/`[]`,
+ * never a thrown error or an invented zero.
+ * ⚠ `collect` gates the READS themselves, not just the output. All rate-based groups share one
+ * sampling wait, so asking for several costs the same wall-clock as asking for one.
+ * REFS helpers/system-metrics/HELPER.md — full contract and the per-platform support table.
  */
 
 // ---- Types ----------------------------------------------------------------
 
-/** A group of readings that can be collected or skipped independently. */
+/**
+ * A group of readings that can be collected or skipped independently.
+ * REFS helpers/system-metrics/api.ts — re-exported as the public list of valid `collect` values.
+ */
 export type MetricGroup =
   | "cpu"
   | "cpuCores"
@@ -38,11 +33,13 @@ export type MetricGroup =
   | "fans"
   | "battery";
 
+/** REFS helpers/system-metrics/api.ts — re-exported so a settings screen can list every group. */
 export const ALL_GROUPS: MetricGroup[] = [
   "cpu", "cpuCores", "memory", "swap", "disks", "diskIo",
   "network", "networkIo", "temps", "fans", "battery",
 ];
 
+/** REFS helpers/system-metrics/api.ts — re-exported; also the element type of `Snapshot.disks`. */
 export type DiskUsage = {
   mount: string;
   totalBytes: number;
@@ -51,24 +48,28 @@ export type DiskUsage = {
   usedPct: number;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; element type of `Snapshot.diskIo`. */
 export type DiskIo = {
   device: string;
   readBytesPerSec: number;
   writeBytesPerSec: number;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; element type of `Snapshot.network`. */
 export type NetworkInterface = {
   name: string;
   addresses: string[];
   mac: string | null;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; element type of `Snapshot.networkIo`. */
 export type NetworkIo = {
   name: string;
   rxBytesPerSec: number;
   txBytesPerSec: number;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; the type of `Snapshot.swap`. */
 export type Swap = {
   totalBytes: number;
   usedBytes: number;
@@ -76,6 +77,7 @@ export type Swap = {
   usedPct: number;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; the type of `Snapshot.battery`. */
 export type Battery = {
   /** 0–100, or null if the host reports charge some other way. */
   percent: number | null;
@@ -83,6 +85,7 @@ export type Battery = {
   status: string;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported unchanged; what `snapshot()` returns. */
 export type Snapshot = {
   host: { hostname: string; platform: string; arch: string; uptimeSec: number };
   cpu: {
@@ -117,6 +120,7 @@ export type Snapshot = {
   battery?: Battery | null;
 };
 
+/** REFS helpers/system-metrics/api.ts — re-exported; the shape of `read()`'s only parameter. */
 export type CollectOptions = {
   /** Which groups to gather. Omit for all of them. */
   collect?: MetricGroup[];
@@ -444,6 +448,8 @@ async function collectBattery(): Promise<Battery | null> {
  * Rate-based groups (`cpu`, `diskIo`, `networkIo`) need two readings a moment apart. They
  * are gathered together around a SINGLE wait, so asking for all three costs the same
  * wall-clock as asking for one. Skipping all three makes the call effectively instant.
+ * REFS helpers/system-metrics/api.ts › read() — the only caller ·
+ *      helpers/system-metrics/tests/collect.test.ts
  */
 export async function snapshot(opts: CollectOptions = {}): Promise<Snapshot> {
   const groups = new Set<MetricGroup>(opts.collect ?? ALL_GROUPS);

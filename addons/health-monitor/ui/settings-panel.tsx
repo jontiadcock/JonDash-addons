@@ -14,8 +14,10 @@ import {
   importConfigAction,
   saveChannelAction,
   saveMonitorAction,
+  saveSettingsAction,
   testChannelAction,
 } from "../actions";
+import { SETTING_FIELDS } from "../lib/settings";
 
 /**
  * Everything that changes the monitoring, rendered by JonDash inside
@@ -25,6 +27,8 @@ import {
  * read-only, so a dashboard can be left open without a stray click reconfiguring
  * anything. Each check expands in place to edit, so nothing here navigates away from the
  * settings screen.
+ *
+ * REFS addons/health-monitor/module.ts
  */
 export default async function HealthSettingsPanel({ ctx }: ModuleSettingsPanelProps) {
   const db = ctx.db;
@@ -39,6 +43,7 @@ export default async function HealthSettingsPanel({ ctx }: ModuleSettingsPanelPr
   const monitors = await listMonitors(db);
   const channels: ChannelRow[] = await listChannels(db);
   const configError = await lastConfigError(ctx);
+  const settingValues = await ctx.settings.all();
   const kindName = new Map(KIND_CHOICES.map((k) => [k.value, k.label]));
   const channelName = new Map(CHANNEL_CHOICES.map((c) => [c.value, c.label]));
 
@@ -226,6 +231,8 @@ export default async function HealthSettingsPanel({ ctx }: ModuleSettingsPanelPr
         </details>
       </section>
 
+      <AdvancedSettings values={settingValues} />
+
       <details className="card p-4">
         <summary className="cursor-pointer text-sm font-medium">Bulk import (JSON)</summary>
         <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
@@ -238,5 +245,68 @@ export default async function HealthSettingsPanel({ ctx }: ModuleSettingsPanelPr
         </div>
       </details>
     </div>
+  );
+}
+
+/**
+ * The module's own settings, rendered here rather than declared to the framework.
+ *
+ * ⚠ Declared settings are always drawn ABOVE a module's panel — that order lives in core and a
+ * module cannot change it. Declaring none is the only way to put the checks first, so `module.ts`
+ * has no `settings` array; putting one back would silently push all of this above them again.
+ *
+ * Fields come from `SETTING_FIELDS`, so keys and saved values carry across an upgrade untouched.
+ *
+ * REFS addons/health-monitor/actions.ts › saveSettingsAction — writes the same keys
+ *      addons/health-monitor/lib/settings.ts › SETTING_FIELDS
+ */
+function AdvancedSettings({ values }: { values: Record<string, unknown> }) {
+  return (
+    <details className="card p-4">
+      <summary className="cursor-pointer text-sm font-medium">Advanced settings</summary>
+      <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+        Defaults for every check, how long history is kept, and how noisy alerts are allowed to be.
+        The defaults suit most people — a check can override the timing ones itself.
+      </p>
+      <div className="mt-3">
+        <ActionForm action={saveSettingsAction} submitLabel="Save settings">
+          {SETTING_FIELDS.map((f) => {
+            const current = values[f.key] ?? f.default;
+            if (f.type === "boolean") {
+              return (
+                <label key={f.key} className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name={f.key} defaultChecked={Boolean(current)} className="mt-1" />
+                  <span>
+                    {f.label}
+                    {f.help ? (
+                      <span className="block text-xs" style={{ color: "var(--muted)" }}>{f.help}</span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            }
+            return (
+              <Field key={f.key} label={f.label} help={f.help}>
+                {f.type === "text" ? (
+                  <textarea
+                    className="input"
+                    name={f.key}
+                    rows={3}
+                    defaultValue={current == null ? "" : String(current)}
+                  />
+                ) : (
+                  <input
+                    className="input"
+                    name={f.key}
+                    type={f.type === "number" ? "number" : "text"}
+                    defaultValue={current == null ? "" : String(current)}
+                  />
+                )}
+              </Field>
+            );
+          })}
+        </ActionForm>
+      </div>
+    </details>
   );
 }

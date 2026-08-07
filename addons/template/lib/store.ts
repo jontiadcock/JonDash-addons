@@ -22,6 +22,7 @@ function toNumber(value: unknown): number {
   return typeof value === "bigint" ? Number(value) : Number(value ?? 0);
 }
 
+/** REFS addons/template/page.tsx */
 export async function listItems(db: Db, limit = 50): Promise<Item[]> {
   return db.query<Item>(
     `SELECT id, text, createdAt, done FROM ${db.table("items")} ORDER BY done ASC, id DESC LIMIT ?`,
@@ -29,16 +30,21 @@ export async function listItems(db: Db, limit = 50): Promise<Item[]> {
   );
 }
 
-/** Flip an item between done and not done. */
+/**
+ * Flip an item between done and not done.
+ * REFS addons/template/actions.ts
+ */
 export async function toggleItem(db: Db, id: number): Promise<void> {
   await db.run(`UPDATE ${db.table("items")} SET done = 1 - done WHERE id = ?`, id);
 }
 
+/** REFS addons/template/widget.tsx */
 export async function countItems(db: Db): Promise<number> {
   const rows = await db.query<{ n: unknown }>(`SELECT COUNT(*) AS n FROM ${db.table("items")}`);
   return toNumber(rows[0]?.n);
 }
 
+/** REFS addons/template/actions.ts */
 export async function addItem(db: Db, text: string): Promise<void> {
   await db.run(
     `INSERT INTO ${db.table("items")} (text, createdAt) VALUES (?, ?)`,
@@ -47,6 +53,7 @@ export async function addItem(db: Db, text: string): Promise<void> {
   );
 }
 
+/** REFS addons/template/actions.ts */
 export async function deleteItem(db: Db, id: number): Promise<void> {
   await db.run(`DELETE FROM ${db.table("items")} WHERE id = ?`, id);
 }

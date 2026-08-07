@@ -19,6 +19,7 @@
 
 export type ScheduleKind = "interval" | "daily";
 
+/** REFS addons/backup-manager/lib/store.ts · addons/backup-manager/tests/schedule.test.ts */
 export type Schedule = {
   kind: ScheduleKind;
   /** Interval only. Hours between runs. */
@@ -29,6 +30,7 @@ export type Schedule = {
   days: number[];
 };
 
+/** REFS addons/backup-manager/ui/settings-panel.tsx */
 export const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /**
@@ -39,6 +41,8 @@ export const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] a
  * which is the default meaning "every day", into "Sundays only". Every job created with
  * default settings would have quietly run once a week. Caught by tests; it produced no error,
  * just a backup that ran six times less often than the admin asked for.
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/lib/store.ts ·
+ *      addons/backup-manager/tests/schedule.test.ts · addons/backup-manager/ui/settings-panel.tsx
  */
 export function parseDays(csv: string): number[] {
   const out = new Set<number>();
@@ -51,9 +55,13 @@ export function parseDays(csv: string): number[] {
   return [...out].sort((a, b) => a - b);
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export const formatDays = (days: number[]): string => days.join(",");
 
-/** "Mon, Tue, Wed" — or "every day", which is what an empty list means. */
+/**
+ * "Mon, Tue, Wed" — or "every day", which is what an empty list means.
+ * REFS addons/backup-manager/tests/schedule.test.ts
+ */
 export function describeDays(days: number[]): string {
   if (days.length === 0 || days.length === 7) return "every day";
   if (days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d))) return "weekdays";
@@ -61,7 +69,11 @@ export function describeDays(days: number[]): string {
   return days.map((d) => WEEKDAY_NAMES[d]).join(", ");
 }
 
-/** One line an admin can read back to check they got what they meant. */
+/**
+ * One line an admin can read back to check they got what they meant.
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/tests/schedule.test.ts ·
+ *      addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/settings-panel.tsx
+ */
 export function describeSchedule(s: Schedule, formatTime: (m: number) => string): string {
   return s.kind === "daily"
     ? `${describeDays(s.days)} at ${formatTime(s.atMinute)}`
@@ -80,15 +92,15 @@ function startOfDay(d: Date): Date {
  *
  * Strictly after matters: computing "the next run" at the instant a run starts must not
  * return that same instant, or the job re-fires on every tick forever.
+ * REFS addons/backup-manager/lib/store.ts · addons/backup-manager/tests/schedule.test.ts
  */
 export function nextRun(s: Schedule, from: Date = new Date()): Date {
   const atMinute = Math.min(1439, Math.max(0, Math.trunc(s.atMinute)));
 
   if (s.kind === "daily") {
     const days = parseDays(formatDays(s.days));
-    // Walk forward a day at a time. Slower than arithmetic and completely immune to month
-    // ends, leap years and daylight saving — `setDate` handles all three, and this runs
-    // once per job per run, not in a loop that anybody will notice.
+    // Walk a day at a time rather than compute arithmetically: `setDate` alone handles month
+    // ends, leap years and DST, and this runs once per job per tick, not in a hot loop.
     for (let i = 0; i <= 14; i++) {
       const candidate = startOfDay(from);
       candidate.setDate(candidate.getDate() + i);
@@ -104,14 +116,11 @@ export function nextRun(s: Schedule, from: Date = new Date()): Date {
     return fallback;
   }
 
-  // Interval: anchored to the time of day, stepped by `everyHours` until it is in the
-  // future. Anchoring is the point — "now + N hours" drifts a little later every run, so a
-  // 2am backup gradually becomes a 3am one.
-  //
-  // Non-finite is checked explicitly: `Math.max(1, NaN)` is NaN, not 1, so a NaN interval
-  // would step by NaN, produce an Invalid Date, and leave the job permanently unschedulable
-  // rather than falling back to something sane.
+  // Interval: anchored to the time of day and stepped by `everyHours`, so it doesn't drift
+  // later each run the way "now + N hours" would.
   const hours = Number(s.everyHours);
+  // NaN checked explicitly: `Math.max(1, NaN)` is NaN, not 1 — an unguarded interval would
+  // produce an Invalid Date and leave the job permanently unschedulable.
   const stepMs = (Number.isFinite(hours) && hours >= 1 ? Math.trunc(hours) : 1) * 3_600_000;
   const next = startOfDay(from);
   next.setMinutes(atMinute);
@@ -125,6 +134,7 @@ export function nextRun(s: Schedule, from: Date = new Date()): Date {
  * Backoff rather than a fixed delay because the common causes differ in how long they
  * last. A NAS rebooting is back in minutes; a disconnected drive is back when somebody
  * plugs it in. Retrying every minute for either is just noise in the log.
+ * REFS addons/backup-manager/tests/schedule.test.ts
  */
 export function retryDelayMs(consecutiveFailures: number): number {
   const n = Math.max(1, Math.trunc(consecutiveFailures));
@@ -134,6 +144,7 @@ export function retryDelayMs(consecutiveFailures: number): number {
 /**
  * When to try again after a failure — or null when the job has used up its retries and
  * should simply wait for its next scheduled slot.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/tests/schedule.test.ts
  */
 export function nextRetry(
   s: Schedule,

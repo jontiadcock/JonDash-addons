@@ -54,9 +54,8 @@ describe("RunLog", () => {
   });
 
   it("says REMOVED for a deletion, not SKIPPED", async () => {
-    // Caught by reading a real prune log: `SKIPPED — removed by retention policy` states
-    // the opposite of what happened, in the one log somebody reads after wondering where
-    // a backup went. A destructive line must not read like a cautious one.
+    // A destructive line must not read like a cautious one: `SKIPPED — removed by retention
+    // policy` states the opposite of what happened, in the log read after wondering where it went.
     const log = await RunLog.open({ ...header("run-prune"), mode: "prune" });
     log!.removed("2026-01-01-02-00-00", "outside the retention policy");
     await log!.close({ state: "done", filesCopied: 0, bytesCopied: 0, skipped: 1, errors: 0, kind: "prune" });
@@ -150,11 +149,10 @@ describe("retention", () => {
 });
 
 /**
- * A browser caught this, not a unit test: a fresh install reported "keeping unlimited days"
- * when the defaults are 30/50. `Number(null)` is 0 — and 0 is itself a legitimate stored
- * value meaning "keep forever" — so coercing before testing for absence silently turned
- * "never configured" into "no retention at all". The parse is duplicated in `api.ts` and
- * `helper.ts`, so the rule is pinned here rather than in either of them.
+ * A fresh install once reported "keeping unlimited days" against defaults of 30/50:
+ * `Number(null)` is 0, and 0 is itself a legitimate stored value ("keep forever"), so
+ * coercing before testing for absence turned "never configured" into "no retention at
+ * all". The parse is duplicated in `api.ts` and `helper.ts`, so the rule is pinned here.
  */
 describe("reading a stored retention value", () => {
   const parse = (v: string | null | undefined, dflt: number) => {

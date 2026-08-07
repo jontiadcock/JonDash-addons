@@ -5,6 +5,12 @@ import { nextRun, parseDays, type Schedule } from "./schedule";
 /** Every read and write in one place. `db.table()` resolves the real `mod_…` name. */
 type Db = NonNullable<ModuleContext["db"]>;
 
+/**
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/lib/notify.ts ·
+ *      addons/backup-manager/module.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/tests/notify.test.ts · addons/backup-manager/ui/settings-panel.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
+ */
 export type Job = {
   id: string;
   name: string;
@@ -46,6 +52,10 @@ export type Job = {
   createdAt: string;
 };
 
+/**
+ * REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/activity.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx · addons/backup-manager/ui/widget.tsx
+ */
 export type Run = {
   id: string;
   jobId: string;
@@ -61,7 +71,10 @@ export type Run = {
   message: string | null;
 };
 
-/** The retention policy in the shape the helper expects. */
+/**
+ * The retention policy in the shape the helper expects.
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/module.ts
+ */
 export function policyOf(job: Job) {
   return {
     keepDaily: job.keepDaily,
@@ -73,15 +86,24 @@ export function policyOf(job: Job) {
 
 const num = (v: unknown) => (typeof v === "bigint" ? Number(v) : Number(v ?? 0));
 
+/**
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/ui/settings-panel.tsx · addons/backup-manager/ui/widget.tsx
+ */
 export async function listJobs(db: Db): Promise<Job[]> {
   return db.query<Job>(`SELECT * FROM ${db.table("jobs")} ORDER BY name`);
 }
 
+/**
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/module.ts ·
+ *      addons/backup-manager/ui/job-detail.tsx
+ */
 export async function getJob(db: Db, id: string): Promise<Job | null> {
   const rows = await db.query<Job>(`SELECT * FROM ${db.table("jobs")} WHERE id = ?`, id);
   return rows[0] ?? null;
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export async function saveJob(db: Db, job: Job): Promise<void> {
   await db.run(
     `INSERT INTO ${db.table("jobs")}
@@ -110,6 +132,7 @@ export async function saveJob(db: Db, job: Job): Promise<void> {
   );
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export async function deleteJob(db: Db, id: string): Promise<void> {
   await db.run(`DELETE FROM ${db.table("runs")} WHERE jobId = ?`, id);
   await db.run(`DELETE FROM ${db.table("jobs")} WHERE id = ?`, id);
@@ -118,6 +141,7 @@ export async function deleteJob(db: Db, id: string): Promise<void> {
 /**
  * Jobs whose time has come. The scheduler helper has no notion of time of day — it ticks —
  * so the timing lives here, in data the admin can edit, and each tick asks this.
+ * REFS addons/backup-manager/module.ts
  */
 export async function dueJobs(db: Db, now = new Date()): Promise<Job[]> {
   return db.query<Job>(
@@ -128,7 +152,11 @@ export async function dueJobs(db: Db, now = new Date()): Promise<Job[]> {
   );
 }
 
-/** A job's schedule in the shape `lib/schedule.ts` works with. */
+/**
+ * A job's schedule in the shape `lib/schedule.ts` works with.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/ui/job-detail.tsx
+ */
 export function scheduleOf(job: Pick<Job, "scheduleKind" | "everyHours" | "atMinute" | "daysCsv">): Schedule {
   return {
     kind: job.scheduleKind === "daily" ? "daily" : "interval",
@@ -144,6 +172,7 @@ export function scheduleOf(job: Pick<Job, "scheduleKind" | "everyHours" | "atMin
  * The arithmetic lives in `lib/schedule.ts` — pure, and tested there rather than here,
  * because "every weeknight at 2am" crossing a month end is exactly the kind of thing that
  * looks right and silently isn't.
+ * REFS addons/backup-manager/actions.ts · addons/backup-manager/module.ts
  */
 export function computeNextRun(
   job: Pick<Job, "scheduleKind" | "everyHours" | "atMinute" | "daysCsv">,
@@ -152,10 +181,12 @@ export function computeNextRun(
   return nextRun(scheduleOf(job), from).toISOString();
 }
 
+/** REFS addons/backup-manager/module.ts */
 export async function markRun(db: Db, jobId: string, nextRunAt: string): Promise<void> {
   await db.run(`UPDATE ${db.table("jobs")} SET nextRunAt = ? WHERE id = ?`, nextRunAt, jobId);
 }
 
+/** REFS addons/backup-manager/module.ts */
 export async function startRun(db: Db, id: string, jobId: string, helperRunId: string | null): Promise<void> {
   await db.run(
     `INSERT INTO ${db.table("runs")} (id, jobId, helperRunId, startedAt, state) VALUES (?, ?, ?, ?, 'running')`,
@@ -165,6 +196,7 @@ export async function startRun(db: Db, id: string, jobId: string, helperRunId: s
 
 /** A job's own no-overlap guard: is one of its runs still going? Stops a slow backup that
  *  outlasts its interval from being started a second time on the next tick. */
+/** REFS addons/backup-manager/module.ts */
 export async function runningRunForJob(db: Db, jobId: string): Promise<Run | null> {
   const rows = await db.query<Run>(
     `SELECT * FROM ${db.table("runs")} WHERE jobId = ? AND state = 'running' LIMIT 1`,
@@ -173,7 +205,10 @@ export async function runningRunForJob(db: Db, jobId: string): Promise<Run | nul
   return rows[0] ?? null;
 }
 
-/** Runs this module thinks are still going and can ask the helper about. */
+/**
+ * Runs this module thinks are still going and can ask the helper about.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function runsAwaitingReconcile(db: Db): Promise<Run[]> {
   return db.query<Run>(
     `SELECT * FROM ${db.table("runs")} WHERE state = 'running' AND helperRunId IS NOT NULL`,
@@ -189,6 +224,7 @@ export type RunOutcome = {
   message: string | null;
 };
 
+/** REFS addons/backup-manager/module.ts */
 export async function finishRun(db: Db, id: string, outcome: RunOutcome): Promise<void> {
   await db.run(
     `UPDATE ${db.table("runs")}
@@ -200,12 +236,18 @@ export async function finishRun(db: Db, id: string, outcome: RunOutcome): Promis
   );
 }
 
-/** Retention is applied after the copy, so its count lands on the run separately. */
+/**
+ * Retention is applied after the copy, so its count lands on the run separately.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function recordPruned(db: Db, id: string, prunedCount: number): Promise<void> {
   await db.run(`UPDATE ${db.table("runs")} SET prunedCount = ? WHERE id = ?`, prunedCount, id);
 }
 
-/** When this job last finished successfully — the basis of the "nothing has run" alert. */
+/**
+ * When this job last finished successfully — the basis of the "nothing has run" alert.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function lastSuccessAt(db: Db, jobId: string): Promise<string | null> {
   const rows = await db.query<{ startedAt: string }>(
     `SELECT startedAt FROM ${db.table("runs")}
@@ -215,7 +257,10 @@ export async function lastSuccessAt(db: Db, jobId: string): Promise<string | nul
   return rows[0]?.startedAt ?? null;
 }
 
-/** Stops a permanently broken job emailing on every tick. */
+/**
+ * Stops a permanently broken job emailing on every tick.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function markNotified(db: Db, jobId: string): Promise<void> {
   await db.run(
     `UPDATE ${db.table("jobs")} SET lastNotifiedAt = ? WHERE id = ?`,
@@ -223,7 +268,10 @@ export async function markNotified(db: Db, jobId: string): Promise<void> {
   );
 }
 
-/** A run ended. Track the streak, because it decides both retries and alert wording. */
+/**
+ * A run ended. Track the streak, because it decides both retries and alert wording.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function recordOutcome(db: Db, jobId: string, ok: boolean): Promise<number> {
   if (ok) {
     await db.run(`UPDATE ${db.table("jobs")} SET consecutiveFailures = 0 WHERE id = ?`, jobId);
@@ -252,6 +300,7 @@ export async function recordOutcome(db: Db, jobId: string, ok: boolean): Promise
  */
 export const DEFAULT_CONCURRENCY = 1;
 
+/** REFS addons/backup-manager/module.ts · addons/backup-manager/ui/settings-panel.tsx */
 export async function getConcurrency(db: Db): Promise<number> {
   const rows = await db.query<{ value: string }>(
     `SELECT value FROM ${db.table("settings")} WHERE key = 'concurrency'`,
@@ -262,6 +311,7 @@ export async function getConcurrency(db: Db): Promise<number> {
   return Number.isFinite(n) && n >= 1 ? Math.min(16, Math.trunc(n)) : DEFAULT_CONCURRENCY;
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export async function setConcurrency(db: Db, n: number): Promise<number> {
   const safe = Number.isFinite(n) && n >= 1 ? Math.min(16, Math.trunc(n)) : DEFAULT_CONCURRENCY;
   await db.run(
@@ -272,7 +322,10 @@ export async function setConcurrency(db: Db, n: number): Promise<number> {
   return safe;
 }
 
-/** Where the weekly summary goes. Empty = don't send one. */
+/**
+ * Where the weekly summary goes. Empty = don't send one.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/ui/settings-panel.tsx
+ */
 export async function getDigestEmail(db: Db): Promise<string> {
   const rows = await db.query<{ value: string }>(
     `SELECT value FROM ${db.table("settings")} WHERE key = 'digestEmail'`,
@@ -280,6 +333,7 @@ export async function getDigestEmail(db: Db): Promise<string> {
   return String(rows[0]?.value ?? "").trim();
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export async function setDigestEmail(db: Db, email: string): Promise<void> {
   await db.run(
     `INSERT INTO ${db.table("settings")} (key, value) VALUES ('digestEmail', ?)
@@ -288,7 +342,10 @@ export async function setDigestEmail(db: Db, email: string): Promise<void> {
   );
 }
 
-/** When the last summary went out, so one goes weekly rather than on every tick. */
+/**
+ * When the last summary went out, so one goes weekly rather than on every tick.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function getDigestSentAt(db: Db): Promise<string | null> {
   const rows = await db.query<{ value: string }>(
     `SELECT value FROM ${db.table("settings")} WHERE key = 'digestSentAt'`,
@@ -296,6 +353,7 @@ export async function getDigestSentAt(db: Db): Promise<string | null> {
   return rows[0]?.value ?? null;
 }
 
+/** REFS addons/backup-manager/module.ts */
 export async function markDigestSent(db: Db): Promise<void> {
   await db.run(
     `INSERT INTO ${db.table("settings")} (key, value) VALUES ('digestSentAt', ?)
@@ -304,7 +362,10 @@ export async function markDigestSent(db: Db): Promise<void> {
   );
 }
 
-/** Per-job totals over a window, for the weekly summary. */
+/**
+ * Per-job totals over a window, for the weekly summary.
+ * REFS addons/backup-manager/module.ts
+ */
 export async function digestLines(db: Db, sinceIso: string) {
   return db.query<Record<string, unknown>>(
     `SELECT j.name AS name,
@@ -321,21 +382,29 @@ export async function digestLines(db: Db, sinceIso: string) {
   );
 }
 
-/** Turn every job on or off in one go — for "we're moving the NAS this weekend". */
+/**
+ * Turn every job on or off in one go — for "we're moving the NAS this weekend".
+ * REFS addons/backup-manager/actions.ts
+ */
 export async function setAllEnabled(db: Db, enabled: boolean): Promise<void> {
   await db.run(`UPDATE ${db.table("jobs")} SET enabled = ?`, enabled ? 1 : 0);
 }
 
+/** REFS addons/backup-manager/page.tsx */
 export async function recentRuns(db: Db, limit = 25): Promise<Run[]> {
   return db.query<Run>(`SELECT * FROM ${db.table("runs")} ORDER BY startedAt DESC LIMIT ?`, limit);
 }
 
+/** REFS addons/backup-manager/actions.ts */
 export async function getRun(db: Db, id: string): Promise<Run | null> {
   const rows = await db.query<Run>(`SELECT * FROM ${db.table("runs")} WHERE id = ?`, id);
   return rows[0] ?? null;
 }
 
-/** One job's own history, for its detail page. */
+/**
+ * One job's own history, for its detail page.
+ * REFS addons/backup-manager/ui/job-detail.tsx
+ */
 export async function runsForJob(db: Db, jobId: string, limit = 50): Promise<Run[]> {
   return db.query<Run>(
     `SELECT * FROM ${db.table("runs")} WHERE jobId = ? ORDER BY startedAt DESC LIMIT ?`,
@@ -350,6 +419,8 @@ export async function runsForJob(db: Db, jobId: string, limit = 50): Promise<Run
  * The dashboard widget asks this on every render, which is why the runs table carries an
  * index on `state` — without it this is a full scan of every run ever recorded, on a query
  * that runs whenever anybody looks at their dashboard.
+ * REFS addons/backup-manager/module.ts · addons/backup-manager/page.tsx ·
+ *      addons/backup-manager/ui/widget.tsx
  */
 export async function runningRuns(db: Db): Promise<Run[]> {
   return db.query<Run>(`SELECT * FROM ${db.table("runs")} WHERE state = 'running' ORDER BY startedAt`);
@@ -364,6 +435,7 @@ export type JobStats = {
   lastSuccessAt: string | null;
 };
 
+/** REFS addons/backup-manager/ui/job-detail.tsx */
 export async function statsForJob(db: Db, jobId: string): Promise<JobStats> {
   const rows = await db.query<Record<string, unknown>>(
     `SELECT
@@ -384,6 +456,7 @@ export async function statsForJob(db: Db, jobId: string): Promise<JobStats> {
   };
 }
 
+/** REFS addons/backup-manager/page.tsx · addons/backup-manager/ui/widget.tsx */
 export async function lastRunFor(db: Db, jobId: string): Promise<Run | null> {
   const rows = await db.query<Run>(
     `SELECT * FROM ${db.table("runs")} WHERE jobId = ? ORDER BY startedAt DESC LIMIT 1`,
@@ -395,6 +468,7 @@ export async function lastRunFor(db: Db, jobId: string): Promise<Run | null> {
 /**
  * A run left `running` with no finish time can only be one thing: the server stopped
  * mid-copy. It must never be reported as a good backup.
+ * REFS addons/backup-manager/module.ts
  */
 export async function reconcileInterrupted(db: Db): Promise<number> {
   const rows = await db.query<{ n: unknown }>(

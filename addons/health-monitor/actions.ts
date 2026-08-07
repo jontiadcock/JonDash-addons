@@ -20,7 +20,7 @@ import {
 import { monitorConfigFrom, parseChannelForm, parseMonitorForm, slugify, uniqueId } from "./lib/forms";
 import { checkMonitor } from "./lib/engine";
 import { importConfigJson } from "./lib/config";
-import { readSettings } from "./lib/settings";
+import { readSettings, SETTING_FIELDS } from "./lib/settings";
 import { sendAlert } from "./lib/notify";
 import { catchUp } from "./lib/scheduler";
 
@@ -37,7 +37,10 @@ import { catchUp } from "./lib/scheduler";
  * error screen.
  */
 
-/** Save a new monitor, or update an existing one when `id` is present. */
+/**
+ * Save a new monitor, or update an existing one when `id` is present.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export const saveMonitorAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {
@@ -92,6 +95,7 @@ export const saveMonitorAction = moduleAction(
   },
 );
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export const deleteMonitorAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {
@@ -109,7 +113,10 @@ export const deleteMonitorAction = moduleAction(
   },
 );
 
-/** Run one monitor's check immediately and report what came back. */
+/**
+ * Run one monitor's check immediately and report what came back.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export const checkNowAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {
@@ -132,6 +139,7 @@ export const checkNowAction = moduleAction(
   },
 );
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export const saveChannelAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {
@@ -160,6 +168,7 @@ export const saveChannelAction = moduleAction(
   },
 );
 
+/** REFS addons/health-monitor/ui/settings-panel.tsx */
 export const deleteChannelAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {
@@ -176,7 +185,46 @@ export const deleteChannelAction = moduleAction(
   },
 );
 
-/** Apply whatever is in the bulk-import box. Adds and updates only — never deletes. */
+/**
+ * Save the module's own settings, which the framework used to render above the panel.
+ *
+ * ⚠ Keys come from `SETTING_FIELDS` itself, never written out by hand. They address the same
+ * store the framework form used, so an upgrade keeps every value — and a hand-typed key that
+ * drifted from the declaration would silently reset somebody's tuning to a default.
+ *
+ * REFS addons/health-monitor/lib/settings.ts › SETTING_FIELDS — the single declaration
+ *      addons/health-monitor/ui/settings-panel.tsx › AdvancedSettings() — same list
+ */
+export const saveSettingsAction = moduleAction(
+  MODULE_ID,
+  async (ctx, fd: FormData): Promise<ActionResult> => {
+    for (const field of SETTING_FIELDS) {
+      const raw = fd.get(field.key);
+      if (field.type === "boolean") {
+        // An unticked checkbox sends nothing at all, so absence is "off" — not "unchanged".
+        await ctx.settings.set(field.key, raw === "on");
+        continue;
+      }
+      if (raw === null) continue;
+      const text = String(raw).trim();
+      if (field.type === "number") {
+        const n = Number(text);
+        if (text === "" || !Number.isFinite(n)) continue;
+        await ctx.settings.set(field.key, n);
+        continue;
+      }
+      await ctx.settings.set(field.key, text);
+    }
+    revalidatePath(ADMIN_PATH);
+    revalidatePath(MODULE_PATH);
+    return { ok: true, message: "Settings saved." };
+  },
+);
+
+/**
+ * Apply whatever is in the bulk-import box. Adds and updates only — never deletes.
+ * REFS addons/health-monitor/ui/settings-panel.tsx — the bulk-import block
+ */
 export const importConfigAction = moduleAction(MODULE_ID, async (ctx): Promise<ActionResult> => {
   const outcome = await importConfigJson(ctx);
   revalidatePath(ADMIN_PATH);
@@ -188,7 +236,10 @@ export const importConfigAction = moduleAction(MODULE_ID, async (ctx): Promise<A
   };
 });
 
-/** Send a test alert, so a channel can be proven before an outage depends on it. */
+/**
+ * Send a test alert, so a channel can be proven before an outage depends on it.
+ * REFS addons/health-monitor/ui/settings-panel.tsx
+ */
 export const testChannelAction = moduleAction(
   MODULE_ID,
   async (ctx, formData: FormData): Promise<ActionResult> => {

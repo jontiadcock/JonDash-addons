@@ -3,24 +3,20 @@ import { contains, isFilesystemRoot } from "./paths";
 
 /**
  * Warnings about a chosen folder — what else is in there that the admin may not have
- * pictured.
+ * pictured. Exists because the helper stopped refusing broad locations: excluding JonDash's
+ * own secrets (`secrets.ts`) makes a root safe for *JonDash*, and says nothing about the
+ * rest of the disk — backing up `C:\` also carries browser password stores, SSH keys and
+ * every other profile's credential caches onto the destination.
  *
- * This exists because the helper stopped refusing broad locations. Excluding JonDash's own
- * secrets (see `secrets.ts`) makes it safe for *JonDash*, and says nothing about the rest
- * of the disk. Backing up `C:\` to a network share also carries browser password stores,
- * SSH keys, credential caches and every other profile on the machine — none of which this
- * helper knows how to protect, and all of which end up on the NAS.
+ * Allow it, and say plainly what it means: a refusal the admin cannot override teaches them
+ * to work around the tool, a warning they must read leaves them in charge with eyes open.
  *
- * So: allow it, and say plainly what it means. A refusal the admin cannot override
- * teaches them to work around the tool; a warning they must read and accept leaves them
- * in charge with their eyes open.
- *
- * Purely textual. No I/O, no throwing — it must be safe to call while rendering a form on
- * every keystroke.
+ * Purely textual — no I/O, no throwing, safe to call on every keystroke while rendering a form.
  */
 
 export type RiskLevel = "none" | "caution" | "high";
 
+/** REFS helpers/filesystem/api.ts */
 export type RootRisk = {
   level: RiskLevel;
   /** One line for the top of a warning box. Empty when level is "none". */
@@ -56,10 +52,11 @@ function systemRoots(): string[] {
 }
 
 /**
- * What an admin should know before backing this folder up.
+ * What an admin should know before backing this folder up. `p` must already be canonical
+ * (see `canonicalise`), so comparisons are segment-aware and casing has been settled.
  *
- * `p` must already be canonical (see `canonicalise`), so comparisons are segment-aware and
- * casing has been settled.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/admin.ts ·
+ *      helpers/filesystem/lib/scopes.ts · helpers/filesystem/tests/risk.test.ts
  */
 export function assessRoot(p: string, installDir = process.cwd()): RootRisk {
   const reasons: string[] = [];
@@ -121,7 +118,11 @@ export function assessRoot(p: string, installDir = process.cwd()): RootRisk {
   };
 }
 
-/** A short, stable summary for storing alongside a root and showing in a log header. */
+/**
+ * A short, stable summary for storing alongside a root and showing in a log header.
+ * REFS helpers/filesystem/api.ts · helpers/filesystem/lib/admin.ts ·
+ *      helpers/filesystem/tests/risk.test.ts
+ */
 export function riskSummary(r: RootRisk): string {
   return r.level === "none" ? "" : `${r.level}: ${r.reasons.join(" ")}`;
 }
